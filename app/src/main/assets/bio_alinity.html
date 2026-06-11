@@ -669,18 +669,21 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
       <div class="entry-block">
         <div class="entry-block-header">&#128230; Pregled BK (zaloga)</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn btn-g btn-sm" onclick="msDownload('pregledBK_db')">&#8595; Prenesi</button>
-          <button class="btn btn-g btn-sm" onclick="msUpload('pregledBK_db')">&#8593; Nalo&#382;i</button>
+          <button class="btn btn-g btn-sm" onclick="msDownload('pregledBK_db')">&#8595; OneDrive prenesi</button>
+          <button class="btn btn-g btn-sm" onclick="msUpload('pregledBK_db')">&#8593; OneDrive nalo&#382;i</button>
+          <button class="btn btn-teal btn-sm" onclick="quickShareDb('pregledBK_db')">&#128229; Quick Share</button>
         </div>
       </div>
       <div class="entry-block">
         <div class="entry-block-header">&#129516; QC Lab (qclab_v2)</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn btn-g btn-sm" onclick="msDownload('qclab_v2')">&#8595; Prenesi</button>
-          <button class="btn btn-g btn-sm" onclick="msUpload('qclab_v2')">&#8593; Nalo&#382;i</button>
+          <button class="btn btn-g btn-sm" onclick="msDownload('qclab_v2')">&#8595; OneDrive prenesi</button>
+          <button class="btn btn-g btn-sm" onclick="msUpload('qclab_v2')">&#8593; OneDrive nalo&#382;i</button>
+          <button class="btn btn-teal btn-sm" onclick="quickShareDb('qclab_v2')">&#128229; Quick Share</button>
         </div>
       </div>
     </div>
+    <div class="disabled-note" style="margin-top:12px;border-style:solid;border-color:var(--abbott-teal)">&#128229; <b>Quick Share</b> deli podatke neposredno z bli&#382;njo napravo (Samsung/Android) brez OneDrive. Na drugi napravi sprejmite datoteko in BIO/Pregled BK aplikacija jo samodejno uvozi (zdru&#382;i).</div>
     <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn btn-blue btn-sm" id="msSignBtn" onclick="msSignIn()">Prijava OneDrive</button>
       <button class="btn btn-d btn-sm" onclick="msSignOut()">Odjava</button>
@@ -1423,6 +1426,31 @@ function msSignIn(){if(!_hasBridge()){notify('Samo na napravi','warn');return;}t
 function msSignOut(){if(!_hasBridge()){notify('Samo na napravi','warn');return;}try{AndroidBridge.msSignOut();}catch(e){}}
 function msUpload(key){if(!_hasBridge()){notify('Samo na napravi','warn');return;}try{const data=key==='qclab_v2'?JSON.stringify(S):JSON.stringify(DB_PREGLED);notify('Nalagam '+key+'…','ok');AndroidBridge.msUpload(key,data);}catch(e){notify('Napaka nalaganja','err');}}
 function msDownload(key){if(!_hasBridge()){notify('Samo na napravi','warn');return;}try{notify('Prena&#353;am '+key+'…','ok');AndroidBridge.msDownload(key);}catch(e){notify('Napaka prenosa','err');}}
+/* ---- Quick Share (Nearby) ---- */
+function quickShareDb(key){
+  const data=key==='qclab_v2'?JSON.stringify(S):JSON.stringify(DB_PREGLED);
+  if(_hasBridge()&&AndroidBridge.quickShare){
+    try{AndroidBridge.quickShare(key+'.json',data);notify('Odpiram Quick Share…','ok');}
+    catch(e){notify('Napaka Quick Share','err');}
+  }else{
+    /* brskalnik: fallback na prenos datoteke */
+    try{const blob=new Blob([data],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=key+'.json';a.click();notify('Quick Share je na voljo na napravi; tu prene&#353;eno kot datoteka','warn');}catch(e){notify('Napaka','err');}
+  }
+}
+function onQuickShareError(msg){notify(msg||'Napaka Quick Share','err');}
+/* Sprejem deljene datoteke (iz Quick Share / odprtja .json) */
+function onSharedImport(filename,json){
+  if(!json){notify('Prazna deljena datoteka','warn');return;}
+  let obj;try{obj=JSON.parse(json);}catch(e){notify('Neveljaven JSON','err');return;}
+  let key=null;const fn=(filename||'').toLowerCase();
+  if(fn.includes('qclab'))key='qclab_v2';
+  else if(fn.includes('pregledbk')||fn.includes('pregled_bk'))key='pregledBK_db';
+  else if(obj.qcEntries||obj.assays||obj.operators||obj.qcMaterials)key='qclab_v2';
+  else if(obj.inventory||obj.gtins)key='pregledBK_db';
+  if(!key){notify('Neznana vrsta deljenih podatkov','warn');return;}
+  if(key==='qclab_v2'){Object.assign(S,obj);save();initState();navMain('qc');navQc(currentQc||'dashboard');notify('Quick Share: QC podatki uvo&#382;eni ✓','success');}
+  else{DB_PREGLED=mergePregledDB(obj);savePregledDB();navMain('zaloga');notify('Quick Share: zaloga uvo&#382;ena ✓','success');}
+}
 /* Callbacks from Android */
 function onMsDeviceCode(userCode,verUri,message){notify('Koda: '+userCode+' na '+(verUri||'microsoft.com/devicelogin'),'ok');}
 function onMsSignedIn(account){notify('Prijavljen: '+(account||'OneDrive'),'ok');refreshSyncUI();}
