@@ -190,10 +190,20 @@ public class MainActivity extends AppCompatActivity {
 
         @JavascriptInterface
         public String getDeviceInfo() {
+            String verName = "?";
+            long verCode = 0;
+            try {
+                android.content.pm.PackageInfo pi =
+                    getPackageManager().getPackageInfo(getPackageName(), 0);
+                verName = pi.versionName;
+                verCode = (Build.VERSION.SDK_INT >= 28) ? pi.getLongVersionCode() : pi.versionCode;
+            } catch (Exception ignored) {}
             return "{\"model\":\"" + Build.MODEL + "\"," +
                     "\"manufacturer\":\"" + Build.MANUFACTURER + "\"," +
                     "\"sdk\":" + Build.VERSION.SDK_INT + "," +
-                    "\"release\":\"" + Build.VERSION.RELEASE + "\"}";
+                    "\"release\":\"" + Build.VERSION.RELEASE + "\"," +
+                    "\"appVersion\":" + JSONObject.quote(verName) + "," +
+                    "\"appBuild\":" + verCode + "}";
         }
 
         // ---- OneDrive / Microsoft Graph (placeholder) ----

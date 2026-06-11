@@ -10,8 +10,13 @@ android {
         applicationId "si.kclj.bioalinity"
         minSdk 26
         targetSdk 34
-        versionCode 1
-        versionName "1.0.0"
+        // Build se samodejno oštevilči v CI (GitHub Actions): run number + kratki SHA.
+        // Lokalno (brez CI) ostane 1 / 1.0.0-local.
+        def runNum = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInteger()
+        def sha = (System.getenv("GITHUB_SHA") ?: "local")
+        def shortSha = sha.length() >= 7 ? sha.substring(0, 7) : sha
+        versionCode runNum
+        versionName "1.0." + runNum + " (" + shortSha + ")"
     }
 
     compileOptions {
