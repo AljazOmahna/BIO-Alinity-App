@@ -1,0 +1,1355 @@
+<!DOCTYPE html>
+<html lang="sl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#002060">
+<title>BIO Alinity App</title>
+<style>
+:root{
+  --bg:#f0f4fb;--bg2:#ffffff;--bg3:#e4edf8;
+  --border:#c5d5ed;--border2:#8aaad8;
+  --text:#002060;--text2:#1a4a9e;--text3:#6080a8;
+  --accent:#84BD00;--accent2:#5f8c00;
+  --green:#84BD00;--gbg:rgba(132,189,0,.15);
+  --yellow:#b07800;--ybg:rgba(176,120,0,.13);
+  --orange:#c85000;--obg:rgba(200,80,0,.12);
+  --red:#c02020;--rbg:rgba(192,32,32,.12);
+  --purple:#C8007A;--pbg:rgba(200,0,122,.13);
+  --abbott-blue:#003087;--abbott-teal:#00a3ad;
+  --success:#059669;--warning:#d97706;--danger:#dc2626;
+  --mono:ui-monospace,monospace;--sans:system-ui,-apple-system,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;font-family:var(--sans);background:var(--bg);color:var(--text);font-size:14px}
+body{overflow:hidden}
+
+/* HEADER */
+.hdr{height:52px;background:#002060;border-bottom:3px solid transparent;
+  border-image:linear-gradient(to right,var(--green),var(--purple)) 1;
+  display:flex;align-items:center;padding:0 14px;gap:12px;flex-shrink:0}
+.hdr-logo{font-family:var(--mono);font-size:17px;font-weight:800;color:#fff;letter-spacing:.5px}
+.hdr-sub{font-size:11px;color:rgba(255,255,255,.55)}
+.hdr-spacer{flex:1}
+.hdr-stat{text-align:center;min-width:42px}
+.hdr-stat-num{font-family:var(--mono);font-size:17px;font-weight:700;color:var(--green)}
+.hdr-stat-lbl{font-size:8px;color:rgba(255,255,255,.45);text-transform:uppercase;letter-spacing:.5px}
+.hdr-sync{display:flex;align-items:center;gap:5px;background:rgba(255,255,255,.1);
+  border:1px solid rgba(255,255,255,.2);color:#fff;padding:6px 12px;border-radius:7px;
+  font-size:12px;font-weight:600;cursor:pointer;margin-left:6px}
+.hdr-sync.on{background:var(--gbg);border-color:var(--green);color:var(--green)}
+
+/* BODY */
+.app-body{height:calc(100% - 52px - 58px);overflow:hidden;position:relative}
+.main{height:100%;overflow-y:auto;padding:14px 18px;-webkit-overflow-scrolling:touch}
+.page-main{display:none}.page-main.active{display:block}
+.qc-page{display:none}.qc-page.active{display:block}
+
+/* BOTTOM NAV */
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;height:58px;background:#002060;
+  border-top:2px solid transparent;border-image:linear-gradient(to right,var(--green),var(--purple)) 1;
+  display:flex;z-index:50}
+.bn-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  cursor:pointer;font-size:10px;color:rgba(255,255,255,.45);gap:3px;
+  border-top:2px solid transparent;transition:all .15s;user-select:none}
+.bn-item.active{color:var(--green);border-top-color:var(--green)}
+.bn-icon{font-size:20px;line-height:1}
+
+/* CARDS */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:12px}
+.card-title{font-size:13px;font-weight:700;letter-spacing:.4px;color:var(--text2);margin-bottom:12px;
+  display:flex;align-items:center;gap:8px;justify-content:space-between;flex-wrap:wrap}
+
+/* SECTION HEADER */
+.sec-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px}
+.sec-title{font-size:18px;font-weight:700;color:var(--text)}
+
+/* STAT GRID */
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px}
+.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center}
+.stat-num{font-family:var(--mono);font-size:26px;font-weight:700}
+.stat-lbl{font-size:10px;color:var(--text3);text-transform:uppercase;margin-top:3px;letter-spacing:.5px}
+
+/* BADGES */
+.badge{display:inline-flex;align-items:center;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700}
+.b-ok,.badge-ok{background:var(--gbg);color:var(--green)}
+.b-exp,.badge-3sd{background:var(--rbg);color:var(--red)}
+.b-14{background:var(--obg);color:var(--orange)}
+.b-28,.badge-2sd{background:var(--ybg);color:var(--yellow)}
+.b-cal,.badge-blue{background:rgba(0,48,135,.1);color:var(--abbott-blue)}
+.b-ctrl{background:var(--pbg);color:var(--purple)}
+.b-gray,.badge-gray{background:rgba(100,116,139,.18);color:var(--text2)}
+
+/* TABLES */
+.tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{background:var(--bg3);color:var(--text3);padding:9px 10px;text-align:left;
+  font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border)}
+td{padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr.r-exp td{background:rgba(192,32,32,.05)}
+tr.r-14 td{background:rgba(200,80,0,.05)}
+tr.r-28 td{background:rgba(176,120,0,.05)}
+.gtin{font-family:var(--mono);font-size:10px;color:var(--text3)}
+.lot-n{font-family:var(--mono);font-size:11px;color:var(--accent2);font-weight:600}
+
+/* FILTER ROW */
+.fr{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
+.fr input,.fr select{background:var(--bg3);border:1px solid var(--border);color:var(--text);
+  padding:8px 10px;border-radius:7px;font-size:14px;outline:none;flex:1;min-width:130px}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 15px;border-radius:7px;
+  font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all .12s;min-height:40px}
+.btn:active{opacity:.85;transform:scale(.98)}
+.btn-a{background:var(--accent2);color:#fff}
+.btn-teal{background:var(--abbott-teal);color:#fff}
+.btn-blue{background:var(--abbott-blue);color:#fff}
+.btn-g{background:var(--bg3);color:var(--text2);border:1px solid var(--border)}
+.btn-d{background:var(--rbg);color:var(--red);border:1px solid rgba(192,32,32,.3)}
+.btn-outline{background:var(--bg2);color:var(--abbott-blue);border:1px solid var(--abbott-blue)}
+.btn-sm{padding:6px 11px;font-size:12px;min-height:34px}
+.btn[disabled]{opacity:.45;cursor:not-allowed;filter:grayscale(.6)}
+
+/* FORM */
+.fg{margin-bottom:12px}
+.fg label{display:block;font-size:10px;font-weight:700;text-transform:uppercase;color:var(--text3);margin-bottom:5px;letter-spacing:.5px}
+.fg input,.fg select,.fg textarea{width:100%;background:var(--bg3);border:1px solid var(--border);
+  color:var(--text);padding:10px;border-radius:7px;font-size:16px;outline:none;font-family:var(--sans)}
+.fg textarea{resize:vertical;min-height:60px;font-size:14px}
+.frow{display:flex;gap:10px;flex-wrap:wrap}
+.frow .fg{flex:1;min-width:130px}
+
+/* SUB TABS */
+.tabs{display:flex;gap:5px;margin-bottom:14px;flex-wrap:wrap}
+.tab{padding:8px 14px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;
+  border:1px solid var(--border);background:var(--bg3);color:var(--text2);min-height:36px;
+  display:flex;align-items:center;gap:5px;white-space:nowrap}
+.tab.active{background:var(--gbg);border-color:var(--accent);color:var(--accent2)}
+.qc-subnav{display:flex;gap:5px;margin-bottom:14px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch}
+.qc-subnav .tab{flex-shrink:0}
+
+/* ALERT STRIP */
+.alert-strip{background:var(--rbg);border:1px solid rgba(192,32,32,.3);border-radius:9px;
+  padding:11px 14px;margin-bottom:12px;font-size:13px;color:var(--red);font-weight:600;display:none}
+.alert-strip.show{display:block}
+
+/* EXPIRY GROUP */
+.exp-group{margin-bottom:16px}
+.exp-group-hdr{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;
+  padding:7px 0;margin-bottom:8px;border-bottom:2px solid var(--border)}
+.exp-item{display:flex;align-items:center;gap:12px;padding:11px 12px;background:var(--bg2);
+  border:1px solid var(--border);border-radius:9px;margin-bottom:7px}
+.exp-item-main{flex:1;min-width:0}
+.exp-item-name{font-weight:600;font-size:14px}
+.exp-item-sub{font-size:11px;color:var(--text3);margin-top:2px}
+
+/* PRODUCT CARD (Loti) */
+.prod-card{border:1px solid var(--border);border-radius:10px;margin-bottom:10px;background:var(--bg2);overflow:hidden}
+.prod-card-hdr{padding:13px 15px;cursor:pointer;display:flex;align-items:center;gap:10px;background:var(--bg3)}
+.prod-card-hdr:active{opacity:.85}
+.prod-card-name{flex:1;font-weight:700;font-size:14px}
+.prod-card-body{padding:6px 15px 12px;display:none}
+.prod-card.open .prod-card-body{display:block}
+.lot-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)}
+.lot-row:last-child{border-bottom:none}
+
+/* DETAIL SHEET / MODAL */
+.mo{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;display:none;
+  align-items:center;justify-content:center;padding:20px}
+.mo.open{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--border);border-radius:14px;
+  width:100%;max-width:600px;max-height:88vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+.mh{padding:16px 18px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.mh h3{font-size:16px;font-weight:700;color:var(--text2)}
+.mc{background:none;border:none;cursor:pointer;color:var(--text3);font-size:22px;padding:4px;line-height:1}
+.mb{padding:16px 18px}
+.mf{padding:12px 18px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+
+/* NOTIF */
+.notif{position:fixed;bottom:70px;left:50%;transform:translateX(-50%) translateY(20px);
+  background:#002060;border:1px solid var(--border2);color:#fff;padding:11px 20px;border-radius:22px;
+  font-size:13px;font-weight:600;box-shadow:0 4px 20px rgba(0,32,96,.3);z-index:300;opacity:0;
+  transition:all .25s;white-space:nowrap;max-width:90vw;text-align:center}
+.notif.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.notif.ok,.notif.success{border-color:var(--green);color:var(--green)}
+.notif.err,.notif.error{border-color:var(--red);color:var(--red)}
+.notif.warn,.notif.warning{border-color:var(--yellow);color:var(--yellow)}
+
+/* INSTRUMENT MAP */
+.instrument-map{display:flex;flex-direction:column;gap:10px;margin-bottom:12px}
+.integration-block{border:2px solid var(--abbott-blue);border-radius:12px;padding:14px 18px;
+  display:flex;align-items:center;gap:18px;background:rgba(0,48,135,.03);flex-wrap:wrap}
+.integration-label{font-size:13px;font-weight:700;color:var(--abbott-blue);text-transform:uppercase;letter-spacing:1px;min-width:100px}
+.instruments{display:flex;gap:8px;align-items:center;flex:1}
+.instr-box{width:72px;height:72px;border-radius:10px;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;font-weight:700;cursor:pointer;transition:all .15s;
+  position:relative;box-shadow:0 2px 6px rgba(0,0,0,.12);color:#fff}
+.instr-box:active{transform:scale(.96)}
+.instr-c{background:linear-gradient(135deg,var(--abbott-blue),#1565c0)}
+.instr-i{background:linear-gradient(135deg,var(--abbott-teal),#007a82)}
+.instr-label-small{font-size:10px;font-weight:500;opacity:.85;margin-top:2px}
+.instr-id-label{font-size:9px;font-weight:400;opacity:.7}
+.instr-status{position:absolute;top:-4px;right:-4px;width:13px;height:13px;border-radius:50%;border:2px solid #fff;background:var(--success)}
+.instr-divider{width:2px;height:46px;background:var(--border);border-radius:2px}
+
+/* WIZARD */
+.wizard-steps{display:flex;gap:4px;margin-bottom:18px}
+.wizard-dot{flex:1;height:5px;border-radius:3px;background:var(--border);transition:background .2s}
+.wizard-dot.done{background:var(--abbott-teal)}
+.wizard-dot.active{background:var(--abbott-blue)}
+.wizard-step{display:none}.wizard-step.active{display:block}
+
+.entry-block{background:rgba(0,48,135,.04);border:1px solid var(--border);border-radius:9px;padding:13px;margin-bottom:10px}
+.entry-block-header{font-weight:600;font-size:13px;color:var(--abbott-blue);margin-bottom:9px;
+  display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px}
+
+.level-pill{padding:8px 17px;border-radius:22px;border:2px solid var(--border);cursor:pointer;
+  font-size:13px;font-weight:600;transition:all .15s;background:var(--bg2);color:var(--text2);display:inline-block}
+.level-pill.selected-pill{background:var(--abbott-teal);border-color:var(--abbott-teal);color:#fff}
+
+.sd-row{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;flex:1;min-width:240px}
+.sd-btn{padding:9px 4px;border-radius:7px;text-align:center;border:2px solid var(--border);
+  cursor:pointer;font-size:12px;font-weight:700;transition:all .15s;background:var(--bg2)}
+.sd-btn.minus-3,.sd-btn.plus-3{border-color:var(--danger);color:var(--danger)}
+.sd-btn.minus-2,.sd-btn.plus-2{border-color:var(--warning);color:#b45309}
+.sd-btn.selected.minus-3,.sd-btn.selected.plus-3{background:var(--danger);color:#fff}
+.sd-btn.selected.minus-2,.sd-btn.selected.plus-2{background:var(--warning);color:#fff}
+
+.assay-pick-item{display:flex;align-items:center;gap:8px;padding:8px 11px;border-radius:8px;cursor:pointer;
+  border:1px solid var(--border);background:var(--bg2);margin-bottom:5px;transition:all .15s}
+.assay-pick-item.picked{background:rgba(0,163,173,.1);border-color:var(--abbott-teal)}
+.assay-pick-item input{accent-color:var(--abbott-teal);width:17px;height:17px;cursor:pointer}
+.assay-check{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:13px}
+.assay-check input{cursor:pointer;accent-color:var(--abbott-teal);width:16px;height:16px}
+
+/* PIN */
+.pin-display{display:flex;gap:9px;justify-content:center;margin:14px 0}
+.pin-dot{width:15px;height:15px;border-radius:50%;border:2px solid var(--abbott-blue);transition:background .15s}
+.pin-dot.filled{background:var(--abbott-blue)}
+.pin-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;max-width:230px;margin:0 auto}
+.pin-key{padding:15px;text-align:center;border-radius:9px;border:1px solid var(--border);cursor:pointer;
+  font-size:18px;font-weight:700;background:var(--bg2);color:var(--text);transition:all .1s;user-select:none}
+.pin-key:active{transform:scale(.95);background:var(--abbott-blue);color:#fff}
+
+/* CANVAS */
+.lj-canvas-wrap{position:relative;width:100%;background:#fafbfd;border-radius:8px;overflow:hidden}
+canvas{display:block;width:100%}
+
+/* TOGGLE */
+.toggle-wrap{display:flex;align-items:center;gap:8px}
+.toggle{position:relative;width:38px;height:21px;cursor:pointer}
+.toggle input{opacity:0;width:0;height:0}
+.toggle-slider{position:absolute;inset:0;background:var(--border);border-radius:11px;transition:.2s}
+.toggle-slider:before{content:'';position:absolute;width:15px;height:15px;border-radius:50%;background:#fff;left:3px;top:3px;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.toggle input:checked + .toggle-slider{background:var(--abbott-teal)}
+.toggle input:checked + .toggle-slider:before{transform:translateX(17px)}
+
+.qc-entry-item{background:var(--bg2);border:1px solid var(--border);border-radius:9px;padding:12px;
+  margin-bottom:8px;display:flex;align-items:flex-start;gap:11px}
+.qc-entry-icon{width:38px;height:38px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+.icon-ok{background:var(--gbg)}.icon-warn{background:var(--ybg)}.icon-fail{background:var(--rbg)}
+
+.muted{color:var(--text3)}
+.empty{color:var(--text3);text-align:center;padding:26px;font-size:14px}
+.disabled-note{background:var(--bg3);border:1px dashed var(--border2);border-radius:8px;padding:10px 13px;
+  font-size:12px;color:var(--text3);margin-bottom:8px;display:flex;align-items:center;gap:8px}
+
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* DARK MODE */
+body.dark{
+  --bg:#0f172a;--bg2:#1e293b;--bg3:#273449;--border:#334155;--border2:#4a6080;
+  --text:#e2e8f0;--text2:#cbd5e1;--text3:#94a3b8;
+  --accent:#84BD00;--accent2:#a3d900;--green:#84BD00;--gbg:rgba(132,189,0,.18);
+  --yellow:#fbbf24;--ybg:rgba(251,191,36,.13);--orange:#fb923c;--obg:rgba(251,146,60,.12);
+  --red:#f87171;--rbg:rgba(248,113,113,.12);--purple:#e879f9;--pbg:rgba(232,121,249,.13);
+  --abbott-blue:#4f8fd9;--abbott-teal:#2dd4bf;
+}
+body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="hdr">
+  <div>
+    <div class="hdr-logo">BIO ALINITY</div>
+    <div class="hdr-sub">Laboratorij BK &middot; Abbott Alinity</div>
+  </div>
+  <div class="hdr-spacer"></div>
+  <div class="hdr-stat"><div class="hdr-stat-num" id="hs-tot">0</div><div class="hdr-stat-lbl">Kos</div></div>
+  <div class="hdr-stat"><div class="hdr-stat-num" style="color:var(--red)" id="hs-exp">0</div><div class="hdr-stat-lbl">Exp</div></div>
+  <div class="hdr-stat"><div class="hdr-stat-num" style="color:var(--orange)" id="hs-14">0</div><div class="hdr-stat-lbl">14d</div></div>
+  <div class="hdr-sync" id="syncChip" onclick="openSyncModal()">&#9729; Sync</div>
+</header>
+
+<div class="app-body">
+<main class="main">
+
+<!-- ============ ZALOGA ============ -->
+<div class="page-main active" id="main-zaloga">
+  <div class="sec-hdr"><div class="sec-title">&#128230; Zaloga</div>
+    <span class="muted" style="font-size:12px">Samo za branje &middot; vir: Pregled BK</span></div>
+  <div class="fr">
+    <input id="zSearch" placeholder="&#128269; Naziv, lot, GTIN..." oninput="renderZaloga()">
+    <select id="zType" onchange="renderZaloga()">
+      <option value="">Vsi tipi</option>
+      <option value="reagent-bio">Reagent biokemija</option>
+      <option value="reagent-imuno">Reagent imunologija</option>
+      <option value="calibrator">Kalibrator</option>
+      <option value="control">Kontrola</option>
+      <option value="consumable">Potro&#353;ni material</option>
+    </select>
+    <select id="zSort" onchange="renderZaloga()">
+      <option value="expiry">Razvrsti: Rok</option>
+      <option value="name">Razvrsti: Naziv</option>
+      <option value="qty">Razvrsti: Koli&#269;ina</option>
+    </select>
+  </div>
+  <div class="card" style="padding:0">
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Naziv</th><th>Lot</th><th>Rok</th><th>Kos</th><th>Tip</th><th>Prejeto</th></tr></thead>
+      <tbody id="zalogaBody"></tbody>
+    </table></div>
+  </div>
+</div>
+
+<!-- ============ ROKI ============ -->
+<div class="page-main" id="main-roki">
+  <div class="sec-hdr"><div class="sec-title">&#128197; Roki uporabe</div>
+    <span class="muted" style="font-size:12px">Samo za branje</span></div>
+  <div class="alert-strip" id="rokiAlert" onclick="navMain('roki')"></div>
+  <div id="rokiBody"></div>
+</div>
+
+<!-- ============ LOTI ============ -->
+<div class="page-main" id="main-loti">
+  <div class="sec-hdr"><div class="sec-title">&#129514; Loti</div>
+    <span class="muted" style="font-size:12px">Samo za branje</span></div>
+  <div class="fr">
+    <input id="lotiSearch" placeholder="&#128269; Iskanje izdelka/lota..." oninput="renderLoti()">
+    <select id="lotiType" onchange="renderLoti()">
+      <option value="">Vsi tipi</option>
+      <option value="calibrator">Kalibrator</option>
+      <option value="control">Kontrola</option>
+      <option value="reagent-bio">Reagent biokemija</option>
+      <option value="reagent-imuno">Reagent imunologija</option>
+      <option value="consumable">Potro&#353;ni material</option>
+    </select>
+  </div>
+  <div id="lotiBody"></div>
+</div>
+
+<!-- ============ QC ============ -->
+<div class="page-main" id="main-qc">
+  <div class="qc-subnav" id="qcSubnav">
+    <div class="tab active" data-qc="dashboard" onclick="navQc('dashboard')">&#128202; Nadzor</div>
+    <div class="tab" data-qc="entry" onclick="navQc('entry')">&#9999;&#65039; Vnos QC</div>
+    <div class="tab" data-qc="review" onclick="navQc('review')">&#128269; Pregled</div>
+    <div class="tab" data-qc="lj" onclick="navQc('lj')">&#128200; L-J Graf</div>
+    <div class="tab" data-qc="ljmulti" onclick="navQc('ljmulti')">&#128201; Multi L-J</div>
+    <div class="tab" data-qc="assays" onclick="navQc('assays')">&#129514; Preiskave</div>
+    <div class="tab" data-qc="qcmaterials" onclick="navQc('qcmaterials')">&#129516; Materiali</div>
+    <div class="tab" data-qc="operators" onclick="navQc('operators')">&#128100; Operaterji</div>
+    <div class="tab" data-qc="maintenance" onclick="navQc('maintenance')">&#128295; Vzdr&#382;ev.</div>
+    <div class="tab" data-qc="maint-review" onclick="navQc('maint-review')">&#128197; Pregled vzd.</div>
+  </div>
+
+  <!-- QC DASHBOARD -->
+  <div class="page qc-page active" id="page-dashboard">
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-num" id="stat-today">0</div><div class="stat-lbl">QC danes</div></div>
+      <div class="stat-card"><div class="stat-num" id="stat-week">0</div><div class="stat-lbl">QC ta teden</div></div>
+      <div class="stat-card"><div class="stat-num" style="color:var(--warning)" id="stat-2sd">0</div><div class="stat-lbl">&plusmn;2SD izpadi</div></div>
+      <div class="stat-card"><div class="stat-num" style="color:var(--danger)" id="stat-3sd">0</div><div class="stat-lbl">&plusmn;3SD izpadi</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">&#128300; Instrumenti &ndash; 3 integracije Alinity</div>
+      <div class="instrument-map" id="instrumentMap"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">&#128336; Zadnji vnosi QC</div>
+      <div id="recentEntries"><div class="empty">Ni &#353;e vnosov.</div></div>
+    </div>
+  </div>
+
+  <!-- QC ENTRY -->
+  <div class="page qc-page" id="page-entry">
+    <div class="card">
+      <div class="wizard-steps">
+        <div class="wizard-dot active" id="wd0"></div><div class="wizard-dot" id="wd1"></div>
+        <div class="wizard-dot" id="wd2"></div><div class="wizard-dot" id="wd3"></div>
+        <div class="wizard-dot" id="wd4"></div><div class="wizard-dot" id="wd5"></div>
+      </div>
+
+      <!-- Step 0 -->
+      <div class="wizard-step active" id="ws0">
+        <div class="card-title">1. In&#353;trument in QC materiali</div>
+        <div class="frow">
+          <div class="fg"><label>In&#353;trument</label><select id="entryInstr" onchange="populateEntryQcMaterials()"></select></div>
+          <div class="fg"><label>Datum / &#269;as</label><input type="datetime-local" id="entryDateTime"></div>
+        </div>
+        <div class="fg"><label>QC materiali <button class="btn btn-g btn-sm" style="float:right;margin-top:-4px" onclick="selectAllQcMats(true)">&#10004; Vse</button></label>
+          <div id="qcMatCheckList" style="display:flex;flex-direction:column;gap:6px"></div></div>
+        <div style="text-align:right;margin-top:10px"><button class="btn btn-blue" onclick="wizardNext(0)">Naprej &rarr;</button></div>
+      </div>
+
+      <!-- Step 1 -->
+      <div class="wizard-step" id="ws1">
+        <div class="card-title">2. Nivoji</div>
+        <div id="levelPillsWrap"></div>
+        <div class="mf" style="border:none;padding:10px 0 0"><button class="btn btn-g" onclick="wizardNext(-2)">&larr; Nazaj</button><button class="btn btn-blue" onclick="wizardNext(1)">Naprej &rarr;</button></div>
+      </div>
+
+      <!-- Step 2 -->
+      <div class="wizard-step" id="ws2">
+        <div class="card-title">3. Preiskave</div>
+        <div id="assayPickWrap"></div>
+        <div class="mf" style="border:none;padding:10px 0 0"><button class="btn btn-g" onclick="wizardNext(-3)">&larr; Nazaj</button><button class="btn btn-blue" onclick="wizardNext(2)">Naprej &rarr;</button></div>
+      </div>
+
+      <!-- Step 3 -->
+      <div class="wizard-step" id="ws3">
+        <div class="card-title">4. Rezultati QC (izpadi)</div>
+        <div style="font-size:12px;color:var(--text3);margin-bottom:10px">Ozna&#269;ite samo preiskave, ki so izpadle. Neozna&#269;ene = znotraj meja (OK).</div>
+        <div id="sdValuesWrap"></div>
+        <div class="mf" style="border:none;padding:10px 0 0"><button class="btn btn-g" onclick="wizardNext(-4)">&larr; Nazaj</button><button class="btn btn-blue" onclick="wizardNext(3)">Naprej &rarr;</button></div>
+      </div>
+
+      <!-- Step 4 -->
+      <div class="wizard-step" id="ws4">
+        <div class="card-title">5. Zabele&#382;ke / ukrepi</div>
+        <div id="notesWrap"></div>
+        <div class="mf" style="border:none;padding:10px 0 0"><button class="btn btn-g" onclick="wizardNext(-5)">&larr; Nazaj</button><button class="btn btn-blue" onclick="wizardNext(4)">Naprej &rarr;</button></div>
+      </div>
+
+      <!-- Step 5 -->
+      <div class="wizard-step" id="ws5">
+        <div class="card-title">6. Potrditev operaterja</div>
+        <div style="font-size:13px;font-weight:600;color:var(--abbott-blue);text-align:center;margin-bottom:6px">Mati&#269;na &#353;tevilka operaterja</div>
+        <div class="pin-display"><div class="pin-dot" id="pd0"></div><div class="pin-dot" id="pd1"></div><div class="pin-dot" id="pd2"></div><div class="pin-dot" id="pd3"></div><div class="pin-dot" id="pd4"></div></div>
+        <div id="pinOperatorName" style="text-align:center;font-size:14px;font-weight:600;color:var(--abbott-teal);min-height:22px;margin-bottom:10px"></div>
+        <div class="pin-grid" id="pinGrid"></div>
+        <div style="text-align:center;margin-top:10px"><button class="btn btn-g btn-sm" onclick="clearPin()">Pobri&#353;i</button></div>
+        <div class="mf" style="border:none;padding:14px 0 0"><button class="btn btn-g" onclick="wizardNext(-1)">&larr; Nazaj</button><button class="btn btn-a" onclick="saveEntry()">&#10003; Shrani QC</button></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- QC REVIEW -->
+  <div class="page qc-page" id="page-review">
+    <div class="tabs" id="reviewTabs"><div class="tab active" onclick="setReviewTab('table')">Tabela</div><div class="tab" onclick="setReviewTab('summary')">Povzetek po preiskavah</div></div>
+    <div class="card" id="reviewSummaryCard" style="display:none"><div class="card-title">Povzetek izpadov po preiskavah</div><div id="reviewSummaryBody"></div></div>
+    <div class="card">
+      <div class="fr">
+        <select id="filterInstr" onchange="renderReview()"></select>
+        <select id="filterQcMat" onchange="renderReview()"></select>
+        <select id="filterAssay" onchange="renderReview()"></select>
+        <select id="filterResult" onchange="renderReview()"><option value="">Vsi rezultati</option><option value="ok">OK</option><option value="2sd">&plusmn;2SD</option><option value="3sd">&plusmn;3SD</option></select>
+        <input type="date" id="filterDateFrom" onchange="renderReview()">
+        <input type="date" id="filterDateTo" onchange="renderReview()">
+        <button class="btn btn-g btn-sm" onclick="exportCSV()">&#128190; CSV</button>
+      </div>
+      <div class="tbl-wrap"><table><thead><tr><th>Datum</th><th>In&#353;tr.</th><th>QC Material</th><th>Nivo</th><th>Preiskava</th><th>Rezultat</th><th>Opomba</th><th>Operater</th></tr></thead><tbody id="reviewBody"></tbody></table></div>
+    </div>
+  </div>
+
+  <!-- QC LJ -->
+  <div class="page qc-page" id="page-lj">
+    <div class="card">
+      <div class="fr">
+        <select id="ljQcMat" onchange="onLjQcMatChange()"></select>
+        <select id="ljAssay" onchange="renderLJ()"></select>
+        <select id="ljLevel" onchange="renderLJ()"><option value="L1">Nivo 1</option><option value="L2">Nivo 2</option></select>
+      </div>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:10px" id="ljRules"></div>
+      <div class="lj-canvas-wrap"><canvas id="ljCanvas" height="380"></canvas></div>
+      <div id="ljStats"></div>
+      <div style="font-size:11px;color:var(--text3);text-align:center;margin-top:4px">Klik na to&#269;ko za podrobnosti.</div>
+    </div>
+  </div>
+
+  <!-- QC LJ MULTI -->
+  <div class="page qc-page" id="page-ljmulti">
+    <div class="card">
+      <div class="fr">
+        <select id="ljmQcMat" onchange="onLjmQcMatChange()"></select>
+        <select id="ljmAssays" multiple size="5" style="min-width:200px"></select>
+      </div>
+      <div id="ljmLevelPills" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px"></div>
+      <button class="btn btn-blue btn-sm" onclick="renderLJMulti()">&#128201; Prika&#382;i grafe</button>
+    </div>
+    <div id="ljMultiCharts"></div>
+  </div>
+
+  <!-- QC ASSAYS -->
+  <div class="page qc-page" id="page-assays">
+    <div class="sec-hdr"><div class="sec-title" style="font-size:16px">Preiskave</div><button class="btn btn-a" onclick="openAssayModal()">+ Nova</button></div>
+    <div class="tabs"><div class="tab active" onclick="setAssayTab('biochem')">Biokemija (Alinity c)</div><div class="tab" onclick="setAssayTab('immuno')">Imunologija (Alinity i)</div></div>
+    <div class="fr"><input id="assaySearch" placeholder="&#128269; Iskanje..." oninput="renderAssays()"></div>
+    <div class="card" style="padding:0"><div class="tbl-wrap"><table><thead><tr><th>Naziv</th><th>Tip</th><th>QC materiali</th><th></th></tr></thead><tbody id="assayBody"></tbody></table></div></div>
+  </div>
+
+  <!-- QC MATERIALS -->
+  <div class="page qc-page" id="page-qcmaterials">
+    <div class="sec-hdr"><div class="sec-title" style="font-size:16px">QC Materiali</div><button class="btn btn-a" onclick="openQcModal()">+ Nov</button></div>
+    <div class="card" style="padding:0"><div class="tbl-wrap"><table><thead><tr><th>Naziv</th><th>Tip</th><th>Nivoji</th><th>Lot</th><th>Preiskave</th><th></th></tr></thead><tbody id="qcMatBody"></tbody></table></div></div>
+  </div>
+
+  <!-- QC OPERATORS -->
+  <div class="page qc-page" id="page-operators">
+    <div class="sec-hdr"><div class="sec-title" style="font-size:16px">Operaterji</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-g btn-sm" onclick="exportOperators()">&#8595; Izvoz</button>
+        <button class="btn btn-g btn-sm" onclick="$i('opImportFile').click()">&#8593; Uvoz</button>
+        <button class="btn btn-a btn-sm" onclick="openOperatorModal()">+ Nov</button>
+        <input type="file" id="opImportFile" accept=".json" style="display:none" onchange="importOperators(this)">
+      </div></div>
+    <div class="fr"><input id="opSearch" placeholder="&#128269; Ime, priimek, ID..." oninput="renderOperators()"></div>
+    <div class="card" style="padding:0"><div class="tbl-wrap"><table><thead><tr><th>ID</th><th>Ime</th><th>Priimek</th><th></th></tr></thead><tbody id="operatorBody"></tbody></table></div></div>
+  </div>
+
+  <!-- QC MAINTENANCE -->
+  <div class="page qc-page" id="page-maintenance">
+    <div class="sec-hdr"><div class="sec-title" style="font-size:16px">Vzdr&#382;evanje</div></div>
+    <div class="tabs" id="maintTypeTabs">
+      <div class="tab active" onclick="setMaintType('daily')">Dnevno</div>
+      <div class="tab" onclick="setMaintType('weekly')">Tedensko</div>
+      <div class="tab" onclick="setMaintType('monthly')">Mese&#269;no</div>
+      <div class="tab" onclick="setMaintType('quarterly')">Kvartalno</div>
+      <div class="tab" onclick="setMaintType('triannual')">Trianulano</div>
+    </div>
+    <div id="maintContent"></div>
+  </div>
+
+  <!-- QC MAINT REVIEW -->
+  <div class="page qc-page" id="page-maint-review">
+    <div class="sec-hdr"><div class="sec-title" style="font-size:16px">Pregled vzdr&#382;evanja</div><button class="btn btn-g btn-sm" onclick="exportMaintCSV()">&#128190; CSV</button></div>
+    <div class="card">
+      <div class="fr">
+        <select id="mrFilterType" onchange="renderMaintReview()"><option value="">Vsi tipi</option><option value="daily">Dnevno</option><option value="weekly">Tedensko</option><option value="monthly">Mese&#269;no</option><option value="quarterly">Kvartalno</option><option value="triannual">Trianulano</option></select>
+        <select id="mrFilterInteg" onchange="renderMaintReview()"><option value="">Vse integracije</option><option value="AL01">AL01</option><option value="AL02">AL02</option><option value="AL03">AL03</option></select>
+        <input type="date" id="mrFilterFrom" onchange="renderMaintReview()">
+        <input type="date" id="mrFilterTo" onchange="renderMaintReview()">
+      </div>
+      <div class="tbl-wrap"><table><thead><tr><th>Datum</th><th>Tip</th><th>Integr.</th><th>Analizator</th><th>Koraki</th><th>Operater</th><th>Opomba</th></tr></thead><tbody id="maintReviewBody"></tbody></table></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ VEČ ============ -->
+<div class="page-main" id="main-vec">
+  <div class="sec-hdr"><div class="sec-title">&#9776; Ve&#269;</div></div>
+
+  <div class="card">
+    <div class="card-title">&#9729; OneDrive sinhronizacija</div>
+    <div id="syncStatus" style="font-size:13px;margin-bottom:12px"></div>
+    <div class="disabled-note" id="syncPendingNote">&#9203; &#268;aka na Azure app registracijo IT UKCL. Funkcija je pripravljena, a &#353;e ni aktivna.</div>
+    <div style="display:grid;grid-template-columns:1fr;gap:14px">
+      <div class="entry-block">
+        <div class="entry-block-header">&#128230; Pregled BK (zaloga)</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-g btn-sm" onclick="msDownload('pregledBK_db')">&#8595; Prenesi</button>
+          <button class="btn btn-g btn-sm" onclick="msUpload('pregledBK_db')">&#8593; Nalo&#382;i</button>
+        </div>
+      </div>
+      <div class="entry-block">
+        <div class="entry-block-header">&#129516; QC Lab (qclab_v2)</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-g btn-sm" onclick="msDownload('qclab_v2')">&#8595; Prenesi</button>
+          <button class="btn btn-g btn-sm" onclick="msUpload('qclab_v2')">&#8593; Nalo&#382;i</button>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-blue btn-sm" id="msSignBtn" onclick="msSignIn()">Prijava OneDrive</button>
+      <button class="btn btn-d btn-sm" onclick="msSignOut()">Odjava</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">&#128190; Lokalni izvoz / uvoz podatkov</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-g btn-sm" onclick="exportJson('qclab_v2')">&#8595; Izvozi qclab_v2</button>
+      <button class="btn btn-g btn-sm" onclick="$i('qcImportFile').click()">&#8593; Uvozi qclab_v2</button>
+      <button class="btn btn-g btn-sm" onclick="exportJson('pregledBK_db')">&#8595; Izvozi pregledBK_db</button>
+      <button class="btn btn-g btn-sm" onclick="$i('pbImportFile').click()">&#8593; Uvozi pregledBK_db</button>
+      <input type="file" id="qcImportFile" accept=".json" style="display:none" onchange="importJson(this,'qclab_v2')">
+      <input type="file" id="pbImportFile" accept=".json" style="display:none" onchange="importJson(this,'pregledBK_db')">
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">&#9881;&#65039; Nastavitve</div>
+    <div class="toggle-wrap" style="margin-bottom:14px"><label class="toggle"><input type="checkbox" id="darkToggle" onchange="toggleDark()"><span class="toggle-slider"></span></label><span style="font-size:13px">Temni na&#269;in</span></div>
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text3);margin:12px 0 8px;letter-spacing:.5px">Skeniranje (onemogo&#269;eno na tablici)</div>
+    <div class="disabled-note">&#128683; Serijski sprejem &ndash; ni skeniranja na tablici</div>
+    <div class="disabled-note">&#128683; Mo&#269; RFID (sprejem) &ndash; ni RFID &#269;italca</div>
+    <div class="disabled-note">&#128683; Multi RFID &ndash; ni RFID &#269;italca</div>
+    <div class="disabled-note">&#128683; Locate Tag &ndash; ni RFID &#269;italca</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">&#8505;&#65039; O aplikaciji</div>
+    <div style="font-size:13px;line-height:1.9">
+      <div><strong>BIO Alinity App</strong> v1.0.0</div>
+      <div class="muted" id="aboutDevice">Naprava: &ndash;</div>
+      <div class="muted" id="aboutStorage">Pomnilnik: &ndash;</div>
+      <div class="muted">Namen: pregled zaloge + QC Abbott Alinity</div>
+    </div>
+  </div>
+</div>
+
+</main>
+</div>
+
+<!-- BOTTOM NAV -->
+<nav class="bottom-nav">
+  <div class="bn-item active" data-main="zaloga" onclick="navMain('zaloga')"><div class="bn-icon">&#128230;</div>Zaloga</div>
+  <div class="bn-item" data-main="roki" onclick="navMain('roki')"><div class="bn-icon">&#128197;</div>Roki</div>
+  <div class="bn-item" data-main="loti" onclick="navMain('loti')"><div class="bn-icon">&#129514;</div>Loti</div>
+  <div class="bn-item" data-main="qc" onclick="navMain('qc')"><div class="bn-icon">&#128202;</div>QC</div>
+  <div class="bn-item" data-main="vec" onclick="navMain('vec')"><div class="bn-icon">&#9776;</div>Ve&#269;</div>
+</nav>
+
+<div class="notif" id="notif"></div>
+
+<!-- DETAIL MODAL (Zaloga item) -->
+<div class="mo" id="detailModal">
+  <div class="modal">
+    <div class="mh"><h3 id="detailTitle">Podrobnosti</h3><button class="mc" onclick="closeMo('detailModal')">&#10005;</button></div>
+    <div class="mb" id="detailBody"></div>
+  </div>
+</div>
+
+<!-- POINT MODAL (LJ) -->
+<div class="mo" id="pointModal">
+  <div class="modal" style="max-width:440px">
+    <div class="mh"><h3>Podatki to&#269;ke</h3><button class="mc" onclick="closeMo('pointModal')">&#10005;</button></div>
+    <div class="mb" id="pointModalBody"></div>
+  </div>
+</div>
+
+<!-- ASSAY MODAL -->
+<div class="mo" id="assayModal">
+  <div class="modal" style="max-width:440px">
+    <div class="mh"><h3 id="assayModalTitle">Preiskava</h3><button class="mc" onclick="closeMo('assayModal')">&#10005;</button></div>
+    <div class="mb">
+      <div class="fg"><label>Naziv</label><input id="assayName"></div>
+      <div class="fg"><label>Tip</label><select id="assayType"><option value="biochem">Biokemija (c)</option><option value="immuno">Imunologija (i)</option></select></div>
+    </div>
+    <div class="mf"><button class="btn btn-g" onclick="closeMo('assayModal')">Prekli&#269;i</button><button class="btn btn-a" onclick="saveAssay()">Shrani</button></div>
+  </div>
+</div>
+
+<!-- QC MATERIAL MODAL -->
+<div class="mo" id="qcModal">
+  <div class="modal">
+    <div class="mh"><h3 id="qcModalTitle">QC material</h3><button class="mc" onclick="closeMo('qcModal')">&#10005;</button></div>
+    <div class="mb">
+      <div class="frow">
+        <div class="fg"><label>Naziv</label><input id="qcName"></div>
+        <div class="fg"><label>Tip</label><select id="qcType"><option value="biochem">Biokemija</option><option value="immuno">Imunologija</option><option value="single">Single</option><option value="pool">Pool</option></select></div>
+      </div>
+      <div class="frow">
+        <div class="fg"><label>Lot</label><input id="qcLot"></div>
+        <div class="fg"><label>Nivoji</label><select id="qcLevels"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option></select></div>
+      </div>
+      <div class="fg"><label>Preiskave</label><div id="qcAssayList" style="display:grid;grid-template-columns:1fr 1fr;gap:4px;max-height:240px;overflow-y:auto"></div></div>
+    </div>
+    <div class="mf"><button class="btn btn-g" onclick="closeMo('qcModal')">Prekli&#269;i</button><button class="btn btn-a" onclick="saveQcMaterial()">Shrani</button></div>
+  </div>
+</div>
+
+<!-- OPERATOR MODAL -->
+<div class="mo" id="operatorModal">
+  <div class="modal" style="max-width:440px">
+    <div class="mh"><h3 id="operatorModalTitle">Operater</h3><button class="mc" onclick="closeMo('operatorModal')">&#10005;</button></div>
+    <div class="mb">
+      <div class="fg"><label>Mati&#269;na &#353;tevilka (5 mest)</label><input id="opId" inputmode="numeric" maxlength="5"></div>
+      <div class="frow"><div class="fg"><label>Ime</label><input id="opFirst"></div><div class="fg"><label>Priimek</label><input id="opLast"></div></div>
+    </div>
+    <div class="mf"><button class="btn btn-g" onclick="closeMo('operatorModal')">Prekli&#269;i</button><button class="btn btn-a" onclick="saveOperator()">Shrani</button></div>
+  </div>
+</div>
+
+<!-- LOT HISTORY MODAL -->
+<div class="mo" id="lotModal">
+  <div class="modal" style="max-width:620px">
+    <div class="mh"><h3 id="lotModalTitle">Zgodovina lotov</h3><button class="mc" onclick="closeMo('lotModal')">&#10005;</button></div>
+    <div class="mb">
+      <div id="lotHistoryBody"></div>
+      <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px">
+        <div style="font-weight:600;font-size:13px;color:var(--abbott-blue);margin-bottom:10px">+ Dodaj menjavo lota ali opombo</div>
+        <div class="frow">
+          <div class="fg"><label>Tip vpisa</label><select id="newLotType" onchange="toggleLotTypeFields()"><option value="qc">&#128308; Menjava lota QC kontrole</option><option value="cal">&#128992; Menjava lota kalibratorja</option><option value="note">&#128221; Splo&#353;na opomba</option></select></div>
+          <div class="fg"><label>Datum</label><input type="date" id="newLotDate"></div>
+        </div>
+        <div id="newLotNumWrap" class="frow"><div class="fg"><label id="newLotNumLabel">Nova lot &#353;tevilka</label><input type="text" id="newLotNum" placeholder="npr. LOT2025A"></div></div>
+        <div class="fg"><label>Opomba</label><input type="text" id="newLotNote" placeholder="Neobvezno"></div>
+        <button class="btn btn-teal btn-sm" onclick="addLot()">+ Shrani vnos</button>
+      </div>
+    </div>
+    <div class="mf"><button class="btn btn-g" onclick="closeMo('lotModal')">Zapri</button></div>
+  </div>
+</div>
+
+<!-- MAINT SIGN MODAL -->
+<div class="mo" id="maintSignModal">
+  <div class="modal" style="max-width:480px">
+    <div class="mh"><h3 id="maintSignTitle">Potrditev vzdr&#382;evanja</h3><button class="mc" onclick="closeMo('maintSignModal')">&#10005;</button></div>
+    <div class="mb">
+      <div id="maintSignSummary" style="margin-bottom:14px"></div>
+      <div class="fg"><label>Opomba / ugotovitve</label><textarea id="maintSignNote" placeholder="Npr. zamenjani filtri..."></textarea></div>
+      <div style="font-size:13px;font-weight:600;color:var(--abbott-blue);text-align:center;margin-bottom:6px">Mati&#269;na &#353;tevilka operaterja</div>
+      <div class="pin-display"><div class="pin-dot" id="mpd0"></div><div class="pin-dot" id="mpd1"></div><div class="pin-dot" id="mpd2"></div><div class="pin-dot" id="mpd3"></div><div class="pin-dot" id="mpd4"></div></div>
+      <div id="maintPinName" style="text-align:center;font-size:13px;font-weight:600;color:var(--abbott-teal);min-height:20px;margin-bottom:10px"></div>
+      <div class="pin-grid" id="maintPinGrid"></div>
+      <div style="text-align:center;margin-top:10px"><button class="btn btn-g btn-sm" onclick="clearMaintPin()">Pobri&#353;i</button></div>
+    </div>
+    <div class="mf"><button class="btn btn-g" onclick="closeMo('maintSignModal')">Prekli&#269;i</button><button class="btn btn-teal" onclick="saveMaintenance()">&#10003; Potrdi</button></div>
+  </div>
+</div>
+
+<!-- SYNC MODAL (header shortcut) -->
+<div class="mo" id="syncModal">
+  <div class="modal" style="max-width:440px">
+    <div class="mh"><h3>&#9729; OneDrive sync</h3><button class="mc" onclick="closeMo('syncModal')">&#10005;</button></div>
+    <div class="mb">
+      <div id="syncModalStatus" style="font-size:13px;margin-bottom:12px"></div>
+      <div class="disabled-note">&#9203; &#268;aka na Azure app registracijo IT UKCL.</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+        <button class="btn btn-g btn-sm" onclick="msDownload('pregledBK_db')">&#8595; Zaloga</button>
+        <button class="btn btn-g btn-sm" onclick="msUpload('pregledBK_db')">&#8593; Zaloga</button>
+        <button class="btn btn-g btn-sm" onclick="msDownload('qclab_v2')">&#8595; QC</button>
+        <button class="btn btn-g btn-sm" onclick="msUpload('qclab_v2')">&#8593; QC</button>
+      </div>
+    </div>
+    <div class="mf"><button class="btn btn-blue" onclick="closeMo('syncModal');navMain('vec')">Odpri nastavitve sync</button></div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   BIO ALINITY APP — combined inventory (read-only) + QC Lab
+   ============================================================ */
+const TABLET_MODE = true;
+function $i(id){return document.getElementById(id);}
+function _hasBridge(){return typeof AndroidBridge!=='undefined'&&AndroidBridge;}
+
+let notifT;
+function notify(msg,type=''){
+  const el=$i('notif');el.textContent=msg;el.className='notif show'+(type?' '+type:'');
+  clearTimeout(notifT);notifT=setTimeout(()=>el.classList.remove('show'),3000);
+}
+function closeMo(id){$i(id).classList.remove('open');}
+function showMo(id){$i(id).classList.add('open');}
+function fmtDt(dt){return new Date(dt).toLocaleString('sl-SI');}
+
+/* ============ MAIN NAVIGATION ============ */
+function navMain(tab){
+  document.querySelectorAll('.page-main').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.bn-item').forEach(n=>n.classList.remove('active'));
+  $i('main-'+tab).classList.add('active');
+  document.querySelector('.bn-item[data-main="'+tab+'"]')?.classList.add('active');
+  $i('mainScrollReset')?.scrollTo?.(0,0);
+  document.querySelector('.main').scrollTop=0;
+  if(tab==='zaloga') renderZaloga();
+  if(tab==='roki') renderRoki();
+  if(tab==='loti') renderLoti();
+  if(tab==='qc') navQc(currentQc||'dashboard');
+  if(tab==='vec') renderVec();
+}
+
+/* ============ QC SUB-NAVIGATION ============ */
+let currentQc='dashboard';
+function navQc(page){
+  currentQc=page;
+  document.querySelectorAll('.qc-page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('#qcSubnav .tab').forEach(t=>t.classList.remove('active'));
+  $i('page-'+page).classList.add('active');
+  document.querySelector('#qcSubnav .tab[data-qc="'+page+'"]')?.classList.add('active');
+  if(page==='dashboard') renderDashboard();
+  if(page==='entry') initWizard();
+  if(page==='review') renderReview();
+  if(page==='lj'){populateLjSelects();renderLJ();}
+  if(page==='ljmulti') populateLjmSelects();
+  if(page==='assays') renderAssays();
+  if(page==='qcmaterials') renderQcMats();
+  if(page==='operators') renderOperators();
+  if(page==='maintenance') setMaintType(maintState.type||'daily');
+  if(page==='maint-review') renderMaintReview();
+}
+
+/* ============================================================
+   PART A — PREGLED BK (read-only inventory)
+   ============================================================ */
+let DB_PREGLED = {inventory:[],gtins:[],lots:[],sessions:[],received:[]};
+function loadPregledDB(){
+  try{
+    const raw=localStorage.getItem('pregledBK_db');
+    if(raw){DB_PREGLED=JSON.parse(raw);}
+  }catch(e){console.log('pregledBK_db load err',e);}
+  DB_PREGLED.inventory=DB_PREGLED.inventory||[];
+  DB_PREGLED.gtins=DB_PREGLED.gtins||[];
+  DB_PREGLED.lots=DB_PREGLED.lots||[];
+  DB_PREGLED.sessions=DB_PREGLED.sessions||[];
+}
+function savePregledDB(){localStorage.setItem('pregledBK_db',JSON.stringify(DB_PREGLED));}
+
+const TYPE_LABELS={'reagent-bio':'Reagent bio','reagent-imuno':'Reagent imuno','calibrator':'Kalibrator','control':'Kontrola','consumable':'Potro&#353;ni'};
+const TYPE_BADGE={'reagent-bio':'b-cal','reagent-imuno':'b-cal','calibrator':'b-cal','control':'b-ctrl','consumable':'b-gray'};
+
+function daysLeft(expiry){
+  if(!expiry) return null;
+  const d=new Date(expiry+'T00:00:00');
+  const now=new Date();now.setHours(0,0,0,0);
+  return Math.round((d-now)/86400000);
+}
+function expiryClass(dl){
+  if(dl===null) return '';
+  if(dl<0) return 'r-exp';
+  if(dl<=14) return 'r-14';
+  if(dl<=28) return 'r-28';
+  return '';
+}
+function expiryBadge(dl){
+  if(dl===null) return '<span class="badge b-gray">&ndash;</span>';
+  if(dl<0) return '<span class="badge b-exp">Poteklo</span>';
+  if(dl<=14) return '<span class="badge b-14">'+dl+' dni</span>';
+  if(dl<=28) return '<span class="badge b-28">'+dl+' dni</span>';
+  return '<span class="badge b-ok">'+dl+' dni</span>';
+}
+
+function updateHeaderStats(){
+  let tot=0,exp=0,d14=0;
+  DB_PREGLED.inventory.forEach(it=>{
+    const q=it.qty||0;tot+=q;
+    const dl=daysLeft(it.expiry);
+    if(dl!==null){if(dl<0)exp+=q;else if(dl<=14)d14+=q;}
+  });
+  $i('hs-tot').textContent=tot;$i('hs-exp').textContent=exp;$i('hs-14').textContent=d14;
+}
+
+function renderZaloga(){
+  loadPregledDB();updateHeaderStats();
+  const q=($i('zSearch').value||'').toLowerCase();
+  const tf=$i('zType').value;
+  const sort=$i('zSort').value;
+  let items=DB_PREGLED.inventory.filter(it=>{
+    if(tf&&it.type!==tf) return false;
+    if(q){const hay=((it.name||'')+' '+(it.lot||'')+' '+(it.gtin||'')).toLowerCase();if(!hay.includes(q))return false;}
+    return true;
+  });
+  if(sort==='name') items.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  else if(sort==='qty') items.sort((a,b)=>(b.qty||0)-(a.qty||0));
+  else items.sort((a,b)=>{
+    const da=daysLeft(a.expiry),db=daysLeft(b.expiry);
+    if(da===null) return 1;if(db===null) return -1;return da-db;
+  });
+  const body=$i('zalogaBody');
+  if(!items.length){body.innerHTML='<tr><td colspan="6" class="empty">Ni artiklov. Sinhronizirajte z Zebro (OneDrive) ali uvozite pregledBK_db.</td></tr>';return;}
+  body.innerHTML=items.map((it,idx)=>{
+    const dl=daysLeft(it.expiry);
+    return '<tr class="'+expiryClass(dl)+'" onclick="showItemDetail('+DB_PREGLED.inventory.indexOf(it)+')" style="cursor:pointer">'+
+      '<td><strong>'+(it.name||'&ndash;')+'</strong><div class="gtin">'+(it.gtin||'')+'</div></td>'+
+      '<td><span class="lot-n">'+(it.lot||'&ndash;')+'</span></td>'+
+      '<td>'+(it.expiry||'&ndash;')+'<br>'+expiryBadge(dl)+'</td>'+
+      '<td><strong>'+(it.qty||0)+'</strong></td>'+
+      '<td><span class="badge '+(TYPE_BADGE[it.type]||'b-gray')+'">'+(TYPE_LABELS[it.type]||it.type||'&ndash;')+'</span></td>'+
+      '<td style="font-size:11px" class="muted">'+(it.received?new Date(it.received).toLocaleDateString('sl-SI'):'&ndash;')+'</td>'+
+    '</tr>';
+  }).join('');
+}
+
+function showItemDetail(idx){
+  const it=DB_PREGLED.inventory[idx];if(!it) return;
+  const dl=daysLeft(it.expiry);
+  const units=it.units||[];
+  $i('detailTitle').textContent=it.name||'Artikel';
+  $i('detailBody').innerHTML=
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:13px">'+
+    '<div><span class="muted" style="font-size:11px">GTIN</span><br><span class="gtin">'+(it.gtin||'&ndash;')+'</span></div>'+
+    '<div><span class="muted" style="font-size:11px">Katalog</span><br>'+(it.catalog||'&ndash;')+'</div>'+
+    '<div><span class="muted" style="font-size:11px">Lot</span><br><span class="lot-n">'+(it.lot||'&ndash;')+'</span></div>'+
+    '<div><span class="muted" style="font-size:11px">Rok</span><br>'+(it.expiry||'&ndash;')+' '+expiryBadge(dl)+'</div>'+
+    '<div><span class="muted" style="font-size:11px">Koli&#269;ina</span><br><strong>'+(it.qty||0)+'</strong></div>'+
+    '<div><span class="muted" style="font-size:11px">Tip</span><br><span class="badge '+(TYPE_BADGE[it.type]||'b-gray')+'">'+(TYPE_LABELS[it.type]||it.type||'&ndash;')+'</span></div>'+
+    '</div>'+
+    (units.length?'<div style="margin-top:14px"><div class="muted" style="font-size:11px;text-transform:uppercase;margin-bottom:6px">Enote (SN / EPC)</div>'+
+      units.map(u=>'<div style="padding:6px 0;border-bottom:1px solid var(--border)"><div style="font-family:var(--mono);font-size:12px;font-weight:600">'+(u.sn||'&ndash;')+'</div>'+(u.epc?'<div style="font-family:var(--mono);font-size:10px;color:var(--text3);padding-left:14px;word-break:break-all">'+u.epc+'</div>':'')+'</div>').join('')+'</div>'
+      : (it.serials&&it.serials.length?'<div style="margin-top:14px"><div class="muted" style="font-size:11px;text-transform:uppercase;margin-bottom:6px">Serijske &#353;tevilke</div><div style="font-family:var(--mono);font-size:12px">'+it.serials.join(', ')+'</div></div>':''));
+  showMo('detailModal');
+}
+
+function renderRoki(){
+  loadPregledDB();updateHeaderStats();
+  const groups={exp:[],d7:[],d14:[],d28:[],ok:[]};
+  DB_PREGLED.inventory.forEach(it=>{
+    const dl=daysLeft(it.expiry);
+    if(dl===null) return;
+    if(dl<0) groups.exp.push({it,dl});
+    else if(dl<=7) groups.d7.push({it,dl});
+    else if(dl<=14) groups.d14.push({it,dl});
+    else if(dl<=28) groups.d28.push({it,dl});
+    else groups.ok.push({it,dl});
+  });
+  Object.keys(groups).forEach(k=>groups[k].sort((a,b)=>a.dl-b.dl));
+  const alert=$i('rokiAlert');
+  const urgent=groups.exp.length+groups.d7.length;
+  if(urgent){alert.classList.add('show');alert.innerHTML='&#9888; '+groups.exp.length+' poteklo, '+groups.d7.length+' poteče v 7 dneh';}
+  else alert.classList.remove('show');
+  const defs=[['exp','&#128308; POTEKLO','var(--red)'],['d7','&#128992; POTE&#268;E V 7 DNEH','var(--orange)'],['d14','&#128993; 8&ndash;14 DNI','var(--yellow)'],['d28','&#128993; 15&ndash;28 DNI','var(--yellow)'],['ok','&#128994; VE&#268; KOT 28 DNI','var(--green)']];
+  let html='';
+  defs.forEach(([k,lbl,col])=>{
+    if(!groups[k].length) return;
+    html+='<div class="exp-group"><div class="exp-group-hdr" style="color:'+col+';border-bottom-color:'+col+'">'+lbl+' ('+groups[k].length+')</div>';
+    groups[k].forEach(({it,dl})=>{
+      html+='<div class="exp-item"><div class="exp-item-main"><div class="exp-item-name">'+(it.name||'&ndash;')+'</div>'+
+        '<div class="exp-item-sub"><span class="lot-n">'+(it.lot||'&ndash;')+'</span> &middot; '+(it.expiry||'&ndash;')+' &middot; '+(it.qty||0)+' kos</div></div>'+
+        expiryBadge(dl)+'</div>';
+    });
+    html+='</div>';
+  });
+  $i('rokiBody').innerHTML=html||'<div class="empty">Ni artiklov z roki uporabe.</div>';
+}
+
+function renderLoti(){
+  loadPregledDB();
+  const q=($i('lotiSearch').value||'').toLowerCase();
+  const tf=$i('lotiType').value;
+  const byProd={};
+  DB_PREGLED.inventory.forEach(it=>{
+    if(tf&&it.type!==tf) return;
+    if(q){const hay=((it.name||'')+' '+(it.lot||'')).toLowerCase();if(!hay.includes(q))return;}
+    const key=it.name||'&ndash;';
+    if(!byProd[key]) byProd[key]={name:key,type:it.type,lots:[]};
+    byProd[key].lots.push(it);
+  });
+  const prods=Object.values(byProd).sort((a,b)=>a.name.localeCompare(b.name));
+  if(!prods.length){$i('lotiBody').innerHTML='<div class="empty">Ni lotov.</div>';return;}
+  $i('lotiBody').innerHTML=prods.map((p,pi)=>{
+    const lotRows=p.lots.sort((a,b)=>{const da=daysLeft(a.expiry),db=daysLeft(b.expiry);if(da===null)return 1;if(db===null)return -1;return da-db;}).map(it=>{
+      const dl=daysLeft(it.expiry);
+      const snCount=(it.units||it.serials||[]).length;
+      const epcCount=(it.units?it.units.filter(u=>u.epc).length:(it.rfidEpcs||[]).length);
+      return '<div class="lot-row"><div style="flex:1"><span class="lot-n">'+(it.lot||'&ndash;')+'</span>'+
+        '<div style="font-size:11px;color:var(--text3);margin-top:2px">'+(it.expiry||'&ndash;')+' &middot; '+(it.qty||0)+' kos'+(snCount?' &middot; '+snCount+' SN':'')+(epcCount?' &middot; '+epcCount+' EPC':'')+'</div></div>'+
+        expiryBadge(dl)+'</div>';
+    }).join('');
+    return '<div class="prod-card" id="prod'+pi+'"><div class="prod-card-hdr" onclick="$i(\'prod'+pi+'\').classList.toggle(\'open\')">'+
+      '<span class="badge '+(TYPE_BADGE[p.type]||'b-gray')+'">'+(TYPE_LABELS[p.type]||p.type||'&ndash;')+'</span>'+
+      '<span class="prod-card-name">'+p.name+'</span><span class="muted" style="font-size:12px">'+p.lots.length+' lot(ov) &#9662;</span></div>'+
+      '<div class="prod-card-body">'+lotRows+'</div></div>';
+  }).join('');
+}
+
+/* ============================================================
+   PART B — QC LAB (full functionality, key qclab_v2)
+   ============================================================ */
+const INSTRUMENTS = [
+  {id:'AL01 C1',label:'C1',name:'Alinity c',integration:'AL01',type:'c'},
+  {id:'AL01 I2',label:'I2',name:'Alinity i',integration:'AL01',type:'i'},
+  {id:'AL01 C3',label:'C3',name:'Alinity c',integration:'AL01',type:'c'},
+  {id:'AL02 C1',label:'C1',name:'Alinity c',integration:'AL02',type:'c'},
+  {id:'AL02 I2',label:'I2',name:'Alinity i',integration:'AL02',type:'i'},
+  {id:'AL02 C3',label:'C3',name:'Alinity c',integration:'AL02',type:'c'},
+  {id:'AL03 C1',label:'C1',name:'Alinity c',integration:'AL03',type:'c'},
+  {id:'AL03 I2',label:'I2',name:'Alinity i',integration:'AL03',type:'i'},
+  {id:'AL03 C3',label:'C3',name:'Alinity c',integration:'AL03',type:'c'},
+];
+const DEFAULT_BIOCHEM = ['Glukoza','Kalij','Natrij','Klorid','Magnezij','Fosfat','CRP','Proteini','Albumini','CK','GGT','AST','ALT','Lipaza','Alkalna fosfataza','Amilaza','Bilirubin direktni','Bilirubin totalni','Kreatinin','Sečnina','Etanol','Digoksin','Teofilin','Vankomicin','Gentamicin','U-Albumin','Kalcij','U/CSF Proteini','HDL-Holesterol','Holesterol','LDL-Holesterol','Trigliceridi','Urati','LDH','Laktat','CO2','UIBC','Železo'];
+const DEFAULT_IMMUNO = ['Troponin','Mioglobin','PCT','Beta-HCG','NT-ProBNP','CK-MB','Feritin','GFAP','UCHL'];
+const DEFAULT_OPERATORS = [
+  {id:"51056",first:"NIKOLA",last:"ALEKSIĆ"},{id:"35694",first:"MAJA",last:"ARSOV"},{id:"40801",first:"KATJA",last:"BAHAR"},{id:"43197",first:"ALJAŽ",last:"OMAHNA"},{id:"16984",first:"JOŠKO",last:"OSREDKAR"},{id:"16163",first:"MILAN",last:"SKITEK"},{id:"27289",first:"ALEŠ",last:"JERIN"}
+];
+
+let S = { assays:[], qcMaterials:[], operators:[], entries:[], currentAssayTab:'biochem',
+  editingAssayIdx:null, editingQcIdx:null, editingOpIdx:null, wiz:{}, pinValue:'',
+  ljRules:{'1_2s':true,'1_3s':true,'2_2s':true,'R_4s':true,'4_1s':true,'10_x':true},
+  assayRules:{}, maintenanceLog:[] };
+
+function initState(){
+  const sv=localStorage.getItem('qclab_v2');
+  if(sv){try{const p=JSON.parse(sv);Object.assign(S,p);if(!S.assayRules)S.assayRules={};if(!S.maintenanceLog)S.maintenanceLog=[];if(!S.ljRules['10_x'])S.ljRules['10_x']=true;}catch(e){}}
+  if(!S.assays.length) S.assays=[...DEFAULT_BIOCHEM.map(n=>({name:n,type:'biochem'})),...DEFAULT_IMMUNO.map(n=>({name:n,type:'immuno'}))];
+  if(!S.qcMaterials.length) S.qcMaterials=[
+    {name:'Multichem S Plus',type:'biochem',levels:2,lot:'LOT2024A',assays:[...DEFAULT_BIOCHEM]},
+    {name:'Multichem IA',type:'immuno',levels:2,lot:'LOT2024B',assays:[...DEFAULT_IMMUNO]},
+    {name:'Abbott PCT single QC',type:'single',levels:2,lot:'LOT2024C',assays:['PCT']},
+    {name:'Randox Humaser L1',type:'single',levels:1,lot:'LOT2024D',assays:[...DEFAULT_IMMUNO]},
+    {name:'Randox Humaser L2',type:'single',levels:1,lot:'LOT2024E',assays:[...DEFAULT_IMMUNO]},
+    {name:'Abbott GFAP/UCHL single QC',type:'single',levels:2,lot:'LOT2024F',assays:['GFAP','UCHL']},
+    {name:'Pool QC',type:'pool',levels:1,lot:'POOL2024',assays:[]},
+  ];
+  if(!S.operators.length) S.operators=DEFAULT_OPERATORS;
+}
+function save(){localStorage.setItem('qclab_v2',JSON.stringify(S));}
+
+function sdLabel(sd){if(sd==='ok'||!sd)return 'OK';return sd.replace('-3sd','−3SD').replace('-2sd','−2SD').replace('+3sd','+3SD').replace('+2sd','+2SD');}
+function sdBadge(sd){if(!sd||sd==='ok')return '<span class="badge badge-ok">OK</span>';if(sd.includes('3'))return '<span class="badge badge-3sd">'+sdLabel(sd)+'</span>';return '<span class="badge badge-2sd">'+sdLabel(sd)+'</span>';}
+
+/* ===== DASHBOARD ===== */
+function buildInstrMap(){
+  const m=$i('instrumentMap');
+  m.innerHTML=['AL01','AL02','AL03'].map((int,idx)=>{
+    const ii=INSTRUMENTS.filter(i=>i.integration===int);
+    const boxes=ii.map((i,j)=>'<div class="instr-box instr-'+i.type+'" onclick="navQc(\'entry\')"><span style="font-size:18px;font-weight:800">'+i.label+'</span><span class="instr-label-small">Alinity '+i.type.toUpperCase()+'</span><span class="instr-id-label">'+i.id+'</span><span class="instr-status"></span></div>'+(j<ii.length-1?'<div class="instr-divider"></div>':'')).join('');
+    return '<div class="integration-block"><div class="integration-label">&#128279; '+int+'</div><div class="instruments">'+boxes+'</div><div style="margin-left:auto;font-size:11px;color:var(--text3);text-align:right"><div>Integracija '+(idx+1)+'</div><div style="color:var(--success);font-weight:600">&#9679; Online</div></div></div>';
+  }).join('');
+}
+function renderDashboard(){
+  const today=new Date().toDateString();
+  const weekAgo=new Date();weekAgo.setDate(weekAgo.getDate()-7);
+  $i('stat-today').textContent=S.entries.filter(e=>new Date(e.datetime).toDateString()===today).length;
+  $i('stat-week').textContent=S.entries.filter(e=>new Date(e.datetime)>=weekAgo).length;
+  $i('stat-2sd').textContent=S.entries.filter(e=>e.results?.some(r=>r.sd&&r.sd.includes('2'))).length;
+  $i('stat-3sd').textContent=S.entries.filter(e=>e.results?.some(r=>r.sd&&r.sd.includes('3'))).length;
+  const recent=[...S.entries].reverse().slice(0,8);
+  const div=$i('recentEntries');
+  if(!recent.length){div.innerHTML='<div class="empty">Ni &#353;e vnosov.</div>';return;}
+  div.innerHTML=recent.map(e=>{
+    const hasFail=e.results?.some(r=>r.sd?.includes('3')),hasWarn=e.results?.some(r=>r.sd?.includes('2'));
+    const ic=hasFail?'icon-fail':hasWarn?'icon-warn':'icon-ok',icon=hasFail?'&#10060;':hasWarn?'&#9888;&#65039;':'&#9989;';
+    const op=S.operators.find(o=>o.id===e.operatorId);
+    return '<div class="qc-entry-item"><div class="qc-entry-icon '+ic+'">'+icon+'</div><div style="flex:1"><div style="font-weight:600;font-size:13px">'+e.qcName+' &ndash; '+e.instrId+'</div><div style="font-size:11px;color:var(--text3)">'+fmtDt(e.datetime)+' | '+(op?op.first+' '+op.last:e.operatorId)+(e.results?.length?' | '+e.results.length+' preiskav':'')+'</div></div><div>'+(hasFail?'<span class="badge badge-3sd">3SD</span>':hasWarn?'<span class="badge badge-2sd">2SD</span>':'<span class="badge badge-ok">OK</span>')+'</div></div>';
+  }).join('');
+}
+
+/* ===== ENTRY WIZARD ===== */
+function populateEntryInstruments(){$i('entryInstr').innerHTML='<option value="">-- Izberite --</option>'+INSTRUMENTS.map(i=>'<option value="'+i.id+'">'+i.id+' ('+i.name+')</option>').join('');}
+function compatibleQcs(instrType){return S.qcMaterials.filter(q=>q.type===instrType||(instrType==='c'&&q.type==='biochem')||(instrType==='i'&&q.type==='immuno')||q.type==='single'||q.type==='pool');}
+function populateEntryQcMaterials(){
+  const instrId=$i('entryInstr').value;const instr=INSTRUMENTS.find(i=>i.id===instrId);
+  const list=$i('qcMatCheckList');if(!list)return;
+  const qcs=instr?compatibleQcs(instr.type):S.qcMaterials;
+  list.innerHTML=qcs.map(q=>{const ri=S.qcMaterials.indexOf(q);
+    return '<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;cursor:pointer;background:var(--bg2)"><input type="checkbox" value="'+ri+'" data-qcname="'+q.name+'" data-lot="'+(q.lot||'')+'" data-levels="'+(q.levels||2)+'" class="qc-mat-cb" style="width:17px;height:17px;accent-color:var(--abbott-teal)"><span style="flex:1"><span style="font-weight:600;font-size:13px">'+q.name+'</span>'+(q.lot?'<span style="font-size:11px;color:var(--text3);margin-left:8px">Lot: '+q.lot+pregledLotHint(q)+'</span>':'')+'</span><span style="font-size:11px;color:var(--text3)">'+(q.levels||2)+' nivo(i)</span></label>';
+  }).join('');
+}
+/* Integration: show matching Pregled BK inventory lots for this QC material */
+function pregledLotHint(q){
+  try{
+    const matches=DB_PREGLED.inventory.filter(it=>(it.type==='control'||it.type==='calibrator')&&(it.name||'').toLowerCase().includes(q.name.toLowerCase().split(' ')[0]));
+    const lots=[...new Set(matches.map(m=>m.lot).filter(Boolean))];
+    if(lots.length) return ' <span style="color:var(--accent2)">&middot; zaloga: '+lots.slice(0,3).join(', ')+'</span>';
+  }catch(e){}
+  return '';
+}
+function selectAllQcMats(val){document.querySelectorAll('.qc-mat-cb').forEach(cb=>cb.checked=val);}
+
+function initWizard(){S.wiz={};S.pinValue='';showWStep(0);clearPin();populateEntryQcMaterials();const now=new Date();now.setMinutes(now.getMinutes()-now.getTimezoneOffset());$i('entryDateTime').value=now.toISOString().slice(0,16);}
+function showWStep(n){document.querySelectorAll('.wizard-step').forEach((s,i)=>s.classList.toggle('active',i===n));document.querySelectorAll('.wizard-dot').forEach((d,i)=>{d.classList.remove('active','done');if(i<n)d.classList.add('done');else if(i===n)d.classList.add('active');});}
+function wizardNext(from){
+  if(from===-5){showWStep(3);return;}if(from===-4){showWStep(2);return;}if(from===-3){showWStep(1);return;}if(from===-2){showWStep(0);return;}if(from===-1){showWStep(0);return;}
+  if(from===0){
+    const instrId=$i('entryInstr').value;if(!instrId){notify('Izberite in&#353;trument','warning');return;}
+    const cbs=[...document.querySelectorAll('.qc-mat-cb:checked')];if(!cbs.length){notify('Izberite vsaj en QC material','warning');return;}
+    S.wiz={instrId,datetime:$i('entryDateTime').value,instrType:INSTRUMENTS.find(i=>i.id===instrId).type,selectedQcs:cbs.map(cb=>({idx:parseInt(cb.value),name:cb.dataset.qcname,lot:cb.dataset.lot,levels:parseInt(cb.dataset.levels)||2}))};
+    buildLevelPills();showWStep(1);
+  }else if(from===1){
+    const qcLevels={};S.wiz.selectedQcs.forEach(qc=>{qcLevels[qc.idx]=[...document.querySelectorAll('.lp-pill[data-qc="'+qc.idx+'"].selected-pill')].map(p=>p.dataset.level);});
+    if(!Object.values(qcLevels).some(l=>l.length>0)){notify('Izberite vsaj en nivo','warning');return;}
+    S.wiz.qcLevels=qcLevels;buildAssayPick();showWStep(2);
+  }else if(from===2){
+    const pickedByQcLvl={};document.querySelectorAll('.ap-cb:checked').forEach(cb=>{const key=cb.dataset.qcidx+'_'+cb.dataset.level;if(!pickedByQcLvl[key])pickedByQcLvl[key]=[];pickedByQcLvl[key].push(cb.value);});
+    S.wiz.pickedByQcLvl=pickedByQcLvl;buildSdValues();showWStep(3);
+  }else if(from===3){collectSdValues();buildNotesSection();showWStep(4);}
+  else if(from===4){collectNotes();showWStep(5);}
+}
+function buildLevelPills(){$i('levelPillsWrap').innerHTML=S.wiz.selectedQcs.map(qc=>'<div class="entry-block"><div class="entry-block-header">'+qc.name+' <span style="font-size:11px;font-weight:400;color:var(--text3)">'+(qc.lot?'Lot: '+qc.lot:'')+'</span></div><div style="display:flex;gap:8px;flex-wrap:wrap">'+Array.from({length:qc.levels},(_,i)=>{const lvl='L'+(i+1);return '<div class="level-pill lp-pill" data-qc="'+qc.idx+'" data-level="'+lvl+'" onclick="this.classList.toggle(\'selected-pill\')">Nivo '+(i+1)+'</div>';}).join('')+'</div></div>').join('');}
+function buildAssayPick(){
+  const wrap=$i('assayPickWrap');
+  wrap.innerHTML=S.wiz.selectedQcs.map(qc=>{
+    const qcObj=S.qcMaterials[qc.idx];
+    const assayNames=qcObj?.assays?.length?qcObj.assays:S.assays.filter(a=>(qcObj?.type==='biochem'&&a.type==='biochem')||(qcObj?.type==='immuno'&&a.type==='immuno')||qcObj?.type==='pool'||qcObj?.type==='single').map(a=>a.name);
+    const levels=S.wiz.qcLevels[qc.idx]||[];
+    return levels.map(lvl=>{const key=qc.idx+'_'+lvl;
+      return '<div class="entry-block"><div class="entry-block-header"><span>'+qc.name+' &ndash; Nivo '+lvl.replace('L','')+'</span><button class="btn btn-g btn-sm" onclick="selectAllAssays(\''+key+'\',true)">&#10004; Vse</button></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;max-height:240px;overflow-y:auto">'+assayNames.map(an=>'<label class="assay-pick-item"><input type="checkbox" class="ap-cb" value="'+an+'" data-qcidx="'+qc.idx+'" data-level="'+lvl+'" onchange="this.closest(\'.assay-pick-item\').classList.toggle(\'picked\',this.checked)"><span style="font-size:12px;font-weight:500">'+an+'</span></label>').join('')+'</div></div>';
+    }).join('');
+  }).join('');
+}
+function selectAllAssays(key,val){const [qi,lvl]=key.split('_L');document.querySelectorAll('.ap-cb[data-qcidx="'+qi+'"][data-level="L'+lvl+'"]').forEach(cb=>{cb.checked=val;cb.closest('.assay-pick-item').classList.toggle('picked',val);});}
+function buildSdValues(){
+  const wrap=$i('sdValuesWrap');const entries=[];
+  S.wiz.selectedQcs.forEach(qc=>{(S.wiz.qcLevels[qc.idx]||[]).forEach(lvl=>{const key=qc.idx+'_'+lvl;const picked=S.wiz.pickedByQcLvl[key]||[];picked.forEach(an=>{entries.push({qc,lvl,an,key:qc.idx+'_'+lvl+'_'+an});});});});
+  if(!entries.length){wrap.innerHTML='<div class="empty">Ni ozna&#269;enih preiskav.</div>';return;}
+  const groups={};entries.forEach(e=>{const gk=e.qc.idx+'_'+e.lvl;if(!groups[gk])groups[gk]={qc:e.qc,lvl:e.lvl,assays:[]};groups[gk].assays.push(e);});
+  wrap.innerHTML=Object.values(groups).map(g=>'<div class="entry-block"><div class="entry-block-header">'+g.qc.name+' &ndash; Nivo '+g.lvl.replace('L','')+'</div>'+g.assays.map(e=>'<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap"><span style="width:150px;font-size:13px;font-weight:600">'+e.an+'</span><div class="sd-row">'+[['-3sd','minus-3','−3SD'],['-2sd','minus-2','−2SD'],['+2sd','plus-2','+2SD'],['+3sd','plus-3','+3SD']].map(([val,cls,lbl])=>'<div class="sd-btn '+cls+'" data-key="'+e.key+'" data-val="'+val+'" onclick="toggleSD(this)">'+lbl+'</div>').join('')+'</div></div>').join('')+'</div>').join('');
+}
+function toggleSD(el){const sib=el.parentElement.querySelectorAll('.sd-btn');const was=el.classList.contains('selected');sib.forEach(s=>s.classList.remove('selected'));if(!was)el.classList.add('selected');}
+function collectSdValues(){const sdMap={};document.querySelectorAll('.sd-btn.selected').forEach(el=>{sdMap[el.dataset.key]=el.dataset.val;});S.wiz.sdMap=sdMap;}
+function buildNotesSection(){
+  const wrap=$i('notesWrap');const items=[];
+  S.wiz.selectedQcs.forEach(qc=>{(S.wiz.qcLevels[qc.idx]||[]).forEach(lvl=>{const key=qc.idx+'_'+lvl;const picked=S.wiz.pickedByQcLvl[key]||[];picked.forEach(an=>{const skey=qc.idx+'_'+lvl+'_'+an;const sd=S.wiz.sdMap?.[skey]||'ok';items.push({qc,lvl,an,sd,skey});});});});
+  if(!items.length){wrap.innerHTML='<div class="empty">Ni preiskav za zabele&#382;ko.</div>';return;}
+  wrap.innerHTML=items.map(it=>'<div class="entry-block"><div class="entry-block-header"><span>'+it.qc.name+' &ndash; '+it.an+' &ndash; Nivo '+it.lvl.replace('L','')+'</span>'+sdBadge(it.sd)+'</div><div class="fg"><label>Ukrep / opomba</label><textarea id="note_'+it.skey.replace(/[^a-zA-Z0-9]/g,'_')+'" placeholder="Npr. ponovna analiza, rekalibracija..."></textarea></div></div>').join('');
+}
+function collectNotes(){const notes={};S.wiz.selectedQcs.forEach(qc=>{(S.wiz.qcLevels[qc.idx]||[]).forEach(lvl=>{const key=qc.idx+'_'+lvl;const picked=S.wiz.pickedByQcLvl[key]||[];picked.forEach(an=>{const skey=qc.idx+'_'+lvl+'_'+an;const el=$i('note_'+skey.replace(/[^a-zA-Z0-9]/g,'_'));if(el&&el.value)notes[skey]=el.value;});});});S.wiz.notes=notes;}
+
+/* ===== PIN ===== */
+function buildPinGrid(){const keys=[1,2,3,4,5,6,7,8,9,'',0,'⌫'];$i('pinGrid').innerHTML=keys.map(k=>'<div class="pin-key" onclick="pinPress(\''+k+'\')">'+k+'</div>').join('');}
+function pinPress(k){if(k===''||k==='undefined')return;if(k==='⌫')S.pinValue=S.pinValue.slice(0,-1);else if(S.pinValue.length<5)S.pinValue+=k;updatePinDisplay();}
+function clearPin(){S.pinValue='';updatePinDisplay();}
+function updatePinDisplay(){for(let i=0;i<5;i++)$i('pd'+i).classList.toggle('filled',i<S.pinValue.length);const op=S.operators.find(o=>o.id===S.pinValue);$i('pinOperatorName').textContent=op?'✓ '+op.first+' '+op.last:(S.pinValue.length===5?'⚠ Operater ni najden':'');}
+
+function saveEntry(){
+  if(S.pinValue.length<5){notify('Vpi&#353;ite vseh 5 mest','warning');return;}
+  const op=S.operators.find(o=>o.id===S.pinValue);if(!op){notify('Operater ni registriran','error');return;}
+  const baseId=Date.now().toString();
+  S.wiz.selectedQcs.forEach((qc,i)=>{
+    const levels=S.wiz.qcLevels[qc.idx]||[];if(!levels.length)return;
+    const results=[];levels.forEach(lvl=>{const picked=(S.wiz.pickedByQcLvl||{})[qc.idx+'_'+lvl]||[];picked.forEach(an=>{const skey=qc.idx+'_'+lvl+'_'+an;const sd=(S.wiz.sdMap||{})[skey]||'ok';const note=(S.wiz.notes||{})[skey]||'';results.push({assay:an,level:lvl,sd,note});});});
+    S.entries.push({id:baseId+'_'+i,datetime:S.wiz.datetime||new Date().toISOString(),instrId:S.wiz.instrId,qcName:qc.name,qcIdx:qc.idx,lot:qc.lot,levels,results,operatorId:S.pinValue,sessionId:baseId});
+  });
+  save();notify('QC vnosi shranjeni! ✓','success');initWizard();navQc('dashboard');
+}
+
+/* ===== REVIEW ===== */
+let currentReviewTab='table';
+function setReviewTab(tab){currentReviewTab=tab;document.querySelectorAll('#reviewTabs .tab').forEach((t,i)=>t.classList.toggle('active',i===(tab==='table'?0:1)));$i('reviewSummaryCard').style.display=tab==='summary'?'block':'none';if(tab==='summary')renderReviewSummary();else renderReview();}
+function renderReview(){
+  if(currentReviewTab==='summary'){renderReviewSummary();return;}
+  populateReviewFilters();
+  const iF=$i('filterInstr').value,mF=$i('filterQcMat').value,aF=$i('filterAssay').value,rF=$i('filterResult').value,dF=$i('filterDateFrom').value,dT=$i('filterDateTo').value;
+  let rows=[];
+  S.entries.forEach(e=>{const op=S.operators.find(o=>o.id===e.operatorId);const all=[...new Set((e.results||[]).map(r=>r.assay))];
+    if(!all.length){(e.levels||[]).forEach(lvl=>{rows.push({e,lvl,an:'–',sd:'ok',note:'',op,dt:new Date(e.datetime)});});return;}
+    (e.results||[]).forEach(r=>{rows.push({e,lvl:r.level,an:r.assay,sd:r.sd||'ok',note:r.note||'',op,dt:new Date(e.datetime)});});});
+  if(iF)rows=rows.filter(r=>r.e.instrId===iF);if(mF)rows=rows.filter(r=>r.e.qcName===mF);if(aF)rows=rows.filter(r=>r.an===aF);
+  if(rF==='ok')rows=rows.filter(r=>!r.sd||r.sd==='ok');else if(rF==='2sd')rows=rows.filter(r=>r.sd?.includes('2'));else if(rF==='3sd')rows=rows.filter(r=>r.sd?.includes('3'));
+  if(dF)rows=rows.filter(r=>r.dt>=new Date(dF));if(dT)rows=rows.filter(r=>r.dt<=new Date(dT+'T23:59:59'));
+  rows.sort((a,b)=>b.dt-a.dt);
+  const tbody=$i('reviewBody');
+  if(!rows.length){tbody.innerHTML='<tr><td colspan="8" class="empty">Ni podatkov.</td></tr>';return;}
+  tbody.innerHTML=rows.slice(0,300).map(({e,lvl,an,sd,note,op,dt})=>'<tr><td>'+dt.toLocaleString('sl-SI')+'</td><td><span class="badge badge-blue">'+e.instrId+'</span></td><td>'+e.qcName+'</td><td>Nivo '+lvl.replace('L','')+'</td><td>'+an+'</td><td>'+sdBadge(sd)+'</td><td style="max-width:200px;font-size:12px">'+(note?'📝 '+note.slice(0,50)+(note.length>50?'…':''):'')+'</td><td>'+(op?op.first+' '+op.last:e.operatorId)+'</td></tr>').join('');
+}
+function populateReviewFilters(){
+  const instrs=[...new Set(S.entries.map(e=>e.instrId))],mats=[...new Set(S.entries.map(e=>e.qcName))],assays=[...new Set(S.entries.flatMap(e=>e.results?.map(r=>r.assay)||[]))];
+  function repop(el,opts,prefix){const cv=el.value;el.innerHTML=prefix+opts.map(o=>'<option value="'+o+'">'+o+'</option>').join('');el.value=cv;}
+  repop($i('filterInstr'),instrs,'<option value="">Vsi in&#353;trumenti</option>');repop($i('filterQcMat'),mats,'<option value="">Vsi QC materiali</option>');repop($i('filterAssay'),assays,'<option value="">Vse preiskave</option>');
+}
+function renderReviewSummary(){
+  const assayMap={};
+  S.entries.forEach(e=>{(e.results||[]).forEach(r=>{const k=r.assay+'||'+e.qcName;if(!assayMap[k])assayMap[k]={assay:r.assay,qcMat:e.qcName,ok:0,sd2:0,sd3:0,total:0};assayMap[k].total++;if(r.sd?.includes('3'))assayMap[k].sd3++;else if(r.sd?.includes('2'))assayMap[k].sd2++;else assayMap[k].ok++;});});
+  const rows=Object.values(assayMap).sort((a,b)=>(b.sd3+b.sd2)-(a.sd3+a.sd2));
+  if(!rows.length){$i('reviewSummaryBody').innerHTML='<div class="empty">Ni podatkov.</div>';return;}
+  $i('reviewSummaryBody').innerHTML='<div class="tbl-wrap"><table><thead><tr><th>Preiskava</th><th>QC Material</th><th>Skupaj</th><th>OK</th><th>±2SD</th><th>±3SD</th><th>% izpadov</th><th>Graf</th></tr></thead><tbody>'+rows.map(r=>{const pct=r.total>0?Math.round((r.sd2+r.sd3)/r.total*100):0;const barC=pct>=20?'var(--danger)':pct>=10?'var(--warning)':'var(--success)';return '<tr><td><strong>'+r.assay+'</strong></td><td style="font-size:12px">'+r.qcMat+'</td><td>'+r.total+'</td><td><span class="badge badge-ok">'+r.ok+'</span></td><td><span class="badge badge-2sd">'+r.sd2+'</span></td><td><span class="badge badge-3sd">'+r.sd3+'</span></td><td><div style="display:flex;align-items:center;gap:6px"><div style="width:50px;height:8px;background:var(--bg3);border-radius:4px;overflow:hidden"><div style="width:'+Math.min(pct,100)+'%;height:100%;background:'+barC+'"></div></div><span style="font-size:12px;color:'+barC+';font-weight:600">'+pct+'%</span></div></td><td><button class="btn btn-outline btn-sm" onclick="goToLjFor(\''+r.assay+'\',\''+r.qcMat+'\')">📈</button></td></tr>';}).join('')+'</tbody></table></div>';
+}
+function goToLjFor(assay,qcMat){navQc('lj');setTimeout(()=>{const ljQ=$i('ljQcMat');if(ljQ){ljQ.value=qcMat;onLjQcMatChange();}const ljA=$i('ljAssay');if(ljA)ljA.value=assay;renderLJ();},100);}
+
+/* ===== LJ ===== */
+function onLjQcMatChange(){const qcName=$i('ljQcMat').value;const qc=S.qcMaterials.find(q=>q.name===qcName);const assays=qc?.assays?.length?qc.assays:S.assays.map(a=>a.name);$i('ljAssay').innerHTML=assays.map(a=>'<option value="'+a+'">'+a+'</option>').join('');renderLJ();}
+function populateLjSelects(){$i('ljQcMat').innerHTML=S.qcMaterials.map(q=>'<option value="'+q.name+'">'+q.name+'</option>').join('');onLjQcMatChange();}
+function sdToVal(sd){return sd==='+3sd'?3.2:sd==='+2sd'?2.2:sd==='-2sd'?-2.2:sd==='-3sd'?-3.2:0;}
+
+/* Westgard — incl. 10_x */
+function checkWestgard(pts,rules){
+  const viol={};
+  const mark=(i,rule,c)=>{if(!viol[i]||viol[i].sev<(c==='#dc2626'?2:1))viol[i]={rule,color:c,sev:c==='#dc2626'?2:1};};
+  const vals=pts.map(p=>p.sdV);
+  for(let i=0;i<vals.length;i++){
+    if(rules['1_2s']&&Math.abs(vals[i])>=2)mark(i,'1₂ₛ','#f59e0b');
+    if(rules['1_3s']&&Math.abs(vals[i])>=3)mark(i,'1₃ₛ','#dc2626');
+    if(rules['2_2s']&&i>0&&Math.abs(vals[i])>=2&&Math.abs(vals[i-1])>=2&&Math.sign(vals[i])===Math.sign(vals[i-1])){mark(i,'2₂ₛ','#dc2626');mark(i-1,'2₂ₛ','#dc2626');}
+    if(rules['R_4s']&&i>0&&((vals[i]-vals[i-1])>=4||(vals[i-1]-vals[i])>=4)){if(Math.abs(vals[i])>=2&&Math.abs(vals[i-1])>=2&&Math.sign(vals[i])!==Math.sign(vals[i-1])){mark(i,'R₄ₛ','#dc2626');mark(i-1,'R₄ₛ','#dc2626');}}
+    if(rules['4_1s']&&i>=3){const last4=vals.slice(i-3,i+1);if(last4.every(v=>v>=1)||last4.every(v=>v<=-1)){for(let j=i-3;j<=i;j++)mark(j,'4₁ₛ','#dc2626');}}
+    if(rules['10_x']&&i>=9){const last10=vals.slice(i-9,i+1);if(last10.every(v=>v>0)||last10.every(v=>v<0)){for(let j=i-9;j<=i;j++)mark(j,'10ₓ','#dc2626');}}
+  }
+  return viol;
+}
+function _drawVLine(ctx,x,yTop,yBot,vl){const color=vl.type==='cal'?'#f97316':vl.type==='note'?'#8b5cf6':'#dc2626';const dash=vl.type==='cal'?[6,3]:vl.type==='note'?[3,3]:[];ctx.save();ctx.beginPath();ctx.strokeStyle=color;ctx.lineWidth=2;ctx.setLineDash(dash);ctx.moveTo(x,yTop);ctx.lineTo(x,yBot);ctx.stroke();ctx.setLineDash([]);ctx.beginPath();ctx.moveTo(x-6,yTop);ctx.lineTo(x+6,yTop);ctx.lineTo(x,yTop+10);ctx.closePath();ctx.fillStyle=color;ctx.fill();ctx.save();ctx.translate(x+4,yTop+32);ctx.rotate(Math.PI/2);ctx.fillStyle=color;ctx.font='bold 9px system-ui';ctx.textAlign='left';ctx.fillText((vl.type==='cal'?'KAL':'QC')+(vl.lotNum?' '+vl.lotNum:''),0,0);ctx.restore();ctx.restore();}
+function drawLJCanvas(canvasId,pts,title,level,statsContainerId,vlines){
+  const canvas=$i(canvasId);if(!canvas)return;const ctx=canvas.getContext('2d');
+  const W=canvas.offsetWidth||700,H=canvas.height||380;canvas.width=W;ctx.clearRect(0,0,W,H);
+  const pad={l:58,r:24,t:30,b:56},cH=H-pad.t-pad.b,cW=W-pad.l-pad.r,midY=pad.t+cH/2;
+  const sdToY=v=>midY-(v/4.5)*(cH/2);
+  [[4.5,3,'rgba(180,20,20,0.07)'],[3,2,'rgba(245,158,11,0.1)'],[2,-2,'rgba(16,185,129,0.06)'],[-2,-3,'rgba(245,158,11,0.1)'],[-3,-4.5,'rgba(180,20,20,0.07)']].forEach(([t,b,c])=>{ctx.fillStyle=c;ctx.fillRect(pad.l,sdToY(t),cW,sdToY(b)-sdToY(t));});
+  [-4,-3,-2,-1,0,1,2,3,4].forEach(sd=>{const y=sdToY(sd);ctx.beginPath();ctx.strokeStyle=sd===0?'rgba(0,48,135,0.4)':Math.abs(sd)>=3?'rgba(220,38,38,0.55)':Math.abs(sd)===2?'rgba(245,158,11,0.55)':'rgba(0,0,0,0.1)';ctx.lineWidth=sd===0?2:Math.abs(sd)>=3?1.5:1;ctx.setLineDash(sd===0?[]:[5,3]);ctx.moveTo(pad.l,y);ctx.lineTo(pad.l+cW,y);ctx.stroke();ctx.setLineDash([]);ctx.fillStyle=Math.abs(sd)>=3?'#dc2626':Math.abs(sd)===2?'#d97706':'#6b7280';ctx.font='10px system-ui';ctx.textAlign='right';ctx.fillText(sd===0?'Mean':sd>0?'+'+sd+'SD':sd+'SD',pad.l-4,y+4);});
+  ctx.fillStyle='#003087';ctx.font='bold 12px system-ui';ctx.textAlign='center';ctx.fillText(title,W/2,18);
+  if(!pts.length){ctx.fillStyle='#9ca3af';ctx.font='13px system-ui';ctx.textAlign='center';ctx.fillText('Ni podatkov za izbrano kombinacijo.',W/2,midY);if(vlines&&vlines.length){vlines.forEach((vl,vi)=>{const x=pad.l+cW*0.1+vi*(cW*0.15);_drawVLine(ctx,x,pad.t,pad.t+cH,vl);});}return;}
+  const n=pts.length,step=Math.max(22,Math.min(cW/(n+1),56));
+  const startX=n*step<=cW?pad.l+(cW-step*n)/2+step/2:pad.l+step/2;const xOf=i=>startX+i*step;
+  const viol=checkWestgard(pts,S.ljRules);
+  canvas._vlines=[];
+  if(vlines&&vlines.length){vlines.forEach(vl=>{let x=null;for(let i=0;i<pts.length;i++){if(pts[i].dt>=vl.dt){x=i===0?xOf(0)-step*0.5:(xOf(i-1)+xOf(i))/2;break;}}if(x===null)x=xOf(pts.length-1)+step*0.5;x=Math.max(pad.l+2,Math.min(x,pad.l+cW-2));_drawVLine(ctx,x,pad.t,pad.t+cH,vl);canvas._vlines.push({...vl,x});});}
+  ctx.beginPath();ctx.strokeStyle='rgba(0,48,135,0.25)';ctx.lineWidth=1.5;ctx.setLineDash([]);pts.forEach((p,i)=>{if(i===0)ctx.moveTo(xOf(i),sdToY(p.sdV));else ctx.lineTo(xOf(i),sdToY(p.sdV));});ctx.stroke();
+  pts.forEach((p,i)=>{const x=xOf(i),y=sdToY(p.sdV),abs=Math.abs(p.sdV);let color=abs>=3?'#dc2626':abs>=2?'#f59e0b':'#059669',ring=null;if(viol[i]){ring=viol[i].color;if(ring==='#dc2626')color='#dc2626';}if(ring){ctx.beginPath();ctx.arc(x,y,9,0,Math.PI*2);ctx.strokeStyle=ring;ctx.lineWidth=2.5;ctx.setLineDash([]);ctx.stroke();}ctx.beginPath();ctx.arc(x,y,5.5,0,Math.PI*2);ctx.fillStyle=color;ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.stroke();if(viol[i]){ctx.fillStyle=ring;ctx.font='bold 8px system-ui';ctx.textAlign='center';ctx.fillText(viol[i].rule,x,y-12);}if(p.note){ctx.fillStyle='#6366f1';ctx.font='9px system-ui';ctx.textAlign='center';ctx.fillText('📝',x+8,y-6);}ctx.save();ctx.translate(x,H-pad.b+10);ctx.rotate(-Math.PI/3.5);ctx.fillStyle='#6b7280';ctx.font='8px system-ui';ctx.textAlign='right';ctx.fillText(p.dt.toLocaleDateString('sl-SI',{day:'2-digit',month:'2-digit'}),0,0);ctx.restore();});
+  canvas._pts=pts.map((p,i)=>({...p,x:xOf(i),y:sdToY(p.sdV)}));
+  if(statsContainerId){const el=$i(statsContainerId);if(el){const n2=pts.length,cnt2sd=pts.filter(p=>Math.abs(p.sdV)>=2&&Math.abs(p.sdV)<3).length,cnt3sd=pts.filter(p=>Math.abs(p.sdV)>=3).length,cntOk=n2-cnt2sd-cnt3sd,violCount=Object.keys(viol).length;el.innerHTML='<div style="display:flex;gap:12px;flex-wrap:wrap;font-size:12px;padding:8px 0;align-items:center"><span><strong>N:</strong> '+n2+'</span><span><strong>OK:</strong> <span style="color:var(--success)">'+cntOk+'</span></span><span><strong>±2SD:</strong> <span style="color:var(--warning)">'+cnt2sd+'</span></span><span><strong>±3SD:</strong> <span style="color:var(--danger)">'+cnt3sd+'</span></span><span><strong>Westgard:</strong> <span style="color:var(--danger)">'+violCount+'</span></span></div>';}}
+}
+function buildVLines(qcObj){if(!qcObj)return [];const lots=qcObj.lotHistory||[];return lots.slice(1).filter(l=>l.date).map(l=>({dt:new Date(l.date+'T00:00:00'),type:l.type||'qc',lotNum:l.lot||'',note:l.note||''}));}
+function getAssayRules(qcMat,assay,level){const key=('wg_'+qcMat+'_'+assay+'_'+level).replace(/[^a-zA-Z0-9_]/g,'_');return S.assayRules?.[key]||{...S.ljRules};}
+function setAssayRule(qcMat,assay,level,rule,val){if(!S.assayRules)S.assayRules={};const key=('wg_'+qcMat+'_'+assay+'_'+level).replace(/[^a-zA-Z0-9_]/g,'_');if(!S.assayRules[key])S.assayRules[key]={...S.ljRules};S.assayRules[key][rule]=val;save();}
+function renderLJ(){
+  const assay=$i('ljAssay')?.value,qcMat=$i('ljQcMat')?.value,level=$i('ljLevel')?.value;if(!assay||!qcMat)return;
+  const perRules=getAssayRules(qcMat,assay,level);
+  const rulesDefs=[{id:'1_2s',label:'1₂ₛ'},{id:'1_3s',label:'1₃ₛ'},{id:'2_2s',label:'2₂ₛ'},{id:'R_4s',label:'R₄ₛ'},{id:'4_1s',label:'4₁ₛ'},{id:'10_x',label:'10ₓ'}];
+  const rulesEl=$i('ljRules');if(rulesEl)rulesEl.innerHTML=rulesDefs.map(r=>'<div class="toggle-wrap"><label class="toggle"><input type="checkbox" '+(perRules[r.id]?'checked':'')+' onchange="setAssayRule(\''+qcMat+'\',\''+assay+'\',\''+level+'\',\''+r.id+'\',this.checked);renderLJ()"><span class="toggle-slider"></span></label><span style="font-size:12px;color:var(--text2)">'+r.label+'</span></div>').join('');
+  const pts=[];
+  S.entries.filter(e=>e.qcName===qcMat&&e.levels?.includes(level)).forEach(e=>{const res=(e.results||[]).find(r=>r.assay===assay&&r.level===level);const sd=res?.sd||'ok';pts.push({dt:new Date(e.datetime),sdV:sdToVal(sd),sd,note:res?.note||'',instrId:e.instrId,operatorId:e.operatorId,entryId:e.id});});
+  pts.sort((a,b)=>a.dt-b.dt);
+  const qcObj=S.qcMaterials.find(q=>q.name===qcMat),vlines=buildVLines(qcObj);
+  const orig=S.ljRules;S.ljRules=perRules;drawLJCanvas('ljCanvas',pts,assay+' – '+qcMat+' – Nivo '+level.replace('L',''),level,'ljStats',vlines);S.ljRules=orig;
+}
+
+/* ===== LJ MULTI ===== */
+function onLjmQcMatChange(){const qcName=$i('ljmQcMat').value;const qc=S.qcMaterials.find(q=>q.name===qcName);const assays=qc?.assays?.length?qc.assays:S.assays.map(a=>a.name);$i('ljmAssays').innerHTML=assays.map(a=>'<option value="'+a+'">'+a+'</option>').join('');const levels=qc?.levels||2;$i('ljmLevelPills').innerHTML=Array.from({length:levels},(_,i)=>'<div class="level-pill lp-pill" data-level="L'+(i+1)+'" onclick="this.classList.toggle(\'selected-pill\')" style="font-size:12px">Nivo '+(i+1)+'</div>').join('');}
+function populateLjmSelects(){$i('ljmQcMat').innerHTML=S.qcMaterials.map(q=>'<option value="'+q.name+'">'+q.name+'</option>').join('');onLjmQcMatChange();}
+function renderLJMulti(){
+  const qcMat=$i('ljmQcMat').value;const selAssays=[...$i('ljmAssays').selectedOptions].map(o=>o.value);const selLevels=[...document.querySelectorAll('#ljmLevelPills .lp-pill.selected-pill')].map(p=>p.dataset.level);
+  if(!selAssays.length){notify('Izberite vsaj eno preiskavo','warning');return;}if(!selLevels.length){notify('Izberite vsaj en nivo','warning');return;}
+  const wrap=$i('ljMultiCharts');wrap.innerHTML='';
+  selAssays.forEach(assay=>{selLevels.forEach(lvl=>{
+    const div=document.createElement('div');div.className='card';const cid='ljmc_'+assay.replace(/[^a-z0-9]/gi,'_')+'_'+lvl,sid='stats_'+cid;
+    div.innerHTML='<div style="font-weight:600;font-size:13px;color:var(--abbott-blue);margin-bottom:8px">'+assay+' – Nivo '+lvl.replace('L','')+'</div><div class="lj-canvas-wrap"><canvas id="'+cid+'" height="260"></canvas></div><div id="'+sid+'" style="margin-top:4px;border-top:1px solid var(--border);padding-top:4px"></div>';
+    wrap.appendChild(div);
+    const pts=[];S.entries.filter(e=>e.qcName===qcMat&&e.levels?.includes(lvl)).forEach(e=>{const res=(e.results||[]).find(r=>r.assay===assay&&r.level===lvl);const sd=res?.sd||'ok';pts.push({dt:new Date(e.datetime),sdV:sdToVal(sd),sd,note:res?.note||'',instrId:e.instrId,operatorId:e.operatorId});});
+    pts.sort((a,b)=>a.dt-b.dt);
+    setTimeout(()=>{const c=$i(cid);if(!c)return;c.height=260;const qcObjM=S.qcMaterials.find(q=>q.name===qcMat);drawLJCanvas(cid,pts,assay+' – '+qcMat+' – Nivo '+lvl.replace('L',''),lvl,sid,buildVLines(qcObjM));},50);
+  });});
+}
+
+/* ===== ASSAYS ===== */
+function setAssayTab(tab){S.currentAssayTab=tab;document.querySelectorAll('#page-assays .tabs .tab').forEach((t,i)=>t.classList.toggle('active',i===(tab==='biochem'?0:1)));renderAssays();}
+function renderAssays(){const q=($i('assaySearch')?.value||'').toLowerCase();const filtered=S.assays.filter(a=>a.type===S.currentAssayTab&&a.name.toLowerCase().includes(q));$i('assayBody').innerHTML=filtered.map(a=>{const ri=S.assays.indexOf(a);const used=S.qcMaterials.filter(q=>q.assays?.includes(a.name)).map(q=>q.name).join(', ')||'–';return '<tr><td><strong>'+a.name+'</strong></td><td><span class="badge '+(a.type==='biochem'?'badge-blue':'badge-ok')+'">'+(a.type==='biochem'?'Biokemija':'Imunologija')+'</span></td><td style="font-size:12px" class="muted">'+used+'</td><td><button class="btn btn-outline btn-sm" onclick="openAssayModal('+ri+')">✏️</button> <button class="btn btn-d btn-sm" onclick="deleteAssay('+ri+')">🗑️</button></td></tr>';}).join('')||'<tr><td colspan="4" class="empty">Ni preiskav.</td></tr>';}
+function openAssayModal(idx){S.editingAssayIdx=idx??null;$i('assayModalTitle').textContent=idx!=null?'Uredi preiskavo':'Nova preiskava';if(idx!=null){$i('assayName').value=S.assays[idx].name;$i('assayType').value=S.assays[idx].type;}else{$i('assayName').value='';$i('assayType').value='biochem';}showMo('assayModal');}
+function deleteAssay(i){if(!confirm('Izbri&#353;i?'))return;S.assays.splice(i,1);save();renderAssays();notify('Preiskava izbrisana');}
+function saveAssay(){const n=$i('assayName').value.trim(),t=$i('assayType').value;if(!n){notify('Vnesite naziv','warning');return;}if(S.editingAssayIdx!=null)S.assays[S.editingAssayIdx]={name:n,type:t};else S.assays.push({name:n,type:t});save();closeMo('assayModal');renderAssays();notify('Preiskava shranjena','success');}
+
+/* ===== QC MATERIALS ===== */
+function renderQcMats(){$i('qcMatBody').innerHTML=S.qcMaterials.map((q,i)=>'<tr><td><strong>'+q.name+'</strong></td><td><span class="badge badge-gray">'+q.type+'</span></td><td>'+q.levels+'</td><td>'+(q.lot||'–')+'</td><td style="font-size:12px">'+((q.assays||[]).slice(0,3).join(', ')+(q.assays?.length>3?' +'+(q.assays.length-3):''))+'</td><td><button class="btn btn-outline btn-sm" onclick="openQcModal('+i+')">✏️</button> <button class="btn btn-g btn-sm" onclick="openLotHistory('+i+')">📋</button> <button class="btn btn-d btn-sm" onclick="deleteQcMat('+i+')">🗑️</button></td></tr>').join('')||'<tr><td colspan="6" class="empty">Ni materialov.</td></tr>';}
+function openQcModal(idx){S.editingQcIdx=idx??null;$i('qcModalTitle').textContent=idx!=null?'Uredi QC material':'Nov QC material';if(idx!=null){const q=S.qcMaterials[idx];$i('qcName').value=q.name;$i('qcType').value=q.type;$i('qcLot').value=q.lot||'';$i('qcLevels').value=q.levels||2;}else{$i('qcName').value='';$i('qcType').value='biochem';$i('qcLot').value='';$i('qcLevels').value=2;}const sel=idx!=null?(S.qcMaterials[idx].assays||[]):[];$i('qcAssayList').innerHTML=S.assays.map(a=>'<label class="assay-check"><input type="checkbox" value="'+a.name+'" '+(sel.includes(a.name)?'checked':'')+'> '+a.name+' <span style="font-size:10px;color:var(--text3)">('+(a.type==='biochem'?'c':'i')+')</span></label>').join('');showMo('qcModal');}
+function deleteQcMat(i){if(!confirm('Izbri&#353;i?'))return;S.qcMaterials.splice(i,1);save();renderQcMats();notify('Material izbrisan');}
+function saveQcMaterial(){const name=$i('qcName').value.trim(),type=$i('qcType').value,lot=$i('qcLot').value.trim(),levels=parseInt($i('qcLevels').value);const assays=[...$i('qcAssayList').querySelectorAll('input:checked')].map(el=>el.value);if(!name){notify('Vnesite naziv','warning');return;}const obj={name,type,lot,levels,assays};if(S.editingQcIdx!=null)S.qcMaterials[S.editingQcIdx]=obj;else S.qcMaterials.push(obj);save();closeMo('qcModal');renderQcMats();notify('Material shranjen','success');}
+
+/* ===== OPERATORS ===== */
+function renderOperators(){const q=($i('opSearch')?.value||'').toLowerCase();const filtered=S.operators.filter(o=>(o.first+' '+o.last+' '+o.id).toLowerCase().includes(q));$i('operatorBody').innerHTML=filtered.map(o=>{const ri=S.operators.indexOf(o);return '<tr><td><span class="badge badge-blue">'+o.id+'</span></td><td>'+o.first+'</td><td>'+o.last+'</td><td><button class="btn btn-outline btn-sm" onclick="openOperatorModal('+ri+')">✏️</button> <button class="btn btn-d btn-sm" onclick="deleteOperator('+ri+')">🗑️</button></td></tr>';}).join('')||'<tr><td colspan="4" class="empty">Ni rezultatov.</td></tr>';}
+function openOperatorModal(idx){S.editingOpIdx=idx??null;$i('operatorModalTitle').textContent=idx!=null?'Uredi operaterja':'Nov operater';if(idx!=null){const o=S.operators[idx];$i('opId').value=o.id;$i('opFirst').value=o.first;$i('opLast').value=o.last;}else{$i('opId').value='';$i('opFirst').value='';$i('opLast').value='';}showMo('operatorModal');}
+function deleteOperator(i){if(!confirm('Izbri&#353;i operaterja?'))return;S.operators.splice(i,1);save();renderOperators();notify('Operater izbrisan');}
+function saveOperator(){const id=$i('opId').value.trim(),first=$i('opFirst').value.trim(),last=$i('opLast').value.trim();if(!id||id.length!==5||isNaN(id)){notify('ID mora biti to&#269;no 5 &#353;tevilk','warning');return;}if(!first||!last){notify('Vnesite ime in priimek','warning');return;}if(S.editingOpIdx!=null)S.operators[S.editingOpIdx]={id,first,last};else{if(S.operators.find(o=>o.id===id)){notify('ID &#382;e obstaja','error');return;}S.operators.push({id,first,last});}save();closeMo('operatorModal');renderOperators();notify('Operater shranjen','success');}
+function exportOperators(){const blob=new Blob([JSON.stringify(S.operators,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='operaterji.json';a.click();notify('Operaterji izvo&#382;eni','success');}
+function importOperators(input){const f=input.files[0];if(!f)return;const r=new FileReader();r.onload=e=>{try{const arr=JSON.parse(e.target.result);if(Array.isArray(arr)){let added=0;arr.forEach(o=>{if(o.id&&!S.operators.find(x=>x.id===o.id)){S.operators.push(o);added++;}});save();renderOperators();notify('Uvo&#382;enih '+added+' operaterjev','success');}}catch(err){notify('Napaka pri uvozu','error');}};r.readAsText(f);input.value='';}
+
+/* ===== EXPORT ===== */
+function exportCSV(){const hdr=['Datum','Čas','Inštrument','QC Material','Lot','Nivo','Preiskava','Rezultat SD','Zabeležka','Operater ID','Operater'];const rows=[hdr.join(',')];S.entries.forEach(e=>{const op=S.operators.find(o=>o.id===e.operatorId);const dt=new Date(e.datetime);if(!(e.results||[]).length){(e.levels||[]).forEach(lvl=>rows.push([dt.toLocaleDateString('sl-SI'),dt.toLocaleTimeString('sl-SI'),e.instrId,e.qcName,e.lot||'','Nivo '+lvl.replace('L',''),'–','ok','',e.operatorId,op?op.first+' '+op.last:''].map(v=>'"'+v+'"').join(',')));return;}(e.results||[]).forEach(r=>rows.push([dt.toLocaleDateString('sl-SI'),dt.toLocaleTimeString('sl-SI'),e.instrId,e.qcName,e.lot||'','Nivo '+r.level.replace('L',''),r.assay,r.sd||'ok',(r.note||'').replace(/,/g,' '),e.operatorId,op?op.first+' '+op.last:''].map(v=>'"'+v+'"').join(',')));});const blob=new Blob(['﻿'+rows.join('\r\n')],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='QC_'+new Date().toISOString().slice(0,10)+'.csv';a.click();notify('CSV izvo&#382;en','success');}
+
+/* ===== LOT HISTORY ===== */
+let currentLotQcIdx=null;
+function openLotHistory(idx){currentLotQcIdx=idx;const qc=S.qcMaterials[idx];$i('lotModalTitle').textContent='Loti – '+qc.name;renderLotHistory(qc);const now=new Date();now.setMinutes(now.getMinutes()-now.getTimezoneOffset());$i('newLotDate').value=now.toISOString().slice(0,10);$i('newLotNum').value='';$i('newLotNote').value='';showMo('lotModal');}
+function renderLotHistory(qc){const lots=qc.lotHistory||[{lot:qc.lot||'–',date:'',type:'qc',note:'Začetni lot'}];const typeInfo={qc:{label:'🔴 QC lot',color:'#dc2626'},cal:{label:'🟠 Kalibrator',color:'#f97316'},note:{label:'📝 Opomba',color:'#8b5cf6'}};let lastQcIdx=-1;lots.forEach((l,i)=>{if((l.type||'qc')==='qc')lastQcIdx=i;});$i('lotHistoryBody').innerHTML='<div class="tbl-wrap"><table><thead><tr><th>Tip</th><th>Lot</th><th>Datum</th><th>Opomba</th><th></th></tr></thead><tbody>'+lots.map((l,i)=>{const ti=typeInfo[l.type||'qc']||typeInfo.qc;const isActive=(l.type||'qc')==='qc'&&i===lastQcIdx;return '<tr><td><span style="font-size:12px;color:'+ti.color+';font-weight:600">'+ti.label+'</span></td><td><strong>'+(l.lot||'–')+'</strong>'+(isActive?'<span class="badge badge-ok" style="margin-left:6px">Aktiven</span>':'')+'</td><td style="font-size:12px">'+(l.date||'–')+'</td><td style="font-size:12px" class="muted">'+(l.note||'')+'</td><td>'+(i>0?'<button class="btn btn-d btn-sm" onclick="deleteLot('+i+')">🗑️</button>':'<span style="font-size:10px" class="muted">Izhodi&#353;&#269;ni</span>')+'</td></tr>';}).join('')+'</tbody></table></div>';}
+function toggleLotTypeFields(){const type=$i('newLotType').value;const numWrap=$i('newLotNumWrap');if(type==='note'){numWrap.style.display='none';}else{numWrap.style.display='';$i('newLotNumLabel').textContent=type==='cal'?'Nova lot &#353;tevilka kalibratorja':'Nova lot &#353;tevilka QC kontrole';}}
+function addLot(){const type=$i('newLotType').value,lot=$i('newLotNum').value.trim(),date=$i('newLotDate').value,note=$i('newLotNote').value.trim();if(type!=='note'&&!lot){notify('Vpi&#353;ite lot &#353;tevilko','warning');return;}if(!date){notify('Izberite datum','warning');return;}const qc=S.qcMaterials[currentLotQcIdx];if(!qc.lotHistory)qc.lotHistory=[{lot:qc.lot||'–',date:'',type:'qc',note:'Začetni lot'}];qc.lotHistory.push({lot:lot||'–',date,type,note});if(type==='qc'&&lot)qc.lot=lot;save();renderLotHistory(qc);renderQcMats();notify('Vnos zabele&#382;en','success');$i('newLotNum').value='';$i('newLotNote').value='';}
+function deleteLot(i){if(!confirm('Izbri&#353;i lot?'))return;const qc=S.qcMaterials[currentLotQcIdx];if(qc.lotHistory)qc.lotHistory.splice(i,1);save();renderLotHistory(qc);notify('Lot izbrisan');}
+
+/* ===== MAINTENANCE ===== */
+const MAINT_TYPES={daily:{label:'Dnevno vzdrževanje',icon:'📅',color:'#0891b2'},weekly:{label:'Tedensko vzdrževanje',icon:'📆',color:'#7c3aed'},monthly:{label:'Mesečno vzdrževanje',icon:'🗓️',color:'#b45309'},quarterly:{label:'Kvartalno vzdrževanje',icon:'📋',color:'#065f46'},triannual:{label:'Trianulano vzdrževanje',icon:'🔩',color:'#9f1239'}};
+const MAINT_STEPS={daily:{c:[],i:[]},weekly:{c:[],i:[]},monthly:{c:[],i:[]},quarterly:{c:[],i:[]},triannual:{c:[],i:[]}};
+let maintState={type:'daily',checked:{},pendingSign:null};
+function setMaintType(type){maintState.type=type;document.querySelectorAll('#maintTypeTabs .tab').forEach((t,i)=>t.classList.toggle('active',i===['daily','weekly','monthly','quarterly','triannual'].indexOf(type)));renderMaintContent();}
+function renderMaintContent(){
+  const type=maintState.type;const wrap=$i('maintContent');
+  wrap.innerHTML=INSTRUMENTS.map(instr=>{
+    const steps=MAINT_STEPS[type]?.[instr.type]||[];const key=instr.id+'_'+type;const checked=maintState.checked[key]||{};
+    const doneCount=steps.filter(s=>checked[s.id]).length;const allDone=steps.length>0&&doneCount===steps.length;const ti=MAINT_TYPES[type];
+    const todayStr=new Date().toISOString().slice(0,10);const alreadyDone=(S.maintenanceLog||[]).find(m=>m.instrId===instr.id&&m.type===type&&m.datetime.slice(0,10)===todayStr);
+    return '<div class="card" style="border-left:4px solid '+(allDone?'var(--success)':ti.color)+'"><div class="card-title"><span>'+ti.icon+' '+instr.id+' &ndash; '+instr.name+'</span><span style="font-size:12px;font-weight:400;color:'+(allDone?'var(--success)':'var(--text3)')+'">'+(allDone?'✅ Vse opravljeno':doneCount+' / '+steps.length+' korakov')+'</span></div>'+(alreadyDone?'<div style="background:var(--gbg);border:1px solid var(--green);border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:12px;color:var(--accent2)">✅ Danes potrjeno ob '+new Date(alreadyDone.datetime).toLocaleTimeString('sl-SI',{hour:'2-digit',minute:'2-digit'})+' &ndash; '+getOpName(alreadyDone.operatorId)+'</div>':'')+(steps.length===0?'<div class="muted" style="font-size:13px;padding:8px">Koraki bodo dodani za '+ti.label.toLowerCase()+' Alinity '+instr.type.toUpperCase()+'.</div>':'<div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:10px"><button class="btn btn-g btn-sm" onclick="checkAllMaint(\''+instr.id+'\',\''+type+'\',true)">✔ Vse</button><button class="btn btn-g btn-sm" onclick="checkAllMaint(\''+instr.id+'\',\''+type+'\',false)">☐ Po&#269;isti</button></div>'+steps.map(step=>{const isC=!!checked[step.id];return '<label style="display:flex;align-items:flex-start;gap:10px;padding:8px 10px;border-radius:7px;cursor:pointer;margin-bottom:4px;background:'+(isC?'var(--gbg)':'var(--bg2)')+';border:1px solid '+(isC?'var(--green)':'var(--border)')+'"><input type="checkbox" '+(isC?'checked':'')+' style="width:17px;height:17px;margin-top:1px;accent-color:var(--success)" onchange="toggleMaintStep(\''+instr.id+'\',\''+type+'\',\''+step.id+'\',this.checked)"><span style="font-size:13px;'+(isC?'text-decoration:line-through;opacity:.7':'')+'">'+step.text+'</span></label>';}).join('')+'<div style="margin-top:12px;text-align:right"><button class="btn '+(allDone?'btn-teal':'btn-outline')+' btn-sm" onclick="openMaintSign(\''+instr.id+'\',\''+type+'\')">'+(allDone?'✅ Potrdi in podpi&#353;i':'⚠️ Potrdi')+'</button></div>')+'</div>';
+  }).join('');
+}
+function toggleMaintStep(instrId,type,stepId,val){const key=instrId+'_'+type;if(!maintState.checked[key])maintState.checked[key]={};maintState.checked[key][stepId]=val;renderMaintContent();}
+function checkAllMaint(instrId,type,val){const steps=MAINT_STEPS[type]?.[INSTRUMENTS.find(i=>i.id===instrId)?.type]||[];const key=instrId+'_'+type;if(!maintState.checked[key])maintState.checked[key]={};steps.forEach(s=>{maintState.checked[key][s.id]=val;});renderMaintContent();}
+let maintPinVal='';
+function openMaintSign(instrId,type){const instr=INSTRUMENTS.find(i=>i.id===instrId);const steps=MAINT_STEPS[type]?.[instr.type]||[];const key=instrId+'_'+type;const checked=maintState.checked[key]||{};const doneCount=steps.filter(s=>checked[s.id]).length;const ti=MAINT_TYPES[type];maintState.pendingSign={instrId,type};maintPinVal='';$i('maintSignTitle').textContent='Potrditev – '+instrId;$i('maintSignSummary').innerHTML='<div style="background:rgba(0,48,135,.05);border-radius:8px;padding:10px 14px"><div style="font-weight:600;font-size:14px;color:var(--abbott-blue);margin-bottom:6px">'+ti.icon+' '+ti.label+' – '+instrId+'</div><div style="font-size:13px">Opravljenih: <strong>'+doneCount+' / '+steps.length+'</strong> '+(doneCount<steps.length?'<span class="badge badge-2sd">Ni popolno</span>':'<span class="badge badge-ok">Vse</span>')+'</div></div>';$i('maintSignNote').value='';updateMaintPinDisplay();buildMaintPinGrid();showMo('maintSignModal');}
+function buildMaintPinGrid(){const keys=[1,2,3,4,5,6,7,8,9,'',0,'⌫'];$i('maintPinGrid').innerHTML=keys.map(k=>'<div class="pin-key" onclick="maintPinPress(\''+k+'\')">'+k+'</div>').join('');}
+function maintPinPress(k){if(k===''||k==='undefined')return;if(k==='⌫')maintPinVal=maintPinVal.slice(0,-1);else if(maintPinVal.length<5)maintPinVal+=k;updateMaintPinDisplay();}
+function clearMaintPin(){maintPinVal='';updateMaintPinDisplay();}
+function updateMaintPinDisplay(){for(let i=0;i<5;i++)$i('mpd'+i)?.classList.toggle('filled',i<maintPinVal.length);const op=S.operators.find(o=>o.id===maintPinVal);$i('maintPinName').textContent=op?'✓ '+op.first+' '+op.last:(maintPinVal.length===5?'⚠ Operater ni najden':'');}
+function saveMaintenance(){if(maintPinVal.length<5){notify('Vpi&#353;ite mati&#269;no &#353;tevilko','warning');return;}const op=S.operators.find(o=>o.id===maintPinVal);if(!op){notify('Operater ni registriran','error');return;}const {instrId,type}=maintState.pendingSign;const instr=INSTRUMENTS.find(i=>i.id===instrId);const steps=MAINT_STEPS[type]?.[instr.type]||[];const key=instrId+'_'+type;const checked=maintState.checked[key]||{};const record={id:Date.now().toString(),datetime:new Date().toISOString(),instrId,integration:instr.integration,type,steps:steps.map(s=>({id:s.id,text:s.text,done:!!checked[s.id]})),doneCount:steps.filter(s=>checked[s.id]).length,totalSteps:steps.length,note:$i('maintSignNote').value.trim(),operatorId:maintPinVal};if(!S.maintenanceLog)S.maintenanceLog=[];S.maintenanceLog.push(record);save();closeMo('maintSignModal');maintState.checked[key]={};renderMaintContent();notify('Vzdr&#382;evanje potrjeno! ✓','success');}
+function getOpName(id){const op=S.operators.find(o=>o.id===id);return op?op.first+' '+op.last:id;}
+function renderMaintReview(){const tf=$i('mrFilterType').value,ig=$i('mrFilterInteg').value,df=$i('mrFilterFrom').value,dt=$i('mrFilterTo').value;let logs=[...(S.maintenanceLog||[])];if(tf)logs=logs.filter(m=>m.type===tf);if(ig)logs=logs.filter(m=>m.integration===ig);if(df)logs=logs.filter(m=>m.datetime>=df);if(dt)logs=logs.filter(m=>m.datetime<=dt+'T23:59:59');logs.sort((a,b)=>b.datetime.localeCompare(a.datetime));const tl={daily:'Dnevno',weekly:'Tedensko',monthly:'Mesečno',quarterly:'Kvartalno',triannual:'Trianulano'};const tbody=$i('maintReviewBody');if(!logs.length){tbody.innerHTML='<tr><td colspan="7" class="empty">Ni podatkov.</td></tr>';return;}tbody.innerHTML=logs.map(m=>{const allDone=m.doneCount===m.totalSteps;const dt2=new Date(m.datetime);return '<tr><td>'+dt2.toLocaleString('sl-SI')+'</td><td>'+(tl[m.type]||m.type)+'</td><td>'+m.integration+'</td><td><span class="badge badge-blue">'+m.instrId+'</span></td><td><span class="badge '+(allDone?'badge-ok':'badge-2sd')+'">'+m.doneCount+'/'+m.totalSteps+'</span></td><td>'+getOpName(m.operatorId)+'</td><td style="font-size:12px" class="muted">'+(m.note||'')+'</td></tr>';}).join('');}
+function exportMaintCSV(){const rows=[['Datum','Čas','Tip','Integracija','Analizator','Korak','Opravljeno','Operater','Opomba']];(S.maintenanceLog||[]).forEach(m=>{const dt=new Date(m.datetime);(m.steps||[]).forEach(s=>{rows.push([dt.toLocaleDateString('sl-SI'),dt.toLocaleTimeString('sl-SI'),m.type,m.integration,m.instrId,s.text,s.done?'DA':'NE',getOpName(m.operatorId),m.note||'']);});});const csv=rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='Vzdrzevanje_'+new Date().toISOString().slice(0,10)+'.csv';a.click();notify('CSV izvo&#382;en','success');}
+
+/* ============================================================
+   PART C — VEČ (sync, settings, export)
+   ============================================================ */
+function renderVec(){
+  refreshSyncUI();
+  if(_hasBridge()){try{const info=JSON.parse(AndroidBridge.getDeviceInfo());$i('aboutDevice').textContent='Naprava: '+info.manufacturer+' '+info.model+' (Android '+info.release+', SDK '+info.sdk+')';}catch(e){}}
+  else $i('aboutDevice').textContent='Naprava: brskalnik (test)';
+  try{const qcSize=(localStorage.getItem('qclab_v2')||'').length;const pbSize=(localStorage.getItem('pregledBK_db')||'').length;$i('aboutStorage').textContent='Pomnilnik: qclab_v2 '+(qcSize/1024).toFixed(1)+' KB, pregledBK_db '+(pbSize/1024).toFixed(1)+' KB';}catch(e){}
+}
+function toggleDark(){document.body.classList.toggle('dark',$i('darkToggle').checked);localStorage.setItem('bioAlinity_dark',$i('darkToggle').checked?'1':'0');}
+
+/* ===== OneDrive sync (placeholder — Android bridge stubs) ===== */
+function openSyncModal(){refreshSyncUI();showMo('syncModal');}
+function refreshSyncUI(){
+  let signedIn=false,account='';
+  if(_hasBridge()){try{signedIn=AndroidBridge.msIsSignedIn();account=AndroidBridge.msGetAccount()||'';}catch(e){}}
+  const chip=$i('syncChip');
+  if(chip){chip.classList.toggle('on',signedIn);chip.innerHTML=signedIn?'&#9729; '+(account||'Sync'):'&#9729; Sync';}
+  const txt=signedIn?('Prijavljen: '+(account||'OneDrive')):'Ni prijave v OneDrive.';
+  const st=$i('syncStatus');if(st)st.textContent=txt;
+  const sm=$i('syncModalStatus');if(sm)sm.textContent=txt;
+  const btn=$i('msSignBtn');if(btn)btn.textContent=signedIn?'Ponovna prijava':'Prijava OneDrive';
+}
+function msSignIn(){if(!_hasBridge()){notify('Samo na napravi','warn');return;}try{AndroidBridge.msSignIn();}catch(e){notify('Napaka prijave','err');}}
+function msSignOut(){if(!_hasBridge()){notify('Samo na napravi','warn');return;}try{AndroidBridge.msSignOut();}catch(e){}}
+function msUpload(key){if(!_hasBridge()){notify('Samo na napravi','warn');return;}try{const data=key==='qclab_v2'?JSON.stringify(S):JSON.stringify(DB_PREGLED);notify('Nalagam '+key+'…','ok');AndroidBridge.msUpload(key,data);}catch(e){notify('Napaka nalaganja','err');}}
+function msDownload(key){if(!_hasBridge()){notify('Samo na napravi','warn');return;}try{notify('Prena&#353;am '+key+'…','ok');AndroidBridge.msDownload(key);}catch(e){notify('Napaka prenosa','err');}}
+/* Callbacks from Android */
+function onMsDeviceCode(userCode,verUri,message){notify('Koda: '+userCode+' na '+(verUri||'microsoft.com/devicelogin'),'ok');}
+function onMsSignedIn(account){notify('Prijavljen: '+(account||'OneDrive'),'ok');refreshSyncUI();}
+function onMsSignedOut(){notify('Odjavljen iz OneDrive','ok');refreshSyncUI();}
+function onMsError(msg){notify(msg||'Napaka OneDrive','err');refreshSyncUI();}
+function onMsUploadDone(ok,msg){notify(msg||(ok?'Nalo&#382;eno':'Napaka'),ok?'ok':'err');refreshSyncUI();}
+function onMsDownloadDone(key,json,msg){
+  if(json===null||json===undefined||json===''){notify(msg||'Ni podatkov v OneDrive','warn');return;}
+  try{
+    if(key==='qclab_v2'){const cloud=JSON.parse(json);Object.assign(S,cloud);save();initState();notify('QC podatki zdru&#382;eni','ok');navQc(currentQc);}
+    else if(key==='pregledBK_db'){const cloud=JSON.parse(json);DB_PREGLED=mergePregledDB(cloud);savePregledDB();notify('Zaloga zdru&#382;ena','ok');renderZaloga();}
+    refreshSyncUI();
+  }catch(e){notify('Napaka pri branju podatkov','err');}
+}
+function _arrUnion(a,b){const out=(a||[]).slice();(b||[]).forEach(x=>{if(out.indexOf(x)<0)out.push(x);});return out;}
+function mergePregledDB(cloud){
+  cloud=cloud||{};const db=DB_PREGLED;db.gtins=db.gtins||[];db.inventory=db.inventory||[];db.sessions=db.sessions||[];
+  const locG={};db.gtins.forEach(g=>{locG[g.gtin]=true;});(cloud.gtins||[]).forEach(g=>{if(g&&g.gtin&&!locG[g.gtin]){db.gtins.push(g);locG[g.gtin]=true;}});
+  const invKey=i=>(i.gtin||'')+'|'+(i.lot||'');const invMap={};db.inventory.forEach(i=>{invMap[invKey(i)]=i;});
+  (cloud.inventory||[]).forEach(ci=>{if(!ci)return;const k=invKey(ci),li=invMap[k];if(!li){db.inventory.push(ci);invMap[k]=ci;}else{li.serials=_arrUnion(li.serials,ci.serials);li.rfidEpcs=_arrUnion(li.rfidEpcs,ci.rfidEpcs);if(li.serials&&li.serials.length)li.qty=li.serials.length;else li.qty=Math.max(li.qty||0,ci.qty||0);if(!li.expiry&&ci.expiry)li.expiry=ci.expiry;}});
+  const locS={};db.sessions.forEach(s=>{locS[s.id]=true;});(cloud.sessions||[]).forEach(s=>{if(s&&s.id&&!locS[s.id]){db.sessions.push(s);locS[s.id]=true;}});
+  return db;
+}
+
+/* ===== Local export/import ===== */
+function exportJson(key){const data=key==='qclab_v2'?JSON.stringify(S,null,2):JSON.stringify(DB_PREGLED,null,2);const blob=new Blob([data],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=key+'_'+new Date().toISOString().slice(0,10)+'.json';a.click();notify(key+' izvo&#382;en','success');}
+function importJson(input,key){const f=input.files[0];if(!f)return;const r=new FileReader();r.onload=e=>{try{const obj=JSON.parse(e.target.result);if(key==='qclab_v2'){Object.assign(S,obj);save();initState();notify('qclab_v2 uvo&#382;en','success');navQc(currentQc);}else{DB_PREGLED=obj;savePregledDB();notify('pregledBK_db uvo&#382;en','success');renderZaloga();}}catch(err){notify('Napaka pri uvozu JSON','error');}};r.readAsText(f);input.value='';}
+
+/* ============ POINT/VLINE CLICK on LJ ============ */
+document.addEventListener('DOMContentLoaded',()=>{
+  const c=$i('ljCanvas');if(!c)return;
+  c.addEventListener('click',e=>{
+    const pts=c._pts||[];if(!pts.length)return;const r=c.getBoundingClientRect();const sx=c.width/r.width,sy=c.height/r.height;const cx=(e.clientX-r.left)*sx,cy=(e.clientY-r.top)*sy;
+    const vlines=c._vlines||[];const hitV=vlines.find(v=>Math.abs(v.x-cx)<10);
+    if(hitV){const tl=hitV.type==='cal'?'🟠 Menjava kalibratorja':hitV.type==='note'?'📝 Opomba':'🔴 Menjava lota QC';$i('pointModalBody').innerHTML='<div style="display:flex;flex-direction:column;gap:10px"><div><span class="muted" style="font-size:12px">Tip</span><br><strong>'+tl+'</strong></div><div><span class="muted" style="font-size:12px">Datum</span><br>'+hitV.dt.toLocaleDateString('sl-SI')+'</div>'+(hitV.lotNum?'<div><span class="muted" style="font-size:12px">Lot</span><br><strong>'+hitV.lotNum+'</strong></div>':'')+(hitV.note?'<div><span class="muted" style="font-size:12px">Opomba</span><br><em>'+hitV.note+'</em></div>':'')+'</div>';showMo('pointModal');return;}
+    const hit=pts.find(p=>Math.hypot(p.x-cx,p.y-cy)<14);if(!hit)return;const op=S.operators.find(o=>o.id===hit.operatorId);
+    $i('pointModalBody').innerHTML='<div style="display:flex;flex-direction:column;gap:10px"><div><span class="muted" style="font-size:12px">Datum/Čas</span><br>'+hit.dt.toLocaleString('sl-SI')+'</div><div><span class="muted" style="font-size:12px">Inštrument</span><br><strong>'+hit.instrId+'</strong></div><div><span class="muted" style="font-size:12px">Rezultat</span><br>'+sdBadge(hit.sd)+'</div>'+(hit.note?'<div><span class="muted" style="font-size:12px">Zabeležka</span><br><em>'+hit.note+'</em></div>':'')+'<div><span class="muted" style="font-size:12px">Operater</span><br>'+(op?op.first+' '+op.last:hit.operatorId)+'</div></div>';showMo('pointModal');
+  });
+});
+window.addEventListener('resize',()=>{if($i('page-lj').classList.contains('active')&&$i('main-qc').classList.contains('active'))renderLJ();});
+document.querySelectorAll('.mo').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');}));
+
+/* ============ BOOT ============ */
+loadPregledDB();
+initState();
+buildInstrMap();
+populateEntryInstruments();
+buildPinGrid();
+if(localStorage.getItem('bioAlinity_dark')==='1'){$i('darkToggle').checked=true;document.body.classList.add('dark');}
+renderZaloga();
+renderDashboard();
+refreshSyncUI();
+</script>
+</body>
+</html>
