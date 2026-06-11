@@ -268,6 +268,39 @@ body.dark{
   --abbott-blue:#4f8fd9;--abbott-teal:#2dd4bf;
 }
 body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
+
+/* ORDER FORM */
+.order-grid{font-size:13px}
+.order-grid th,.order-grid td{padding:5px 7px;border:1px solid var(--border);text-align:center}
+.order-grid th{font-size:10px}
+.order-grid td.l{text-align:left}
+.order-grid input{width:100%;border:1px solid var(--border);border-radius:5px;padding:5px;font-size:15px;text-align:center;background:var(--bg2);color:var(--text)}
+.order-grid input.calc{background:var(--gbg);font-weight:700;color:var(--accent2)}
+.order-grid .ident{font-family:var(--mono);font-size:11px;color:var(--text3)}
+.order-meta{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:12px}
+.order-meta .fg{margin-bottom:0}
+.cat-chip{padding:8px 13px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text2);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
+.cat-chip.active{background:var(--gbg);border-color:var(--accent);color:var(--accent2)}
+.bar-row{display:flex;align-items:center;gap:8px;margin-bottom:5px;font-size:12px}
+.bar-row .bar-lbl{width:160px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar-row .bar-track{flex:1;height:16px;background:var(--bg3);border-radius:4px;overflow:hidden}
+.bar-row .bar-fill{height:100%;background:linear-gradient(90deg,var(--abbott-teal),var(--abbott-blue))}
+.bar-row .bar-val{width:46px;text-align:right;font-family:var(--mono);font-weight:700}
+
+/* PRINT — ločen PDF na kategorijo */
+#orderPrintArea{display:none}
+@media print{
+  body{overflow:visible !important;background:#fff;color:#000;font-size:11px}
+  .hdr,.bottom-nav,.qc-subnav,.no-print,.app-body{display:none !important}
+  #orderPrintArea{display:block !important;padding:0}
+  #orderPrintArea h2{font-size:15px;margin:0 0 8px}
+  #orderPrintArea table{border-collapse:collapse;width:100%}
+  #orderPrintArea th,#orderPrintArea td{border:1px solid #000;padding:3px 5px;font-size:10px;text-align:center}
+  #orderPrintArea td.l{text-align:left}
+  #orderPrintArea .pmeta{margin-bottom:8px;font-size:11px}
+  #orderPrintArea .pmeta div{margin-bottom:2px}
+  @page{size:A4 portrait;margin:12mm}
+}
 </style>
 </head>
 <body>
@@ -539,6 +572,95 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
   </div>
 </div>
 
+<!-- ============ NAROČILA ============ -->
+<div class="page-main" id="main-narocila">
+  <div class="qc-subnav" id="ordSubnav">
+    <div class="tab active" data-ord="prepare" onclick="navOrd('prepare')">&#128722; Priprava naro&#269;ila</div>
+    <div class="tab" data-ord="minstock" onclick="navOrd('minstock')">&#128207; Min. zaloga</div>
+    <div class="tab" data-ord="statrecv" onclick="navOrd('statrecv')">&#128229; Statistika sprejema</div>
+    <div class="tab" data-ord="statuse" onclick="navOrd('statuse')">&#128228; Statistika porabe</div>
+  </div>
+
+  <!-- PRIPRAVA NAROČILA -->
+  <div class="page ord-page active" id="ord-prepare">
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px" id="ordCatChips"></div>
+    <div class="card">
+      <div class="order-meta">
+        <div class="fg"><label>Naro&#269;ilo za mesec</label><input type="month" id="ordMonth"></div>
+        <div class="fg"><label>Datum 1. popisa</label><input type="date" id="ordPopis1"></div>
+        <div class="fg"><label>Datum 1. naro&#269;ila</label><input type="date" id="ordNarocilo1"></div>
+        <div class="fg"><label>&#352;t. naro&#269;ila 1</label><input type="text" id="ordNum1"></div>
+        <div class="fg"><label>Datum 2. popisa</label><input type="date" id="ordPopis2"></div>
+        <div class="fg"><label>Datum 2. naro&#269;ila</label><input type="date" id="ordNarocilo2"></div>
+        <div class="fg"><label>&#352;t. naro&#269;ila 2</label><input type="text" id="ordNum2"></div>
+        <div class="fg"><label>Predvidena dostava</label><input type="date" id="ordDostava1"></div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+        <button class="btn btn-a btn-sm" onclick="autofillStock()">&#8635; Predizpolni zalogo iz sistema</button>
+        <button class="btn btn-g btn-sm" onclick="saveSnapshot()">&#128190; Shrani popis (snapshot)</button>
+        <button class="btn btn-blue btn-sm" onclick="printOrder()">&#128424;&#65039; Natisni / PDF</button>
+        <button class="btn btn-g btn-sm" onclick="exportOrderCSV()">CSV</button>
+      </div>
+      <div class="tbl-wrap">
+        <table class="order-grid">
+          <thead><tr>
+            <th>IDENT</th><th class="l">IME ARTIKLA</th><th>MIN.<br>ZALOGA</th>
+            <th>ZALOGA<br>1.del</th><th>NARO&#268;ILO<br>1.del</th>
+            <th>ZALOGA<br>2.del</th><th>NARO&#268;ILO<br>2.del</th><th>DO-<br>NARO&#268;ILO</th>
+          </tr></thead>
+          <tbody id="ordBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- MIN. ZALOGA -->
+  <div class="page ord-page" id="ord-minstock">
+    <div class="sec-hdr"><div class="sec-title" style="font-size:16px">Minimalne zaloge</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-g btn-sm" onclick="exportMinCSV()">&#8595; Izvoz CSV</button>
+        <button class="btn btn-g btn-sm" onclick="$i('minImportFile').click()">&#8593; Uvoz CSV</button>
+        <button class="btn btn-d btn-sm" onclick="resetMinOverrides()">&#8635; Ponastavi</button>
+        <input type="file" id="minImportFile" accept=".csv" style="display:none" onchange="importMinCSV(this)">
+      </div></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px" id="minCatChips"></div>
+    <div class="card" style="padding:0"><div class="tbl-wrap"><table class="order-grid">
+      <thead><tr><th>IDENT</th><th class="l">IME ARTIKLA</th><th>Tip</th><th>MIN. ZALOGA</th></tr></thead>
+      <tbody id="minBody"></tbody>
+    </table></div></div>
+  </div>
+
+  <!-- STATISTIKA SPREJEMA -->
+  <div class="page ord-page" id="ord-statrecv">
+    <div class="card">
+      <div class="fr">
+        <select id="srPeriod" onchange="renderStatRecv()"><option value="month">Mese&#269;no (zadnjih 12)</option><option value="year">Letno</option><option value="range">Razpon</option></select>
+        <input type="date" id="srFrom" onchange="renderStatRecv()">
+        <input type="date" id="srTo" onchange="renderStatRecv()">
+        <select id="srGroup" onchange="renderStatRecv()"><option value="type">Po tipu</option><option value="article">Po artiklu</option><option value="lot">Po lotu</option></select>
+        <button class="btn btn-g btn-sm" onclick="exportStatRecvCSV()">&#128190; CSV</button>
+      </div>
+      <div class="lj-canvas-wrap"><canvas id="srCanvas" height="300"></canvas></div>
+      <div class="tbl-wrap" style="margin-top:10px"><table><thead id="srHead"></thead><tbody id="srBody"></tbody></table></div>
+    </div>
+  </div>
+
+  <!-- STATISTIKA PORABE -->
+  <div class="page ord-page" id="ord-statuse">
+    <div class="alert-strip" id="useNote" style="display:block;background:var(--ybg);border-color:var(--yellow);color:var(--yellow)"></div>
+    <div class="card">
+      <div class="fr">
+        <select id="suFrom" onchange="renderStatUse()"></select>
+        <span style="align-self:center">&rarr;</span>
+        <select id="suTo" onchange="renderStatUse()"></select>
+        <button class="btn btn-g btn-sm" onclick="exportStatUseCSV()">&#128190; CSV</button>
+      </div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:10px">Poraba = zaloga(popis A) + sprejeto(med A in B) &minus; zaloga(popis B). Shranite popis ob vsakem naro&#269;ilu za natan&#269;en izra&#269;un.</div>
+      <div id="suResult"></div>
+    </div>
+  </div>
+</div>
+
 <!-- ============ VEČ ============ -->
 <div class="page-main" id="main-vec">
   <div class="sec-hdr"><div class="sec-title">&#9776; Ve&#269;</div></div>
@@ -610,11 +732,17 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
   <div class="bn-item active" data-main="zaloga" onclick="navMain('zaloga')"><div class="bn-icon">&#128230;</div>Zaloga</div>
   <div class="bn-item" data-main="roki" onclick="navMain('roki')"><div class="bn-icon">&#128197;</div>Roki</div>
   <div class="bn-item" data-main="loti" onclick="navMain('loti')"><div class="bn-icon">&#129514;</div>Loti</div>
+  <div class="bn-item" data-main="narocila" onclick="navMain('narocila')"><div class="bn-icon">&#128722;</div>Naro&#269;ila</div>
   <div class="bn-item" data-main="qc" onclick="navMain('qc')"><div class="bn-icon">&#128202;</div>QC</div>
   <div class="bn-item" data-main="vec" onclick="navMain('vec')"><div class="bn-icon">&#9776;</div>Ve&#269;</div>
 </nav>
 
 <div class="notif" id="notif"></div>
+
+<!-- PRINT AREA (en kategorijski obrazec naenkrat) -->
+<div id="orderPrintArea"></div>
+
+<script src="order_templates.js"></script>
 
 <!-- DETAIL MODAL (Zaloga item) -->
 <div class="mo" id="detailModal">
@@ -761,6 +889,7 @@ function navMain(tab){
   if(tab==='loti') renderLoti();
   if(tab==='qc') navQc(currentQc||'dashboard');
   if(tab==='vec') renderVec();
+  if(tab==='narocila') navOrd(currentOrd||'prepare');
 }
 
 /* ============ QC SUB-NAVIGATION ============ */
@@ -1340,8 +1469,230 @@ document.addEventListener('DOMContentLoaded',()=>{
 window.addEventListener('resize',()=>{if($i('page-lj').classList.contains('active')&&$i('main-qc').classList.contains('active'))renderLJ();});
 document.querySelectorAll('.mo').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');}));
 
+/* ============================================================
+   PART D — NAROČILA & STATISTIKA
+   ============================================================ */
+let ORD = { minOverrides:{}, snapshots:[], orderDrafts:{} };
+function loadOrd(){try{const r=localStorage.getItem('bioAlinity_orders');if(r)ORD=Object.assign(ORD,JSON.parse(r));}catch(e){}ORD.minOverrides=ORD.minOverrides||{};ORD.snapshots=ORD.snapshots||[];ORD.orderDrafts=ORD.orderDrafts||{};}
+function saveOrd(){localStorage.setItem('bioAlinity_orders',JSON.stringify(ORD));}
+function templates(){return window.ORDER_TEMPLATES||[];}
+function catById(id){return templates().find(c=>c.id===id);}
+function minOf(item){const o=ORD.minOverrides[item.ident];return (o!==undefined&&o!==null&&o!=='')?Number(o):item.min;}
+
+let currentOrd='prepare', currentOrdCat=null, currentMinCat=null;
+function navOrd(page){
+  currentOrd=page;
+  document.querySelectorAll('.ord-page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('#ordSubnav .tab').forEach(t=>t.classList.remove('active'));
+  $i('ord-'+page).classList.add('active');
+  document.querySelector('#ordSubnav .tab[data-ord="'+page+'"]')?.classList.add('active');
+  if(page==='prepare') initPrepare();
+  if(page==='minstock') initMinStock();
+  if(page==='statrecv') initStatRecv();
+  if(page==='statuse') initStatUse();
+}
+
+/* ---- matching trenutne zaloge ---- */
+function normCat(c){return (c||'').toString().toUpperCase().replace(/[^A-Z0-9]/g,'').replace(/^A/,'').replace(/^0+/,'');}
+function gtinToIdent(){const m={};(DB_PREGLED.gtins||[]).forEach(g=>{if(g.gtin&&g.ident)m[g.gtin]=String(g.ident);});return m;}
+function gtinToCat(){const m={};(DB_PREGLED.gtins||[]).forEach(g=>{if(g.gtin&&g.catalog)m[g.gtin]=g.catalog;});return m;}
+function resolveIdent(rec,g2i){return rec.ident?String(rec.ident):(rec.gtin&&g2i[rec.gtin])?g2i[rec.gtin]:null;}
+function resolveCat(rec,g2c){return rec.catalog||(rec.gtin&&g2c[rec.gtin])||'';}
+function computeStockMaps(){
+  loadPregledDB();
+  const g2i=gtinToIdent(),g2c=gtinToCat();
+  const byIdent={},byCat={};
+  (DB_PREGLED.inventory||[]).forEach(it=>{
+    const q=it.qty||0;
+    const id=resolveIdent(it,g2i);if(id)byIdent[id]=(byIdent[id]||0)+q;
+    const nc=normCat(resolveCat(it,g2c));if(nc)byCat[nc]=(byCat[nc]||0)+q;
+  });
+  return {byIdent,byCat};
+}
+function matchStock(item,maps){
+  if(maps.byIdent[item.ident]!=null) return maps.byIdent[item.ident];
+  const nc=normCat(item.catalog);if(nc&&maps.byCat[nc]!=null) return maps.byCat[nc];
+  return 0;
+}
+
+/* ---- chips ---- */
+function catChipsHtml(activeId,fn){return templates().map(c=>'<div class="cat-chip'+(c.id===activeId?' active':'')+'" onclick="'+fn+'(\''+c.id+'\')">'+c.label+' <span class="muted">('+c.items.length+')</span></div>').join('');}
+
+/* ============ PRIPRAVA NAROČILA ============ */
+function initPrepare(){
+  if(!currentOrdCat) currentOrdCat=templates()[0]?.id;
+  if(!$i('ordMonth').value){const d=new Date();$i('ordMonth').value=d.toISOString().slice(0,7);}
+  $i('ordCatChips').innerHTML=catChipsHtml(currentOrdCat,'selectOrdCat');
+  renderOrderForm();
+}
+function selectOrdCat(id){currentOrdCat=id;$i('ordCatChips').innerHTML=catChipsHtml(id,'selectOrdCat');renderOrderForm();}
+function renderOrderForm(){
+  const cat=catById(currentOrdCat);if(!cat){$i('ordBody').innerHTML='';return;}
+  const draft=ORD.orderDrafts[currentOrdCat]||{};
+  $i('ordBody').innerHTML=cat.items.map((it,i)=>{
+    const m=minOf(it);const d=draft[it.ident]||{};
+    return '<tr>'+
+      '<td class="ident">'+it.ident+'</td>'+
+      '<td class="l">'+it.name+(it.catalog?' <span class="muted">'+it.catalog+'</span>':'')+'</td>'+
+      '<td><input type="number" data-k="min" data-id="'+it.ident+'" value="'+(m==null?'':m)+'" onchange="onMinEdit(\''+it.ident+'\',this.value)"></td>'+
+      '<td><input type="number" data-k="z1" data-id="'+it.ident+'" value="'+(d.z1??'')+'" oninput="recalcOrd(\''+it.ident+'\')"></td>'+
+      '<td><input type="number" class="calc" data-k="n1" data-id="'+it.ident+'" value="'+(d.n1??'')+'" oninput="markManual(\''+it.ident+'\',\'n1\')"></td>'+
+      '<td><input type="number" data-k="z2" data-id="'+it.ident+'" value="'+(d.z2??'')+'" oninput="recalcOrd(\''+it.ident+'\')"></td>'+
+      '<td><input type="number" class="calc" data-k="n2" data-id="'+it.ident+'" value="'+(d.n2??'')+'" oninput="markManual(\''+it.ident+'\',\'n2\')"></td>'+
+      '<td><input type="number" data-k="dn" data-id="'+it.ident+'" value="'+(d.dn??'')+'"></td>'+
+    '</tr>';
+  }).join('');
+}
+function cell(ident,k){return document.querySelector('#ordBody input[data-id="'+ident+'"][data-k="'+k+'"]');}
+function onMinEdit(ident,v){onMinChange(ident,v);recalcOrd(ident);}
+function recalcOrd(ident){
+  const cat=catById(currentOrdCat);const it=cat.items.find(x=>x.ident===ident);const m=minOf(it);
+  ['1','2'].forEach(p=>{
+    const z=cell(ident,'z'+p),n=cell(ident,'n'+p);if(!z||!n)return;
+    if(n.dataset.manual==='1')return;
+    const zv=z.value===''?null:Number(z.value);
+    if(m!=null&&zv!=null)n.value=Math.max(0,m-zv); else n.value='';
+  });
+  persistDraft(ident);
+}
+function markManual(ident,k){const n=cell(ident,k);if(n)n.dataset.manual='1';persistDraft(ident);}
+function persistDraft(ident){
+  const d=ORD.orderDrafts[currentOrdCat]||(ORD.orderDrafts[currentOrdCat]={});
+  const row=d[ident]||(d[ident]={});
+  ['z1','n1','z2','n2','dn'].forEach(k=>{const el=cell(ident,k);if(el)row[k]=el.value===''?'':Number(el.value);});
+  saveOrd();
+}
+function autofillStock(){
+  const maps=computeStockMaps();const cat=catById(currentOrdCat);if(!cat)return;let n=0;
+  cat.items.forEach(it=>{const q=matchStock(it,maps);const z1=cell(it.ident,'z1');if(z1){z1.value=q;n++;}const nn=cell(it.ident,'n1');if(nn)delete nn.dataset.manual;recalcOrd(it.ident);});
+  notify('Predizpolnjeno '+n+' vrstic iz zaloge','ok');
+}
+function saveSnapshot(){
+  const maps=computeStockMaps();const date=new Date().toISOString().slice(0,10);const byIdent={};
+  templates().forEach(c=>c.items.forEach(it=>{byIdent[it.ident]=matchStock(it,maps);}));
+  ORD.snapshots.push({id:Date.now().toString(),date,label:date,byIdent});saveOrd();
+  notify('Popis shranjen ('+date+')','success');
+}
+function exportOrderCSV(){
+  const cat=catById(currentOrdCat);if(!cat)return;const d=ORD.orderDrafts[currentOrdCat]||{};
+  const rows=[['IDENT','IME ARTIKLA','MIN','ZALOGA 1.del','NAROCILO 1.del','ZALOGA 2.del','NAROCILO 2.del','DO-NAROCILO']];
+  cat.items.forEach(it=>{const r=d[it.ident]||{};rows.push([it.ident,it.name,minOf(it)??'',r.z1??'',r.n1??'',r.z2??'',r.n2??'',r.dn??'']);});
+  dlCsv(rows,'Narocilo_'+cat.id+'_'+($i('ordMonth').value||'')+'.csv');
+}
+function printOrder(){
+  const cat=catById(currentOrdCat);if(!cat)return;const d=ORD.orderDrafts[currentOrdCat]||{};
+  const mo=$i('ordMonth').value||'';
+  const meta='<div class="pmeta">'+
+    '<div><strong>NARO&#268;ILO ALINITY &ndash; '+cat.label.toUpperCase()+'</strong></div>'+
+    '<div>Naro&#269;ilo za mesec: '+mo+'</div>'+
+    '<div>Datum 1. popisa: '+($i('ordPopis1').value||'________')+' &nbsp; Datum 1. naro&#269;ila: '+($i('ordNarocilo1').value||'________')+' &nbsp; &#352;t. 1: '+($i('ordNum1').value||'____')+'</div>'+
+    '<div>Datum 2. popisa: '+($i('ordPopis2').value||'________')+' &nbsp; Datum 2. naro&#269;ila: '+($i('ordNarocilo2').value||'________')+' &nbsp; &#352;t. 2: '+($i('ordNum2').value||'____')+'</div>'+
+    '<div>Predvidena dostava: '+($i('ordDostava1').value||'________')+'</div></div>';
+  const head='<tr><th>IDENT</th><th class="l">IME ARTIKLA</th><th>MIN.<br>ZALOGA</th><th>ZALOGA<br>1.del</th><th>NARO&#268;ILO<br>1.del</th><th>ZALOGA<br>2.del</th><th>NARO&#268;ILO<br>2.del</th><th>DO-<br>NARO&#268;ILO</th></tr>';
+  const body=cat.items.map(it=>{const r=d[it.ident]||{};return '<tr><td>'+it.ident+'</td><td class="l">'+it.name+(it.catalog?' '+it.catalog:'')+'</td><td>'+(minOf(it)??'')+'</td><td>'+(r.z1??'')+'</td><td>'+(r.n1??'')+'</td><td>'+(r.z2??'')+'</td><td>'+(r.n2??'')+'</td><td>'+(r.dn??'')+'</td></tr>';}).join('');
+  $i('orderPrintArea').innerHTML='<h2>'+cat.label+'</h2>'+meta+'<table><thead>'+head+'</thead><tbody>'+body+'</tbody></table>';
+  if(_hasBridge()&&AndroidBridge.printPdf){try{AndroidBridge.printPdf('Narocilo_'+cat.id+'_'+mo,$i('orderPrintArea').innerHTML);return;}catch(e){}}
+  window.print();
+}
+
+/* ============ MIN. ZALOGA ============ */
+function initMinStock(){if(!currentMinCat)currentMinCat=templates()[0]?.id;$i('minCatChips').innerHTML=catChipsHtml(currentMinCat,'selectMinCat');renderMinStock();}
+function selectMinCat(id){currentMinCat=id;$i('minCatChips').innerHTML=catChipsHtml(id,'selectMinCat');renderMinStock();}
+function renderMinStock(){
+  const cat=catById(currentMinCat);if(!cat){$i('minBody').innerHTML='';return;}
+  $i('minBody').innerHTML=cat.items.map(it=>{const m=minOf(it);const ov=ORD.minOverrides[it.ident]!=null;
+    return '<tr><td class="ident">'+it.ident+'</td><td class="l">'+it.name+'</td><td><span class="badge '+(TYPE_BADGE[it.type]||'b-gray')+'">'+(TYPE_LABELS[it.type]||it.type)+'</span></td>'+
+      '<td><input type="number" value="'+(m==null?'':m)+'" style="'+(ov?'border-color:var(--accent)':'')+'" onchange="onMinChange(\''+it.ident+'\',this.value)"></td></tr>';
+  }).join('');
+}
+function onMinChange(ident,v){if(v===''||v==null){delete ORD.minOverrides[ident];}else{ORD.minOverrides[ident]=Number(v);}saveOrd();}
+function resetMinOverrides(){if(!confirm('Ponastavim vse ro&#269;ne min. zaloge na privzete iz predlog?'))return;ORD.minOverrides={};saveOrd();renderMinStock();notify('Ponastavljeno');}
+function exportMinCSV(){const rows=[['ident','name','category','min']];templates().forEach(c=>c.items.forEach(it=>rows.push([it.ident,it.name,c.id,minOf(it)??''])));dlCsv(rows,'min_zaloge.csv');}
+function importMinCSV(input){const f=input.files[0];if(!f)return;const r=new FileReader();r.onload=e=>{try{const lines=e.target.result.replace(/^﻿/,'').split(/\r?\n/).filter(l=>l.trim());let n=0;lines.slice(1).forEach(l=>{const c=l.split(',');const ident=(c[0]||'').trim();const min=(c[3]||'').trim();if(ident&&min!==''){ORD.minOverrides[ident]=Number(min);n++;}});saveOrd();renderMinStock();notify('Uvo&#382;enih '+n+' min. zalog','success');}catch(err){notify('Napaka uvoza','error');}};r.readAsText(f);input.value='';}
+
+/* ============ STATISTIKA SPREJEMA ============ */
+function allIdentMap(){const m={};templates().forEach(c=>c.items.forEach(it=>m[it.ident]={name:it.name,type:it.type,cat:c.label}));return m;}
+function initStatRecv(){const t=new Date();$i('srTo').value=t.toISOString().slice(0,10);const f=new Date();f.setFullYear(f.getFullYear()-1);$i('srFrom').value=f.toISOString().slice(0,10);renderStatRecv();}
+function recvInRange(){
+  loadPregledDB();const g2i=gtinToIdent();const idMap=allIdentMap();
+  const period=$i('srPeriod').value;let from=null,to=null;
+  if(period==='range'){from=$i('srFrom').value?new Date($i('srFrom').value):null;to=$i('srTo').value?new Date($i('srTo').value+'T23:59:59'):null;}
+  return (DB_PREGLED.received||[]).filter(r=>{const d=new Date(r.receivedAt||r.received);if(from&&d<from)return false;if(to&&d>to)return false;return true;}).map(r=>{const id=resolveIdent(r,g2i);return {...r,_ident:id,_name:r.name||(id&&idMap[id]?idMap[id].name:r.gtin),_type:r.type||(id&&idMap[id]?idMap[id].type:'')};});
+}
+function renderStatRecv(){
+  const recs=recvInRange();const group=$i('srGroup').value;const period=$i('srPeriod').value;
+  $i('srFrom').style.display=$i('srTo').style.display=period==='range'?'':'none';
+  let agg={};
+  if(period==='year'){
+    recs.forEach(r=>{const y=new Date(r.receivedAt||r.received).getFullYear();agg[y]=(agg[y]||0)+1;});
+    drawBars('srCanvas',Object.entries(agg).sort((a,b)=>a[0]-b[0]).map(([k,v])=>({label:k,val:v})),'Sprejem po letih');
+    fillStatTable('srHead','srBody',['Leto','Kosov'],Object.entries(agg).sort((a,b)=>a[0]-b[0]));return;
+  }
+  if(period==='month'){
+    recs.forEach(r=>{const k=(r.receivedAt||r.received||'').slice(0,7);if(k)agg[k]=(agg[k]||0)+1;});
+    const sorted=Object.entries(agg).sort((a,b)=>a[0]<b[0]?-1:1).slice(-12);
+    drawBars('srCanvas',sorted.map(([k,v])=>({label:k,val:v})),'Sprejem po mesecih');
+    fillStatTable('srHead','srBody',['Mesec','Kosov'],sorted);return;
+  }
+  // range → group by type/article/lot
+  const keyFn=group==='type'?(r=>TYPE_LABELS[r._type]||r._type||'?'):group==='lot'?(r=>(r._name||'?')+' / '+(r.lot||'?')):(r=>r._name||r.gtin||'?');
+  recs.forEach(r=>{const k=keyFn(r);agg[k]=(agg[k]||0)+1;});
+  const sorted=Object.entries(agg).sort((a,b)=>b[1]-a[1]);
+  drawBars('srCanvas',sorted.slice(0,15).map(([k,v])=>({label:k,val:v})),'Sprejem ('+($i('srGroup').selectedOptions[0].text)+')');
+  fillStatTable('srHead','srBody',[$i('srGroup').selectedOptions[0].text,'Kosov'],sorted);
+}
+function fillStatTable(headId,bodyId,cols,rows){$i(headId).innerHTML='<tr>'+cols.map(c=>'<th>'+c+'</th>').join('')+'</tr>';$i(bodyId).innerHTML=rows.length?rows.map(([k,v])=>'<tr><td>'+k+'</td><td style="text-align:right;font-family:var(--mono)">'+v+'</td></tr>').join(''):'<tr><td colspan="2" class="empty">Ni podatkov o sprejemu v obdobju.</td></tr>';}
+function exportStatRecvCSV(){const rows=[['kljuc','kosov']];document.querySelectorAll('#srBody tr').forEach(tr=>{const c=tr.querySelectorAll('td');if(c.length===2)rows.push([c[0].textContent,c[1].textContent]);});dlCsv(rows,'statistika_sprejema.csv');}
+
+/* ============ STATISTIKA PORABE ============ */
+function initStatUse(){
+  const snaps=ORD.snapshots.slice().sort((a,b)=>a.date<b.date?-1:1);
+  const note=$i('useNote');
+  if(snaps.length<2){note.style.display='block';note.textContent='⚠ Za izra&#269;un porabe potrebujete vsaj 2 shranjena popisa. Trenutno: '+snaps.length+'. Shranite popis v zavihku Priprava naro&#269;ila.';}
+  else note.style.display='none';
+  const opts=snaps.map((s,i)=>'<option value="'+s.id+'">'+s.date+'</option>').join('');
+  $i('suFrom').innerHTML=opts;$i('suTo').innerHTML=opts;
+  if(snaps.length>=2){$i('suFrom').value=snaps[snaps.length-2].id;$i('suTo').value=snaps[snaps.length-1].id;}
+  renderStatUse();
+}
+function renderStatUse(){
+  const snaps=ORD.snapshots;const A=snaps.find(s=>s.id===$i('suFrom').value),B=snaps.find(s=>s.id===$i('suTo').value);
+  if(!A||!B||A.id===B.id){$i('suResult').innerHTML='<div class="empty">Izberite dva razli&#269;na popisa.</div>';return;}
+  const lo=A.date<B.date?A:B, hi=A.date<B.date?B:A;
+  loadPregledDB();const g2i=gtinToIdent();
+  const recvBetween={};
+  (DB_PREGLED.received||[]).forEach(r=>{const d=(r.receivedAt||r.received||'').slice(0,10);if(d>lo.date&&d<=hi.date){const id=resolveIdent(r,g2i);if(id)recvBetween[id]=(recvBetween[id]||0)+1;}});
+  const idMap=allIdentMap();const rows=[];
+  Object.keys(idMap).forEach(id=>{const a=lo.byIdent[id]||0,b=hi.byIdent[id]||0,rec=recvBetween[id]||0;const used=a+rec-b;if(used>0)rows.push({id,name:idMap[id].name,type:idMap[id].type,a,rec,b,used});});
+  rows.sort((x,y)=>y.used-x.used);
+  if(!rows.length){$i('suResult').innerHTML='<div class="empty">Ni izra&#269;unane porabe med '+lo.date+' in '+hi.date+'.</div>';return;}
+  const max=rows[0].used;
+  const bars=rows.slice(0,20).map(r=>'<div class="bar-row"><span class="bar-lbl" title="'+r.name+'">'+r.name+'</span><span class="bar-track"><span class="bar-fill" style="width:'+(r.used/max*100)+'%"></span></span><span class="bar-val">'+r.used+'</span></div>').join('');
+  const tbl='<div class="tbl-wrap" style="margin-top:12px"><table><thead><tr><th>Artikel</th><th>Tip</th><th>Popis '+lo.date+'</th><th>Sprejeto</th><th>Popis '+hi.date+'</th><th>Poraba</th></tr></thead><tbody>'+
+    rows.map(r=>'<tr><td>'+r.name+'</td><td><span class="badge '+(TYPE_BADGE[r.type]||'b-gray')+'">'+(TYPE_LABELS[r.type]||r.type)+'</span></td><td style="text-align:center">'+r.a+'</td><td style="text-align:center">'+r.rec+'</td><td style="text-align:center">'+r.b+'</td><td style="text-align:center;font-weight:700;color:var(--accent2)">'+r.used+'</td></tr>').join('')+'</tbody></table></div>';
+  $i('suResult').innerHTML='<div style="font-size:13px;font-weight:600;margin-bottom:8px">Poraba '+lo.date+' &rarr; '+hi.date+'</div>'+bars+tbl;
+  $i('suResult')._rows=rows;$i('suResult')._range=[lo.date,hi.date];
+}
+function exportStatUseCSV(){const rows=$i('suResult')._rows;if(!rows){notify('Ni podatkov','warn');return;}const out=[['ident','artikel','tip','popis_zac','sprejeto','popis_kon','poraba']];rows.forEach(r=>out.push([r.id,r.name,r.type,r.a,r.rec,r.b,r.used]));dlCsv(out,'statistika_porabe.csv');}
+
+/* ---- helpers: CSV + bar chart ---- */
+function dlCsv(rows,fname){const csv=rows.map(r=>r.map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(',')).join('\r\n');const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fname;a.click();notify('CSV izvo&#382;en','success');}
+function drawBars(canvasId,data,title){
+  const c=$i(canvasId);if(!c)return;const ctx=c.getContext('2d');const W=c.offsetWidth||700,H=c.height||300;c.width=W;ctx.clearRect(0,0,W,H);
+  ctx.fillStyle=getComputedStyle(document.body).getPropertyValue('--text2')||'#003087';ctx.font='bold 13px system-ui';ctx.textAlign='center';ctx.fillText(title,W/2,18);
+  if(!data.length){ctx.fillStyle='#9ca3af';ctx.font='13px system-ui';ctx.fillText('Ni podatkov.',W/2,H/2);return;}
+  const pad={l:40,r:14,t:32,b:64},cW=W-pad.l-pad.r,cH=H-pad.t-pad.b;const max=Math.max(...data.map(d=>d.val),1);
+  const bw=Math.min(cW/data.length*0.7,60),step=cW/data.length;
+  ctx.strokeStyle='rgba(0,0,0,.12)';ctx.beginPath();ctx.moveTo(pad.l,pad.t+cH);ctx.lineTo(pad.l+cW,pad.t+cH);ctx.stroke();
+  data.forEach((d,i)=>{const x=pad.l+step*i+step/2,bh=d.val/max*cH,y=pad.t+cH-bh;
+    ctx.fillStyle='#00a3ad';ctx.fillRect(x-bw/2,y,bw,bh);
+    ctx.fillStyle=getComputedStyle(document.body).getPropertyValue('--text')||'#000';ctx.font='bold 10px system-ui';ctx.textAlign='center';ctx.fillText(d.val,x,y-3);
+    ctx.save();ctx.translate(x,pad.t+cH+8);ctx.rotate(-Math.PI/4);ctx.fillStyle='#6b7280';ctx.font='9px system-ui';ctx.textAlign='right';ctx.fillText(String(d.label).slice(0,18),0,0);ctx.restore();});
+}
+
 /* ============ BOOT ============ */
 loadPregledDB();
+loadOrd();
 initState();
 buildInstrMap();
 populateEntryInstruments();

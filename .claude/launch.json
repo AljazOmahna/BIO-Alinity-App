@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "bioalinity",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["-y", "http-server", "app/src/main/assets", "-p", "8777", "-c-1"],
+      "port": 8777
+    }
+  ]
+}
