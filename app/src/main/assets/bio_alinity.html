@@ -587,12 +587,9 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
     <div class="card">
       <div class="order-meta">
         <div class="fg"><label>Naro&#269;ilo za mesec</label><input type="month" id="ordMonth"></div>
-        <div class="fg"><label>Datum 1. popisa</label><input type="date" id="ordPopis1"></div>
-        <div class="fg"><label>Datum 1. naro&#269;ila</label><input type="date" id="ordNarocilo1"></div>
-        <div class="fg"><label>&#352;t. naro&#269;ila 1</label><input type="text" id="ordNum1"></div>
-        <div class="fg"><label>Datum 2. popisa</label><input type="date" id="ordPopis2"></div>
-        <div class="fg"><label>Datum 2. naro&#269;ila</label><input type="date" id="ordNarocilo2"></div>
-        <div class="fg"><label>&#352;t. naro&#269;ila 2</label><input type="text" id="ordNum2"></div>
+        <div class="fg"><label>Datum popisa</label><input type="date" id="ordPopis1"></div>
+        <div class="fg"><label>Datum naro&#269;ila</label><input type="date" id="ordNarocilo1"></div>
+        <div class="fg"><label>&#352;t. naro&#269;ila</label><input type="text" id="ordNum1"></div>
         <div class="fg"><label>Predvidena dostava</label><input type="date" id="ordDostava1"></div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
@@ -605,8 +602,7 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
         <table class="order-grid">
           <thead><tr>
             <th>IDENT</th><th class="l">IME ARTIKLA</th><th>MIN.<br>ZALOGA</th>
-            <th>ZALOGA<br>1.del</th><th>NARO&#268;ILO<br>1.del</th>
-            <th>ZALOGA<br>2.del</th><th>NARO&#268;ILO<br>2.del</th><th>DO-<br>NARO&#268;ILO</th>
+            <th>ZALOGA</th><th>NARO&#268;ILO</th>
           </tr></thead>
           <tbody id="ordBody"></tbody>
         </table>
@@ -1535,11 +1531,8 @@ function renderOrderForm(){
       '<td class="ident">'+it.ident+'</td>'+
       '<td class="l">'+it.name+(it.catalog?' <span class="muted">'+it.catalog+'</span>':'')+'</td>'+
       '<td><input type="number" data-k="min" data-id="'+it.ident+'" value="'+(m==null?'':m)+'" onchange="onMinEdit(\''+it.ident+'\',this.value)"></td>'+
-      '<td><input type="number" data-k="z1" data-id="'+it.ident+'" value="'+(d.z1??'')+'" oninput="recalcOrd(\''+it.ident+'\')"></td>'+
-      '<td><input type="number" class="calc" data-k="n1" data-id="'+it.ident+'" value="'+(d.n1??'')+'" oninput="markManual(\''+it.ident+'\',\'n1\')"></td>'+
-      '<td><input type="number" data-k="z2" data-id="'+it.ident+'" value="'+(d.z2??'')+'" oninput="recalcOrd(\''+it.ident+'\')"></td>'+
-      '<td><input type="number" class="calc" data-k="n2" data-id="'+it.ident+'" value="'+(d.n2??'')+'" oninput="markManual(\''+it.ident+'\',\'n2\')"></td>'+
-      '<td><input type="number" data-k="dn" data-id="'+it.ident+'" value="'+(d.dn??'')+'"></td>'+
+      '<td><input type="number" data-k="z" data-id="'+it.ident+'" value="'+(d.z??'')+'" oninput="recalcOrd(\''+it.ident+'\')"></td>'+
+      '<td><input type="number" class="calc" data-k="n" data-id="'+it.ident+'" value="'+(d.n??'')+'" oninput="markManual(\''+it.ident+'\',\'n\')"></td>'+
     '</tr>';
   }).join('');
 }
@@ -1547,24 +1540,23 @@ function cell(ident,k){return document.querySelector('#ordBody input[data-id="'+
 function onMinEdit(ident,v){onMinChange(ident,v);recalcOrd(ident);}
 function recalcOrd(ident){
   const cat=catById(currentOrdCat);const it=cat.items.find(x=>x.ident===ident);const m=minOf(it);
-  ['1','2'].forEach(p=>{
-    const z=cell(ident,'z'+p),n=cell(ident,'n'+p);if(!z||!n)return;
-    if(n.dataset.manual==='1')return;
+  const z=cell(ident,'z'),n=cell(ident,'n');
+  if(z&&n&&n.dataset.manual!=='1'){
     const zv=z.value===''?null:Number(z.value);
     if(m!=null&&zv!=null)n.value=Math.max(0,m-zv); else n.value='';
-  });
+  }
   persistDraft(ident);
 }
 function markManual(ident,k){const n=cell(ident,k);if(n)n.dataset.manual='1';persistDraft(ident);}
 function persistDraft(ident){
   const d=ORD.orderDrafts[currentOrdCat]||(ORD.orderDrafts[currentOrdCat]={});
   const row=d[ident]||(d[ident]={});
-  ['z1','n1','z2','n2','dn'].forEach(k=>{const el=cell(ident,k);if(el)row[k]=el.value===''?'':Number(el.value);});
+  ['z','n'].forEach(k=>{const el=cell(ident,k);if(el)row[k]=el.value===''?'':Number(el.value);});
   saveOrd();
 }
 function autofillStock(){
   const maps=computeStockMaps();const cat=catById(currentOrdCat);if(!cat)return;let n=0;
-  cat.items.forEach(it=>{const q=matchStock(it,maps);const z1=cell(it.ident,'z1');if(z1){z1.value=q;n++;}const nn=cell(it.ident,'n1');if(nn)delete nn.dataset.manual;recalcOrd(it.ident);});
+  cat.items.forEach(it=>{const q=matchStock(it,maps);const z=cell(it.ident,'z');if(z){z.value=q;n++;}const nn=cell(it.ident,'n');if(nn)delete nn.dataset.manual;recalcOrd(it.ident);});
   notify('Predizpolnjeno '+n+' vrstic iz zaloge','ok');
 }
 function saveSnapshot(){
@@ -1575,8 +1567,8 @@ function saveSnapshot(){
 }
 function exportOrderCSV(){
   const cat=catById(currentOrdCat);if(!cat)return;const d=ORD.orderDrafts[currentOrdCat]||{};
-  const rows=[['IDENT','IME ARTIKLA','MIN','ZALOGA 1.del','NAROCILO 1.del','ZALOGA 2.del','NAROCILO 2.del','DO-NAROCILO']];
-  cat.items.forEach(it=>{const r=d[it.ident]||{};rows.push([it.ident,it.name,minOf(it)??'',r.z1??'',r.n1??'',r.z2??'',r.n2??'',r.dn??'']);});
+  const rows=[['IDENT','IME ARTIKLA','MIN','ZALOGA','NAROCILO']];
+  cat.items.forEach(it=>{const r=d[it.ident]||{};rows.push([it.ident,it.name,minOf(it)??'',r.z??'',r.n??'']);});
   dlCsv(rows,'Narocilo_'+cat.id+'_'+($i('ordMonth').value||'')+'.csv');
 }
 function printOrder(){
@@ -1585,11 +1577,10 @@ function printOrder(){
   const meta='<div class="pmeta">'+
     '<div><strong>NARO&#268;ILO ALINITY &ndash; '+cat.label.toUpperCase()+'</strong></div>'+
     '<div>Naro&#269;ilo za mesec: '+mo+'</div>'+
-    '<div>Datum 1. popisa: '+($i('ordPopis1').value||'________')+' &nbsp; Datum 1. naro&#269;ila: '+($i('ordNarocilo1').value||'________')+' &nbsp; &#352;t. 1: '+($i('ordNum1').value||'____')+'</div>'+
-    '<div>Datum 2. popisa: '+($i('ordPopis2').value||'________')+' &nbsp; Datum 2. naro&#269;ila: '+($i('ordNarocilo2').value||'________')+' &nbsp; &#352;t. 2: '+($i('ordNum2').value||'____')+'</div>'+
+    '<div>Datum popisa: '+($i('ordPopis1').value||'________')+' &nbsp; Datum naro&#269;ila: '+($i('ordNarocilo1').value||'________')+' &nbsp; &#352;t. naro&#269;ila: '+($i('ordNum1').value||'____')+'</div>'+
     '<div>Predvidena dostava: '+($i('ordDostava1').value||'________')+'</div></div>';
-  const head='<tr><th>IDENT</th><th class="l">IME ARTIKLA</th><th>MIN.<br>ZALOGA</th><th>ZALOGA<br>1.del</th><th>NARO&#268;ILO<br>1.del</th><th>ZALOGA<br>2.del</th><th>NARO&#268;ILO<br>2.del</th><th>DO-<br>NARO&#268;ILO</th></tr>';
-  const body=cat.items.map(it=>{const r=d[it.ident]||{};return '<tr><td>'+it.ident+'</td><td class="l">'+it.name+(it.catalog?' '+it.catalog:'')+'</td><td>'+(minOf(it)??'')+'</td><td>'+(r.z1??'')+'</td><td>'+(r.n1??'')+'</td><td>'+(r.z2??'')+'</td><td>'+(r.n2??'')+'</td><td>'+(r.dn??'')+'</td></tr>';}).join('');
+  const head='<tr><th>IDENT</th><th class="l">IME ARTIKLA</th><th>MIN.<br>ZALOGA</th><th>ZALOGA</th><th>NARO&#268;ILO</th></tr>';
+  const body=cat.items.map(it=>{const r=d[it.ident]||{};return '<tr><td>'+it.ident+'</td><td class="l">'+it.name+(it.catalog?' '+it.catalog:'')+'</td><td>'+(minOf(it)??'')+'</td><td>'+(r.z??'')+'</td><td>'+(r.n??'')+'</td></tr>';}).join('');
   $i('orderPrintArea').innerHTML='<h2>'+cat.label+'</h2>'+meta+'<table><thead>'+head+'</thead><tbody>'+body+'</tbody></table>';
   if(_hasBridge()&&AndroidBridge.printPdf){try{AndroidBridge.printPdf('Narocilo_'+cat.id+'_'+mo,$i('orderPrintArea').innerHTML);return;}catch(e){}}
   window.print();
