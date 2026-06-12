@@ -27,6 +27,8 @@ import java.io.OutputStreamWriter;
 
 public class MainActivity extends AppCompatActivity {
 
+    private static final int REQ_PICK_REPORT = 1001;
+
     private WebView webView;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private boolean pageReady = false;
@@ -147,6 +149,53 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // =========================================================
+    // Servisna poročila — izbira prek SAF, kopija v ServisnaPorocila
+    // =========================================================
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != REQ_PICK_REPORT) return;
+        if (resultCode != RESULT_OK || data == null || data.getData() == null) return;
+        Uri uri = data.getData();
+        try {
+            String name = queryName(uri);
+            if (name == null || name.isEmpty()) name = "porocilo_" + System.currentTimeMillis() + ".pdf";
+            byte[] bytes;
+            try (InputStream in = getContentResolver().openInputStream(uri)) {
+                if (in == null) throw new Exception("Ni mogoče odpreti datoteke");
+                ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                byte[] buf = new byte[8192];
+                int r;
+                while ((r = in.read(buf)) != -1) bos.write(buf, 0, r);
+                bytes = bos.toByteArray();
+            }
+            if (bytes.length > 10 * 1024 * 1024) {
+                callJs("if(typeof onReportPickError==='function')onReportPickError('Datoteka je prevelika (max 10 MB)')");
+                return;
+            }
+            File dir = getExternalFilesDir("ServisnaPorocila");
+            if (dir == null) dir = new File(getFilesDir(), "ServisnaPorocila");
+            if (!dir.exists()) dir.mkdirs();
+            File f = new File(dir, name);
+            // pri obstoječem imenu dodaj časovni žig, da ne prepišemo drugega poročila
+            if (f.exists()) {
+                int dot = name.lastIndexOf('.');
+                String base = dot > 0 ? name.substring(0, dot) : name;
+                String ext = dot > 0 ? name.substring(dot) : "";
+                f = new File(dir, base + "_" + System.currentTimeMillis() + ext);
+            }
+            try (FileOutputStream fos = new FileOutputStream(f)) {
+                fos.write(bytes);
+            }
+            String b64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP);
+            callJs("if(typeof onReportPicked==='function')onReportPicked("
+                    + jsStr(f.getName()) + "," + jsStr(f.getAbsolutePath()) + "," + jsStr(b64) + ")");
+        } catch (Exception e) {
+            callJs("if(typeof onReportPickError==='function')onReportPickError(" + jsStr("Napaka: " + e.getMessage()) + ")");
+        }
+    }
+
+    // =========================================================
     // AndroidBridge — JS interface (tablet subset, no RFID/DW)
     // =========================================================
     public class AndroidBridge {
@@ -184,6 +233,48 @@ public class MainActivity extends AppCompatActivity {
                     startActivity(chooser);
                 } catch (Exception e) {
                     callJs("if(typeof onQuickShareError==='function')onQuickShareError(" + jsStr(e.getMessage()) + ")");
+                }
+            });
+        }
+
+        // ---- Servisna poročila (priponke) ----
+        @JavascriptInterface
+        public void pickReportFile() {
+            mainHandler.post(() -> {
+                try {
+                    Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                    i.addCategory(Intent.CATEGORY_OPENABLE);
+                    i.setType("*/*");
+                    i.putExtra(Intent.EXTRA_MIME_TYPES,
+                            new String[]{"application/pdf", "image/*", "application/json"});
+                    startActivityForResult(i, REQ_PICK_REPORT);
+                } catch (Exception e) {
+                    callJs("if(typeof onReportPickError==='function')onReportPickError(" + jsStr(e.getMessage()) + ")");
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public void openReportFile(String path) {
+            mainHandler.post(() -> {
+                try {
+                    File f = new File(path);
+                    if (!f.exists()) {
+                        callJs("if(typeof onReportPickError==='function')onReportPickError('Datoteka ne obstaja več na napravi')");
+                        return;
+                    }
+                    Uri uri = FileProvider.getUriForFile(MainActivity.this,
+                            getPackageName() + ".fileprovider", f);
+                    String n = f.getName().toLowerCase();
+                    String mime = n.endsWith(".pdf") ? "application/pdf"
+                            : (n.endsWith(".png") || n.endsWith(".jpg") || n.endsWith(".jpeg")) ? "image/*"
+                            : n.endsWith(".json") ? "application/json" : "*/*";
+                    Intent view = new Intent(Intent.ACTION_VIEW);
+                    view.setDataAndType(uri, mime);
+                    view.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    startActivity(Intent.createChooser(view, f.getName()));
+                } catch (Exception e) {
+                    callJs("if(typeof onReportPickError==='function')onReportPickError(" + jsStr("Ni mogoče odpreti: " + e.getMessage()) + ")");
                 }
             });
         }

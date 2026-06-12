@@ -44,6 +44,8 @@ body{overflow:hidden}
 .main{height:100%;overflow-y:auto;padding:14px 18px;-webkit-overflow-scrolling:touch}
 .page-main{display:none}.page-main.active{display:block}
 .qc-page{display:none}.qc-page.active{display:block}
+.ord-page{display:none}.ord-page.active{display:block}
+.srv-page{display:none}.srv-page.active{display:block}
 
 /* BOTTOM NAV */
 .bottom-nav{position:fixed;bottom:0;left:0;right:0;height:58px;background:#002060;
@@ -546,13 +548,12 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
 
   <!-- QC MAINTENANCE -->
   <div class="page qc-page" id="page-maintenance">
-    <div class="sec-hdr"><div class="sec-title" style="font-size:16px">Vzdrževanje</div></div>
+    <div class="sec-hdr"><div class="sec-title" style="font-size:16px">Vzdrževanje</div><button class="btn btn-g btn-sm" onclick="openMaintEdit()">&#9999;&#65039; Uredi opravila</button></div>
     <div class="tabs" id="maintTypeTabs">
       <div class="tab active" onclick="setMaintType('daily')">Dnevno</div>
       <div class="tab" onclick="setMaintType('weekly')">Tedensko</div>
       <div class="tab" onclick="setMaintType('monthly')">Mesečno</div>
-      <div class="tab" onclick="setMaintType('quarterly')">Kvartalno</div>
-      <div class="tab" onclick="setMaintType('triannual')">Trianulano</div>
+      <div class="tab" onclick="setMaintType('quarterly')">3-mesečno/po potrebi</div>
     </div>
     <div id="maintContent"></div>
   </div>
@@ -562,7 +563,7 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
     <div class="sec-hdr"><div class="sec-title" style="font-size:16px">Pregled vzdrževanja</div><button class="btn btn-g btn-sm" onclick="exportMaintCSV()">&#128190; CSV</button></div>
     <div class="card">
       <div class="fr">
-        <select id="mrFilterType" onchange="renderMaintReview()"><option value="">Vsi tipi</option><option value="daily">Dnevno</option><option value="weekly">Tedensko</option><option value="monthly">Mesečno</option><option value="quarterly">Kvartalno</option><option value="triannual">Trianulano</option></select>
+        <select id="mrFilterType" onchange="renderMaintReview()"><option value="">Vsi tipi</option><option value="daily">Dnevno</option><option value="weekly">Tedensko</option><option value="monthly">Mesečno</option><option value="quarterly">3-mesečno/po potrebi</option></select>
         <select id="mrFilterInteg" onchange="renderMaintReview()"><option value="">Vse integracije</option><option value="AL01">AL01</option><option value="AL02">AL02</option><option value="AL03">AL03</option></select>
         <input type="date" id="mrFilterFrom" onchange="renderMaintReview()">
         <input type="date" id="mrFilterTo" onchange="renderMaintReview()">
@@ -657,6 +658,96 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
   </div>
 </div>
 
+<!-- ============ SERVIS / NAPAKE ============ -->
+<div class="page-main" id="main-servis">
+  <div class="qc-subnav" id="srvSubnav">
+    <div class="tab active" data-srv="entry" onclick="navSrv('entry')">&#128221; Vpis napake</div>
+    <div class="tab" data-srv="list" onclick="navSrv('list')">&#128203; Napake</div>
+    <div class="tab" data-srv="stats" onclick="navSrv('stats')">&#128200; Statistika</div>
+  </div>
+
+  <!-- SRV ENTRY -->
+  <div class="page srv-page active" id="srv-entry">
+    <div class="sec-hdr"><div class="sec-title" style="font-size:16px" id="srvFormTitle">Vpis napake / servisa</div></div>
+    <div class="card">
+      <div class="fr">
+        <div class="fg" style="flex:1"><label>Naprava / modul *</label><select id="sfDevice"></select></div>
+        <div class="fg" style="flex:2"><label>Napaka / okvara *</label><input id="sfFault" placeholder="Npr. Lifter error"></div>
+      </div>
+      <div class="fr">
+        <div class="fg"><label>&#9888;&#65039; Napaka se je pojavila *</label><input type="datetime-local" id="sfOccurred"></div>
+        <div class="fg"><label>&#128222; Servis obveščen</label><input type="datetime-local" id="sfNotified"></div>
+        <div class="fg"><label>&#128172; Servis se je odzval</label><input type="datetime-local" id="sfResponded"></div>
+      </div>
+      <div class="fr">
+        <div class="fg"><label>&#128694; Servis je prišel</label><input type="datetime-local" id="sfArrived"></div>
+        <div class="fg"><label>&#9989; Napaka odpravljena</label><input type="datetime-local" id="sfFixed"></div>
+      </div>
+      <div class="fr">
+        <div class="fg"><label>&#128196; Št. naloga (servis)</label><input id="sfNalog" placeholder="npr. 0260/2026"></div>
+        <div class="fg"><label>&#128195; Naročilnica (interna)</label><input id="sfOrder" placeholder="npr. NAR-2026-123"></div>
+      </div>
+      <div class="fg"><label>Opomba</label><textarea id="sfNote" placeholder="Opis storitve, zamenjani deli, serviser..."></textarea></div>
+      <div class="fg">
+        <label>&#128206; Priponke (servisna poročila PDF)</label>
+        <div id="sfAttachList" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-g btn-sm" onclick="srvPickFile()">+ Dodaj datoteko</button>
+          <input type="file" id="sfFileInput" accept=".pdf,.json,image/*" style="display:none" onchange="srvFileChosen(this)">
+        </div>
+        <div class="muted" style="font-size:11px;margin-top:6px">Datoteke se shranijo na tablico v mapo <b>ServisnaPorocila</b> (Android/data/si.kclj.bioalinity/files). Ob aktivaciji OneDrive se bo mapa sinhronizirala. Pri PDF poskusim samodejno prebrati št. naloga.</div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn btn-g" id="srvCancelEdit" style="display:none" onclick="srvResetForm()">Prekliči urejanje</button>
+        <button class="btn btn-teal" onclick="srvSave()">&#10003; Shrani</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SRV LIST -->
+  <div class="page srv-page" id="srv-list">
+    <div class="sec-hdr"><div class="sec-title" style="font-size:16px">Napake / servisi</div><button class="btn btn-g btn-sm" onclick="exportSrvCSV()">&#128190; CSV</button></div>
+    <div class="card">
+      <div class="fr">
+        <select id="slDevice" onchange="renderSrvList()"><option value="">Vse naprave</option></select>
+        <select id="slStatus" onchange="renderSrvList()">
+          <option value="">Vsi statusi</option>
+          <option value="open">Odprta</option>
+          <option value="notified">Servis obveščen</option>
+          <option value="fixed">Odpravljena</option>
+        </select>
+        <input type="date" id="slFrom" onchange="renderSrvList()">
+        <input type="date" id="slTo" onchange="renderSrvList()">
+      </div>
+      <div class="tbl-wrap"><table><thead><tr><th>Pojav napake</th><th>Naprava</th><th>Napaka</th><th>Št. naloga</th><th>Status</th><th>Do odprave</th><th>&#128206;</th><th></th></tr></thead><tbody id="srvListBody"></tbody></table></div>
+    </div>
+  </div>
+
+  <!-- SRV STATS -->
+  <div class="page srv-page" id="srv-stats">
+    <div class="sec-hdr"><div class="sec-title" style="font-size:16px">Statistika servisov</div><button class="btn btn-g btn-sm" onclick="exportSrvStatsCSV()">&#128190; CSV</button></div>
+    <div class="card">
+      <div class="fr">
+        <select id="ssMode" onchange="srvStatsModeChange()">
+          <option value="month">Mesečno</option>
+          <option value="year">Letno</option>
+          <option value="range">Poljubno obdobje</option>
+        </select>
+        <input type="month" id="ssMonth" onchange="renderSrvStats()">
+        <select id="ssYear" onchange="renderSrvStats()" style="display:none"></select>
+        <input type="date" id="ssFrom" onchange="renderSrvStats()" style="display:none">
+        <input type="date" id="ssTo" onchange="renderSrvStats()" style="display:none">
+        <select id="ssGroup" onchange="renderSrvStats()">
+          <option value="device">Po napravi/modulu</option>
+          <option value="analyser">Po analizatorju/liniji</option>
+        </select>
+      </div>
+      <div class="card" style="padding:8px"><canvas id="srvStatsCanvas" style="width:100%;height:300px"></canvas></div>
+      <div class="tbl-wrap"><table><thead><tr><th>Naprava</th><th>Napak</th><th>Odpravljenih</th><th>Odprtih</th><th>Povpr. čas do odprave</th></tr></thead><tbody id="srvStatsBody"></tbody></table></div>
+    </div>
+  </div>
+</div>
+
 <!-- ============ VEČ ============ -->
 <div class="page-main" id="main-vec">
   <div class="sec-hdr"><div class="sec-title">&#9776; Več</div></div>
@@ -685,9 +776,12 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
     </div>
     <div class="disabled-note" style="margin-top:12px;border-style:solid;border-color:var(--abbott-teal)">&#128229; <b>Quick Share</b> deli podatke neposredno z bližnjo napravo (Samsung/Android) brez OneDrive. Na drugi napravi sprejmite datoteko in BIO/Pregled BK aplikacija jo samodejno uvozi (združi).</div>
     <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-teal btn-sm" onclick="$i('qsImportFile').click()">&#128194; Uvozi iz datoteke</button>
+      <input type="file" id="qsImportFile" accept=".json,application/json" style="display:none" onchange="importSharedFile(this)">
       <button class="btn btn-blue btn-sm" id="msSignBtn" onclick="msSignIn()">Prijava OneDrive</button>
       <button class="btn btn-d btn-sm" onclick="msSignOut()">Odjava</button>
     </div>
+    <div class="muted" style="font-size:11px;margin-top:6px">&#128194; »Uvozi iz datoteke« odpre .json, prejet prek Quick Share (mapa Prenosi) &ndash; samodejno zazna vrsto (zaloga/QC) in pametno združi.</div>
   </div>
 
   <div class="card">
@@ -733,6 +827,7 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
   <div class="bn-item" data-main="roki" onclick="navMain('roki')"><div class="bn-icon">&#128197;</div>Roki</div>
   <div class="bn-item" data-main="loti" onclick="navMain('loti')"><div class="bn-icon">&#129514;</div>Loti</div>
   <div class="bn-item" data-main="narocila" onclick="navMain('narocila')"><div class="bn-icon">&#128722;</div>Naročila</div>
+  <div class="bn-item" data-main="servis" onclick="navMain('servis')"><div class="bn-icon">&#128295;</div>Servis</div>
   <div class="bn-item" data-main="qc" onclick="navMain('qc')"><div class="bn-icon">&#128202;</div>QC</div>
   <div class="bn-item" data-main="vec" onclick="navMain('vec')"><div class="bn-icon">&#9776;</div>Več</div>
 </nav>
@@ -841,6 +936,37 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
   </div>
 </div>
 
+<!-- MAINT EDIT MODAL (urejanje opravil vzdrževanja) -->
+<div class="mo" id="maintEditModal">
+  <div class="modal" style="max-width:680px">
+    <div class="mh"><h3>&#9999;&#65039; Uredi opravila vzdrževanja</h3><button class="mc" onclick="closeMo('maintEditModal')">&#10005;</button></div>
+    <div class="mb">
+      <div class="fr" style="margin-bottom:12px">
+        <select id="meType" onchange="renderMaintEdit()">
+          <option value="daily">Dnevno</option>
+          <option value="weekly">Tedensko</option>
+          <option value="monthly">Mesečno</option>
+          <option value="quarterly">3-mesečno/po potrebi</option>
+        </select>
+        <select id="meInstr" onchange="renderMaintEdit()">
+          <option value="c">Alinity c</option>
+          <option value="i">Alinity i</option>
+        </select>
+      </div>
+      <div id="meList" style="display:flex;flex-direction:column;gap:6px;max-height:46vh;overflow-y:auto"></div>
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <input id="meNewText" placeholder="Novo opravilo..." style="flex:1">
+        <button class="btn btn-teal btn-sm" onclick="maintEditAdd()">+ Dodaj</button>
+      </div>
+      <div class="muted" style="font-size:11px;margin-top:8px">Spremembe veljajo za vse analizatorje izbrane vrste (c/i). Zapisani podpisi v dnevniku ostanejo nespremenjeni.</div>
+    </div>
+    <div class="mf">
+      <button class="btn btn-d btn-sm" onclick="maintEditRestore()">&#8634; Povrni privzeto</button>
+      <button class="btn btn-blue" onclick="closeMo('maintEditModal');renderMaintContent()">Zapri</button>
+    </div>
+  </div>
+</div>
+
 <!-- SYNC MODAL (header shortcut) -->
 <div class="mo" id="syncModal">
   <div class="modal" style="max-width:440px">
@@ -890,6 +1016,7 @@ function navMain(tab){
   if(tab==='qc') navQc(currentQc||'dashboard');
   if(tab==='vec') renderVec();
   if(tab==='narocila') navOrd(currentOrd||'prepare');
+  if(tab==='servis') navSrv(currentSrv||'entry');
 }
 
 /* ============ QC SUB-NAVIGATION ============ */
@@ -925,6 +1052,9 @@ function loadPregledDB(){
   DB_PREGLED.gtins=DB_PREGLED.gtins||[];
   DB_PREGLED.lots=DB_PREGLED.lots||[];
   DB_PREGLED.sessions=DB_PREGLED.sessions||[];
+  DB_PREGLED.received=DB_PREGLED.received||[];
+  DB_PREGLED.consumed=DB_PREGLED.consumed||[];
+  DB_PREGLED.lastUsed=DB_PREGLED.lastUsed||[];
 }
 function savePregledDB(){localStorage.setItem('pregledBK_db',JSON.stringify(DB_PREGLED));}
 
@@ -1098,11 +1228,17 @@ const DEFAULT_OPERATORS = [
 let S = { assays:[], qcMaterials:[], operators:[], entries:[], currentAssayTab:'biochem',
   editingAssayIdx:null, editingQcIdx:null, editingOpIdx:null, wiz:{}, pinValue:'',
   ljRules:{'1_2s':true,'1_3s':true,'2_2s':true,'R_4s':true,'4_1s':true,'10_x':true},
-  assayRules:{}, maintenanceLog:[] };
+  assayRules:{}, maintenanceLog:[], maintSteps:null, serviceLog:[] };
 
 function initState(){
   const sv=localStorage.getItem('qclab_v2');
   if(sv){try{const p=JSON.parse(sv);Object.assign(S,p);if(!S.assayRules)S.assayRules={};if(!S.maintenanceLog)S.maintenanceLog=[];if(!S.ljRules['10_x'])S.ljRules['10_x']=true;}catch(e){}}
+  if(!S.serviceLog)S.serviceLog=[];
+  /* vzdrževalna opravila: privzeta iz OB-KIKKB obrazcev, urejljiva */
+  if(!S.maintSteps)S.maintSteps=JSON.parse(JSON.stringify(MAINT_DEFAULTS));
+  ['daily','weekly','monthly','quarterly'].forEach(t=>{if(!S.maintSteps[t])S.maintSteps[t]={c:[],i:[]};if(!S.maintSteps[t].c)S.maintSteps[t].c=[];if(!S.maintSteps[t].i)S.maintSteps[t].i=[];});
+  /* migracija starih zapisov: triannual → quarterly (3-mesečno) */
+  (S.maintenanceLog||[]).forEach(m=>{if(m.type==='triannual')m.type='quarterly';});
   if(!S.assays.length) S.assays=[...DEFAULT_BIOCHEM.map(n=>({name:n,type:'biochem'})),...DEFAULT_IMMUNO.map(n=>({name:n,type:'immuno'}))];
   if(!S.qcMaterials.length) S.qcMaterials=[
     {name:'Multichem S Plus',type:'biochem',levels:2,lot:'LOT2024A',assays:[...DEFAULT_BIOCHEM]},
@@ -1374,30 +1510,433 @@ function addLot(){const type=$i('newLotType').value,lot=$i('newLotNum').value.tr
 function deleteLot(i){if(!confirm('Izbriši lot?'))return;const qc=S.qcMaterials[currentLotQcIdx];if(qc.lotHistory)qc.lotHistory.splice(i,1);save();renderLotHistory(qc);notify('Lot izbrisan');}
 
 /* ===== MAINTENANCE ===== */
-const MAINT_TYPES={daily:{label:'Dnevno vzdrževanje',icon:'📅',color:'#0891b2'},weekly:{label:'Tedensko vzdrževanje',icon:'📆',color:'#7c3aed'},monthly:{label:'Mesečno vzdrževanje',icon:'🗓️',color:'#b45309'},quarterly:{label:'Kvartalno vzdrževanje',icon:'📋',color:'#065f46'},triannual:{label:'Trianulano vzdrževanje',icon:'🔩',color:'#9f1239'}};
-const MAINT_STEPS={daily:{c:[],i:[]},weekly:{c:[],i:[]},monthly:{c:[],i:[]},quarterly:{c:[],i:[]},triannual:{c:[],i:[]}};
+const MAINT_TYPES={daily:{label:'Dnevno vzdrževanje',icon:'📅',color:'#0891b2'},weekly:{label:'Tedensko vzdrževanje',icon:'📆',color:'#7c3aed'},monthly:{label:'Mesečno vzdrževanje',icon:'🗓️',color:'#b45309'},quarterly:{label:'3-mesečno / po potrebi',icon:'🔩',color:'#9f1239'}};
+/* Privzeta opravila iz obrazcev OB KIKKB 213/64:
+   V2_OB-Evidenca-periodicnega-vzdrzevanja-opreme_AL01cic-C1 (Alinity c)
+   v2_OB-Evidenca-periodicnega-vzdrzevanja-opreme_AL01cic-I2 (Alinity i) */
+const MAINT_DEFAULTS={
+ daily:{
+  c:[
+   {id:'cd1',text:'Analizator postavi v IDLE (Pause)'},
+   {id:'cd2',text:'Očisti ICT in vzorčno iglo'},
+   {id:'cd3',text:'Preveri dnevno vzdrževanje (Procedures → Daily)'},
+   {id:'cd4',text:'Preveri delovne raztopine na vratih in v zadnjem delu analizatorja (Supplies)'},
+   {id:'cd5',text:'Preveri količine reagentov in delovnih raztopin v krožniku (Reagents → razvrsti po abecednem vrstnem redu)'},
+   {id:'cd6',text:'Kalibracije (CAL) — preveri kalibracije'},
+   {id:'cd7',text:'Kontrole (Create order → Control) — preveri kontrole v AMS in na aparatu'},
+   {id:'cd8',text:'Priklopi analizator na linijo (Semafor → gumb desno spodaj, zelena luč)'}
+  ],
+  i:[
+   {id:'id1',text:'Analizator postavi v IDLE (Pause)'},
+   {id:'id2',text:'Očisti vzorčno iglo in spiralno posodico vzorčne igle'},
+   {id:'id3',text:'Zaženi dnevno vzdrževanje (Procedures → Daily → Daily Maintenance; i Cleaning — 25 ml 0,5 % varikine)'},
+   {id:'id4',text:'Zaključi dnevno vzdrževanje (Procedures → In Process → Completed → Done)'},
+   {id:'id5',text:'Preveri delovne raztopine na vratih analizatorja (Supplies)'},
+   {id:'id6',text:'Dodaj kivete RVs'},
+   {id:'id7',text:'Izprazni odpad RV Waste'},
+   {id:'id8',text:'Preveri količine reagentov in delovnih raztopin v krožniku (Reagents → abecedni vrstni red)'},
+   {id:'id9',text:'Kalibracije (CAL) — preveri kalibracije'},
+   {id:'id10',text:'Kontrole (Create order → Control) — preveri na analizatorju in v AMS'},
+   {id:'id11',text:'Preveri zavihek Results → Stored exception → Select all → Delete'},
+   {id:'id12',text:'Priklopi analizator na linijo (Semafor → zelena luč)'}
+  ]
+ },
+ weekly:{
+  c:[
+   {id:'cw1',text:'Analizator postavi v IDLE (Pause), ključ v analizatorju obrni v desno (bela oznaka)'},
+   {id:'cw2',text:'Preveri delovne raztopine v krožniku (porabi se celoten Detergent A)'},
+   {id:'cw3',text:'Preveri delovne raztopine na vratih in v zadnjem delu analizatorja (Supplies)'},
+   {id:'cw4',text:'Zamenjaj epruvete z dodatnimi raztopinami v zadnjem delu (Acid Probe Wash in Detergent A) — skeniraj QR kode, epruveti potisni do konca!'},
+   {id:'cw5',text:'Zamenjaj kartušo za saline (1 kartuša na analizatorju)'},
+   {id:'cw6',text:'Očisti reagenčne igle'},
+   {id:'cw7',text:'Zaženi tedensko vzdrževanje (Procedures → Weekly → Clean Cuvettes with Detergent A)'},
+   {id:'cw8',text:'Shrani rezultate vzorcev, kontrol in kalibracij na ključ USB ter prenesi na strežnik (Calibrations → Historical → Archive [samo Date to:]; Results → Specimens/Controls → Archive [Date from:, Date to:])'},
+   {id:'cw9',text:'Preveri zavihek Results → Stored exception → Select all → Delete'},
+   {id:'cw10',text:'Zaključi tedensko vzdrževanje (Procedures → In Process → Completed → Done)'},
+   {id:'cw11',text:'Shrani podatke na strežnik (24_urni_laboratorij → Ostalo → Alinity arhiv pacientov, kontrol in kalibracij)'}
+  ],
+  i:[
+   {id:'iw1',text:'Analizator postavi v IDLE (Pause), ključ v analizatorju obrni v desno (bela oznaka)'},
+   {id:'iw2',text:'Zaženi tedensko vzdrževanje (Procedures → Weekly — 3 koraki)'},
+   {id:'iw3',text:'Ročno očisti pipetorje z destilirano vodo (Manual Pipettor Probe Cleaning)'},
+   {id:'iw4',text:'Ročno očisti spiralne postaje z destilirano vodo (Manual Wash Zone Probe Cleaning)'},
+   {id:'iw5',text:'Ročno očisti spiralne posodice z destilirano vodo (Manual Wash Cup Cleaning)'},
+   {id:'iw6',text:'Shrani rezultate vzorcev, kontrol in kalibracij na ključ USB ter prenesi na strežnik (Calibrations → Historical → Archive; Results → Specimens/Controls → Archive)'},
+   {id:'iw7',text:'Shrani podatke na strežnik (24_urni_laboratorij → Ostalo → Alinity arhiv pacientov, kontrol in kalibracij)'}
+  ]
+ },
+ monthly:{
+  c:[
+   {id:'cm1',text:'Čiščenje spiralne postaje kivet in menjava »dry tipa«'},
+   {id:'cm2',text:'Čiščenje kivet (postopek 5910 v zavihku vzdrževanj »as needed«)'},
+   {id:'cm3',text:'Čiščenje ICT Drain Tip-a (zadnji del analizatorja, skrajno levo), ko je analizator v IDLE — ob neuspešni proceduri naredi Flush ICT Reference solution cup in ponovi'},
+   {id:'cm4',text:'Zamenjaj kartuše za HIL'}
+  ],
+  i:[
+   {id:'im1',text:'Posesaj zračni filter (Procedures → Semiyearly → Air Filter Cleaning)'}
+  ]
+ },
+ quarterly:{
+  c:[
+   {id:'cq1',text:'Menjava žarnice'},
+   {id:'cq2',text:'Menjava ICT modula (on-board stabilnost 90 dni oz. 20.000 meritev)'},
+   {id:'cq3',text:'Menjava igle ICT'},
+   {id:'cq4',text:'Menjava reagenčne igle'},
+   {id:'cq5',text:'Menjava vzorčne igle'},
+   {id:'cq6',text:'Čiščenje mest za vstavljanje reagentov in vzorcev'},
+   {id:'cq7',text:'Menjava senzorjev sistemskih tekočin'}
+  ],
+  i:[]
+ }
+};
+/* aktivni (urejljivi) koraki — S.maintSteps; fallback na privzete */
+function getMaintSteps(type,instrType){return ((S.maintSteps||MAINT_DEFAULTS)[type]||{})[instrType]||[];}
 let maintState={type:'daily',checked:{},pendingSign:null};
-function setMaintType(type){maintState.type=type;document.querySelectorAll('#maintTypeTabs .tab').forEach((t,i)=>t.classList.toggle('active',i===['daily','weekly','monthly','quarterly','triannual'].indexOf(type)));renderMaintContent();}
+function setMaintType(type){maintState.type=type;document.querySelectorAll('#maintTypeTabs .tab').forEach((t,i)=>t.classList.toggle('active',i===['daily','weekly','monthly','quarterly'].indexOf(type)));renderMaintContent();}
 function renderMaintContent(){
   const type=maintState.type;const wrap=$i('maintContent');
   wrap.innerHTML=INSTRUMENTS.map(instr=>{
-    const steps=MAINT_STEPS[type]?.[instr.type]||[];const key=instr.id+'_'+type;const checked=maintState.checked[key]||{};
+    const steps=getMaintSteps(type,instr.type);const key=instr.id+'_'+type;const checked=maintState.checked[key]||{};
     const doneCount=steps.filter(s=>checked[s.id]).length;const allDone=steps.length>0&&doneCount===steps.length;const ti=MAINT_TYPES[type];
     const todayStr=new Date().toISOString().slice(0,10);const alreadyDone=(S.maintenanceLog||[]).find(m=>m.instrId===instr.id&&m.type===type&&m.datetime.slice(0,10)===todayStr);
     return '<div class="card" style="border-left:4px solid '+(allDone?'var(--success)':ti.color)+'"><div class="card-title"><span>'+ti.icon+' '+instr.id+' &ndash; '+instr.name+'</span><span style="font-size:12px;font-weight:400;color:'+(allDone?'var(--success)':'var(--text3)')+'">'+(allDone?'✅ Vse opravljeno':doneCount+' / '+steps.length+' korakov')+'</span></div>'+(alreadyDone?'<div style="background:var(--gbg);border:1px solid var(--green);border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:12px;color:var(--accent2)">✅ Danes potrjeno ob '+new Date(alreadyDone.datetime).toLocaleTimeString('sl-SI',{hour:'2-digit',minute:'2-digit'})+' &ndash; '+getOpName(alreadyDone.operatorId)+'</div>':'')+(steps.length===0?'<div class="muted" style="font-size:13px;padding:8px">Koraki bodo dodani za '+ti.label.toLowerCase()+' Alinity '+instr.type.toUpperCase()+'.</div>':'<div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:10px"><button class="btn btn-g btn-sm" onclick="checkAllMaint(\''+instr.id+'\',\''+type+'\',true)">✔ Vse</button><button class="btn btn-g btn-sm" onclick="checkAllMaint(\''+instr.id+'\',\''+type+'\',false)">☐ Počisti</button></div>'+steps.map(step=>{const isC=!!checked[step.id];return '<label style="display:flex;align-items:flex-start;gap:10px;padding:8px 10px;border-radius:7px;cursor:pointer;margin-bottom:4px;background:'+(isC?'var(--gbg)':'var(--bg2)')+';border:1px solid '+(isC?'var(--green)':'var(--border)')+'"><input type="checkbox" '+(isC?'checked':'')+' style="width:17px;height:17px;margin-top:1px;accent-color:var(--success)" onchange="toggleMaintStep(\''+instr.id+'\',\''+type+'\',\''+step.id+'\',this.checked)"><span style="font-size:13px;'+(isC?'text-decoration:line-through;opacity:.7':'')+'">'+step.text+'</span></label>';}).join('')+'<div style="margin-top:12px;text-align:right"><button class="btn '+(allDone?'btn-teal':'btn-outline')+' btn-sm" onclick="openMaintSign(\''+instr.id+'\',\''+type+'\')">'+(allDone?'✅ Potrdi in podpiši':'⚠️ Potrdi')+'</button></div>')+'</div>';
   }).join('');
 }
 function toggleMaintStep(instrId,type,stepId,val){const key=instrId+'_'+type;if(!maintState.checked[key])maintState.checked[key]={};maintState.checked[key][stepId]=val;renderMaintContent();}
-function checkAllMaint(instrId,type,val){const steps=MAINT_STEPS[type]?.[INSTRUMENTS.find(i=>i.id===instrId)?.type]||[];const key=instrId+'_'+type;if(!maintState.checked[key])maintState.checked[key]={};steps.forEach(s=>{maintState.checked[key][s.id]=val;});renderMaintContent();}
+function checkAllMaint(instrId,type,val){const steps=getMaintSteps(type,INSTRUMENTS.find(i=>i.id===instrId)?.type);const key=instrId+'_'+type;if(!maintState.checked[key])maintState.checked[key]={};steps.forEach(s=>{maintState.checked[key][s.id]=val;});renderMaintContent();}
 let maintPinVal='';
-function openMaintSign(instrId,type){const instr=INSTRUMENTS.find(i=>i.id===instrId);const steps=MAINT_STEPS[type]?.[instr.type]||[];const key=instrId+'_'+type;const checked=maintState.checked[key]||{};const doneCount=steps.filter(s=>checked[s.id]).length;const ti=MAINT_TYPES[type];maintState.pendingSign={instrId,type};maintPinVal='';$i('maintSignTitle').textContent='Potrditev – '+instrId;$i('maintSignSummary').innerHTML='<div style="background:rgba(0,48,135,.05);border-radius:8px;padding:10px 14px"><div style="font-weight:600;font-size:14px;color:var(--abbott-blue);margin-bottom:6px">'+ti.icon+' '+ti.label+' – '+instrId+'</div><div style="font-size:13px">Opravljenih: <strong>'+doneCount+' / '+steps.length+'</strong> '+(doneCount<steps.length?'<span class="badge badge-2sd">Ni popolno</span>':'<span class="badge badge-ok">Vse</span>')+'</div></div>';$i('maintSignNote').value='';updateMaintPinDisplay();buildMaintPinGrid();showMo('maintSignModal');}
+function openMaintSign(instrId,type){const instr=INSTRUMENTS.find(i=>i.id===instrId);const steps=getMaintSteps(type,instr.type);const key=instrId+'_'+type;const checked=maintState.checked[key]||{};const doneCount=steps.filter(s=>checked[s.id]).length;const ti=MAINT_TYPES[type];maintState.pendingSign={instrId,type};maintPinVal='';$i('maintSignTitle').textContent='Potrditev – '+instrId;$i('maintSignSummary').innerHTML='<div style="background:rgba(0,48,135,.05);border-radius:8px;padding:10px 14px"><div style="font-weight:600;font-size:14px;color:var(--abbott-blue);margin-bottom:6px">'+ti.icon+' '+ti.label+' – '+instrId+'</div><div style="font-size:13px">Opravljenih: <strong>'+doneCount+' / '+steps.length+'</strong> '+(doneCount<steps.length?'<span class="badge badge-2sd">Ni popolno</span>':'<span class="badge badge-ok">Vse</span>')+'</div></div>';$i('maintSignNote').value='';updateMaintPinDisplay();buildMaintPinGrid();showMo('maintSignModal');}
 function buildMaintPinGrid(){const keys=[1,2,3,4,5,6,7,8,9,'',0,'⌫'];$i('maintPinGrid').innerHTML=keys.map(k=>'<div class="pin-key" onclick="maintPinPress(\''+k+'\')">'+k+'</div>').join('');}
 function maintPinPress(k){if(k===''||k==='undefined')return;if(k==='⌫')maintPinVal=maintPinVal.slice(0,-1);else if(maintPinVal.length<5)maintPinVal+=k;updateMaintPinDisplay();}
 function clearMaintPin(){maintPinVal='';updateMaintPinDisplay();}
 function updateMaintPinDisplay(){for(let i=0;i<5;i++)$i('mpd'+i)?.classList.toggle('filled',i<maintPinVal.length);const op=S.operators.find(o=>o.id===maintPinVal);$i('maintPinName').textContent=op?'✓ '+op.first+' '+op.last:(maintPinVal.length===5?'⚠ Operater ni najden':'');}
-function saveMaintenance(){if(maintPinVal.length<5){notify('Vpišite matično številko','warning');return;}const op=S.operators.find(o=>o.id===maintPinVal);if(!op){notify('Operater ni registriran','error');return;}const {instrId,type}=maintState.pendingSign;const instr=INSTRUMENTS.find(i=>i.id===instrId);const steps=MAINT_STEPS[type]?.[instr.type]||[];const key=instrId+'_'+type;const checked=maintState.checked[key]||{};const record={id:Date.now().toString(),datetime:new Date().toISOString(),instrId,integration:instr.integration,type,steps:steps.map(s=>({id:s.id,text:s.text,done:!!checked[s.id]})),doneCount:steps.filter(s=>checked[s.id]).length,totalSteps:steps.length,note:$i('maintSignNote').value.trim(),operatorId:maintPinVal};if(!S.maintenanceLog)S.maintenanceLog=[];S.maintenanceLog.push(record);save();closeMo('maintSignModal');maintState.checked[key]={};renderMaintContent();notify('Vzdrževanje potrjeno! ✓','success');}
+function saveMaintenance(){if(maintPinVal.length<5){notify('Vpišite matično številko','warning');return;}const op=S.operators.find(o=>o.id===maintPinVal);if(!op){notify('Operater ni registriran','error');return;}const {instrId,type}=maintState.pendingSign;const instr=INSTRUMENTS.find(i=>i.id===instrId);const steps=getMaintSteps(type,instr.type);const key=instrId+'_'+type;const checked=maintState.checked[key]||{};const record={id:Date.now().toString(),datetime:new Date().toISOString(),instrId,integration:instr.integration,type,steps:steps.map(s=>({id:s.id,text:s.text,done:!!checked[s.id]})),doneCount:steps.filter(s=>checked[s.id]).length,totalSteps:steps.length,note:$i('maintSignNote').value.trim(),operatorId:maintPinVal};if(!S.maintenanceLog)S.maintenanceLog=[];S.maintenanceLog.push(record);save();closeMo('maintSignModal');maintState.checked[key]={};renderMaintContent();notify('Vzdrževanje potrjeno! ✓','success');}
 function getOpName(id){const op=S.operators.find(o=>o.id===id);return op?op.first+' '+op.last:id;}
-function renderMaintReview(){const tf=$i('mrFilterType').value,ig=$i('mrFilterInteg').value,df=$i('mrFilterFrom').value,dt=$i('mrFilterTo').value;let logs=[...(S.maintenanceLog||[])];if(tf)logs=logs.filter(m=>m.type===tf);if(ig)logs=logs.filter(m=>m.integration===ig);if(df)logs=logs.filter(m=>m.datetime>=df);if(dt)logs=logs.filter(m=>m.datetime<=dt+'T23:59:59');logs.sort((a,b)=>b.datetime.localeCompare(a.datetime));const tl={daily:'Dnevno',weekly:'Tedensko',monthly:'Mesečno',quarterly:'Kvartalno',triannual:'Trianulano'};const tbody=$i('maintReviewBody');if(!logs.length){tbody.innerHTML='<tr><td colspan="7" class="empty">Ni podatkov.</td></tr>';return;}tbody.innerHTML=logs.map(m=>{const allDone=m.doneCount===m.totalSteps;const dt2=new Date(m.datetime);return '<tr><td>'+dt2.toLocaleString('sl-SI')+'</td><td>'+(tl[m.type]||m.type)+'</td><td>'+m.integration+'</td><td><span class="badge badge-blue">'+m.instrId+'</span></td><td><span class="badge '+(allDone?'badge-ok':'badge-2sd')+'">'+m.doneCount+'/'+m.totalSteps+'</span></td><td>'+getOpName(m.operatorId)+'</td><td style="font-size:12px" class="muted">'+(m.note||'')+'</td></tr>';}).join('');}
+/* ---- urejevalnik opravil vzdrževanja ---- */
+function openMaintEdit(){$i('meType').value=maintState.type==='triannual'?'quarterly':maintState.type;renderMaintEdit();showMo('maintEditModal');}
+function _meSteps(){return S.maintSteps[$i('meType').value][$i('meInstr').value];}
+function renderMaintEdit(){
+  const steps=_meSteps();const list=$i('meList');
+  if(!steps.length){list.innerHTML='<div class="muted" style="font-size:13px;padding:10px;text-align:center">Ni opravil. Dodajte novo spodaj.</div>';return;}
+  list.innerHTML=steps.map((s,i)=>'<div style="display:flex;align-items:center;gap:6px;background:var(--bg2);border:1px solid var(--border);border-radius:7px;padding:6px 8px">'+
+    '<span style="color:var(--text3);font-size:11px;min-width:18px;text-align:right">'+(i+1)+'.</span>'+
+    '<input value="'+String(s.text).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;')+'" style="flex:1;font-size:13px;border:none;background:transparent;padding:4px" onchange="maintEditRename('+i+',this.value)">'+
+    '<button class="btn btn-g btn-sm" '+(i===0?'disabled':'')+' onclick="maintEditMove('+i+',-1)" title="Gor">&#9650;</button>'+
+    '<button class="btn btn-g btn-sm" '+(i===steps.length-1?'disabled':'')+' onclick="maintEditMove('+i+',1)" title="Dol">&#9660;</button>'+
+    '<button class="btn btn-d btn-sm" onclick="maintEditDel('+i+')" title="Izbriši">&#128465;</button>'+
+    '</div>').join('');
+}
+function maintEditAdd(){
+  const t=$i('meNewText').value.trim();if(!t){notify('Vpišite besedilo opravila','warning');return;}
+  _meSteps().push({id:'cust_'+Date.now(),text:t});
+  $i('meNewText').value='';save();renderMaintEdit();notify('Opravilo dodano','success');
+}
+function maintEditRename(i,val){const s=_meSteps()[i];if(!s)return;const t=String(val).trim();if(!t){renderMaintEdit();return;}s.text=t;save();}
+function maintEditDel(i){const steps=_meSteps();const s=steps[i];if(!s)return;if(!confirm('Izbrišem opravilo?\n\n„'+s.text+'“'))return;steps.splice(i,1);save();renderMaintEdit();notify('Opravilo izbrisano','success');}
+function maintEditMove(i,dir){const steps=_meSteps();const j=i+dir;if(j<0||j>=steps.length)return;const tmp=steps[i];steps[i]=steps[j];steps[j]=tmp;save();renderMaintEdit();}
+function maintEditRestore(){
+  const ty=$i('meType').value,it=$i('meInstr').value;
+  if(!confirm('Povrnem privzeta opravila ('+MAINT_TYPES[ty].label+', Alinity '+it+') iz obrazca OB KIKKB? Vaše spremembe za ta sklop bodo izgubljene.'))return;
+  S.maintSteps[ty][it]=JSON.parse(JSON.stringify(MAINT_DEFAULTS[ty][it]||[]));
+  save();renderMaintEdit();notify('Privzeta opravila povrnjena','success');
+}
+
+/* ============================================================
+   SERVIS / NAPAKE — vpis napak, servisna poročila, statistika
+   ============================================================ */
+const GLP_MODULES=['IOM-1','IOM-2','IOM-3','TAC','BM-1','BM-2','AM','DM','CM-1','CM-2','RM','REM','SM-1','SM-2','LINIJA'];
+const SERVICE_DEVICES=[...INSTRUMENTS.map(i=>i.id),...GLP_MODULES];
+function srvDeviceGroup(dev){const ins=INSTRUMENTS.find(i=>i.id===dev);return ins?ins.integration:'GLP linija';}
+function srvStatus(e){if(e.fixedAt)return 'fixed';if(e.notifiedAt)return 'notified';return 'open';}
+const SRV_STATUS_LABEL={open:'<span class="badge badge-3sd">🔴 Odprta</span>',notified:'<span class="badge badge-2sd">🟠 Servis obveščen</span>',fixed:'<span class="badge badge-ok">🟢 Odpravljena</span>'};
+function _fmtDur(ms){if(ms==null||ms<0)return '–';const h=ms/3600000;if(h<1)return Math.round(ms/60000)+' min';if(h<48)return h.toFixed(1)+' h';return Math.floor(h/24)+' d '+Math.round(h%24)+' h';}
+
+let currentSrv='entry';let srvEditId=null;let srvAttachTemp=[];let _srvInit=false;
+function navSrv(page){
+  currentSrv=page;
+  document.querySelectorAll('.srv-page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('#srvSubnav .tab').forEach(t=>t.classList.remove('active'));
+  $i('srv-'+page).classList.add('active');
+  document.querySelector('#srvSubnav .tab[data-srv="'+page+'"]')?.classList.add('active');
+  if(!_srvInit){_srvInit=true;srvInitSelects();}
+  if(page==='entry'&&!srvEditId)srvResetForm(true);
+  if(page==='list')renderSrvList();
+  if(page==='stats')renderSrvStats();
+}
+function srvInitSelects(){
+  const opts=SERVICE_DEVICES.map(d=>'<option value="'+d+'">'+d+'</option>').join('');
+  $i('sfDevice').innerHTML='<option value="">— izberi —</option>'+opts;
+  $i('slDevice').innerHTML='<option value="">Vse naprave</option>'+opts;
+  $i('ssMonth').value=new Date().toISOString().slice(0,7);
+}
+function srvResetForm(keepDefaults){
+  srvEditId=null;srvAttachTemp=[];
+  ['sfDevice','sfFault','sfNotified','sfResponded','sfArrived','sfFixed','sfNalog','sfOrder','sfNote'].forEach(id=>{$i(id).value='';});
+  /* privzeto: pojav napake = zdaj (lokalni čas za datetime-local) */
+  const n=new Date();n.setMinutes(n.getMinutes()-n.getTimezoneOffset());
+  $i('sfOccurred').value=keepDefaults?n.toISOString().slice(0,16):'';
+  $i('srvFormTitle').textContent='Vpis napake / servisa';
+  $i('srvCancelEdit').style.display='none';
+  renderSrvAttach();
+}
+function srvEdit(id){
+  const e=(S.serviceLog||[]).find(x=>x.id===id);if(!e)return;
+  srvEditId=id;srvAttachTemp=(e.attachments||[]).slice();
+  $i('sfDevice').value=e.device||'';$i('sfFault').value=e.fault||'';
+  $i('sfOccurred').value=e.occurredAt||'';$i('sfNotified').value=e.notifiedAt||'';
+  $i('sfResponded').value=e.respondedAt||'';$i('sfArrived').value=e.arrivedAt||'';$i('sfFixed').value=e.fixedAt||'';
+  $i('sfNalog').value=e.nalogNum||'';$i('sfOrder').value=e.orderNum||'';$i('sfNote').value=e.note||'';
+  $i('srvFormTitle').textContent='Urejanje napake — '+(e.device||'');
+  $i('srvCancelEdit').style.display='';
+  renderSrvAttach();
+  navSrv('entry');
+}
+function srvSave(){
+  const device=$i('sfDevice').value,fault=$i('sfFault').value.trim(),occ=$i('sfOccurred').value;
+  if(!device){notify('Izberite napravo/modul','warning');return;}
+  if(!fault){notify('Vpišite opis napake','warning');return;}
+  if(!occ){notify('Vpišite, kdaj se je napaka pojavila','warning');return;}
+  const data={device,fault,occurredAt:occ,
+    notifiedAt:$i('sfNotified').value||'',respondedAt:$i('sfResponded').value||'',
+    arrivedAt:$i('sfArrived').value||'',fixedAt:$i('sfFixed').value||'',
+    nalogNum:$i('sfNalog').value.trim(),orderNum:$i('sfOrder').value.trim(),
+    note:$i('sfNote').value.trim(),attachments:srvAttachTemp.slice()};
+  if(!S.serviceLog)S.serviceLog=[];
+  if(srvEditId){
+    const e=S.serviceLog.find(x=>x.id===srvEditId);
+    if(e)Object.assign(e,data,{updatedAt:new Date().toISOString()});
+    notify('Napaka posodobljena ✓','success');
+  }else{
+    S.serviceLog.push(Object.assign({id:Date.now().toString(),createdAt:new Date().toISOString()},data));
+    notify('Napaka zabeležena ✓','success');
+  }
+  save();srvResetForm(true);navSrv('list');
+}
+/* ---- priponke ---- */
+function renderSrvAttach(){
+  const w=$i('sfAttachList');
+  if(!srvAttachTemp.length){w.innerHTML='<div class="muted" style="font-size:12px">Ni priponk.</div>';return;}
+  w.innerHTML=srvAttachTemp.map((a,i)=>'<div style="display:flex;align-items:center;gap:8px;background:var(--bg2);border:1px solid var(--border);border-radius:7px;padding:6px 10px;font-size:13px">'+
+    '<span>&#128196;</span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer" onclick="srvOpenAttach('+i+')">'+a.name+'</span>'+
+    '<span class="muted" style="font-size:11px">'+(a.size?(a.size/1024).toFixed(0)+' KB':'')+'</span>'+
+    '<button class="btn btn-d btn-sm" onclick="srvDelAttach('+i+')">&#128465;</button></div>').join('');
+}
+function srvDelAttach(i){srvAttachTemp.splice(i,1);renderSrvAttach();}
+function srvOpenAttach(i){
+  const a=srvAttachTemp[i];if(!a)return;
+  if(_hasBridge()&&AndroidBridge.openReportFile&&a.path){try{AndroidBridge.openReportFile(a.path);}catch(e){notify('Ni mogoče odpreti datoteke','err');}}
+  else notify('Odpiranje datotek deluje na napravi','warn');
+}
+function srvOpenAttachByPath(path){
+  if(_hasBridge()&&AndroidBridge.openReportFile&&path){try{AndroidBridge.openReportFile(path);}catch(e){notify('Ni mogoče odpreti datoteke','err');}}
+  else notify('Odpiranje datotek deluje na napravi','warn');
+}
+function srvPickFile(){
+  if(_hasBridge()&&AndroidBridge.pickReportFile){try{AndroidBridge.pickReportFile();}catch(e){notify('Napaka pri izbiri datoteke','err');}}
+  else $i('sfFileInput').click();
+}
+/* callback iz Androida: datoteka izbrana prek SAF in shranjena v ServisnaPorocila */
+function onReportPicked(name,path,base64){
+  const size=base64?Math.floor(base64.length*3/4):0;
+  srvAttachTemp.push({name:name||'datoteka',path:path||'',size,addedAt:new Date().toISOString()});
+  renderSrvAttach();notify('Priponka dodana: '+name,'success');
+  if(/\.pdf$/i.test(name||'')&&base64)srvTryExtractNalog(base64);
+}
+function onReportPickError(msg){notify(msg||'Napaka pri izbiri datoteke','err');}
+/* brskalnik fallback */
+function srvFileChosen(input){
+  const f=input.files[0];if(!f)return;
+  srvAttachTemp.push({name:f.name,path:'',size:f.size,addedAt:new Date().toISOString()});
+  renderSrvAttach();notify('Priponka dodana (v brskalniku brez kopije): '+f.name,'warn');
+  if(/\.pdf$/i.test(f.name)){
+    const r=new FileReader();
+    r.onload=e=>{const b=new Uint8Array(e.target.result);let s='';for(let i=0;i<b.length;i++)s+=String.fromCharCode(b[i]);srvTryExtractNalog(btoa(s));};
+    r.readAsArrayBuffer(f);
+  }
+  input.value='';
+}
+/* ---- best-effort branje "Št. naloga" iz PDF ---- */
+async function _inflateBytes(bytes){
+  try{
+    const ds=new DecompressionStream('deflate');
+    const stream=new Blob([bytes]).stream().pipeThrough(ds);
+    return new Uint8Array(await new Response(stream).arrayBuffer());
+  }catch(e){return null;}
+}
+async function _pdfText(u8){
+  const raw=new TextDecoder('latin1').decode(u8);
+  let inflated='';
+  let idx=0;
+  for(let guard=0;guard<200;guard++){
+    const s=raw.indexOf('stream',idx);if(s<0)break;
+    let st=s+6;if(raw.charCodeAt(st)===13)st++;if(raw.charCodeAt(st)===10)st++;
+    const e=raw.indexOf('endstream',st);if(e<0)break;
+    /* odreži CR/LF/presledke pred endstream — sicer DecompressionStream javi napako */
+    let e2=e;while(e2>st&&(raw.charCodeAt(e2-1)===10||raw.charCodeAt(e2-1)===13||raw.charCodeAt(e2-1)===32))e2--;
+    const inf=await _inflateBytes(u8.subarray(st,e2));
+    if(inf)inflated+=new TextDecoder('latin1').decode(inf);
+    idx=e+9;
+  }
+  const src=inflated+raw;
+  /* besedilo iz PDF operatorjev Tj / TJ */
+  let txt='';let m;
+  const reTj=/\(((?:\\.|[^\\()])*)\)\s*Tj/g;
+  while((m=reTj.exec(src)))txt+=m[1].replace(/\\([()\\])/g,'$1')+' ';
+  const reTJ=/\[((?:\\.|[^\]])*)\]\s*TJ/g;
+  while((m=reTJ.exec(src)))txt+=m[1].replace(/\(((?:\\.|[^\\()])*)\)/g,'$1 ').replace(/\\([()\\])/g,'$1');
+  return txt+' '+src;
+}
+async function srvTryExtractNalog(base64){
+  try{
+    const bin=atob(base64);const u8=new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++)u8[i]=bin.charCodeAt(i);
+    const txt=(await _pdfText(u8)).replace(/\x00/g,'');
+    const m=txt.match(/naloga[:\s]{0,10}(\d{2,5}\s*\/\s*\d{4})/i)||txt.match(/(\d{3,4}\/20\d{2})/);
+    if(m){
+      const v=m[1].replace(/\s+/g,'');
+      if(!$i('sfNalog').value){$i('sfNalog').value=v;notify('Št. naloga prebrana iz PDF: '+v,'success');}
+      return v;
+    }
+  }catch(e){console.log('pdf parse err',e);}
+  return null;
+}
+/* ---- seznam napak ---- */
+function renderSrvList(){
+  const dev=$i('slDevice').value,st=$i('slStatus').value,df=$i('slFrom').value,dt=$i('slTo').value;
+  let logs=[...(S.serviceLog||[])];
+  if(dev)logs=logs.filter(e=>e.device===dev);
+  if(st)logs=logs.filter(e=>srvStatus(e)===st);
+  if(df)logs=logs.filter(e=>(e.occurredAt||'')>=df);
+  if(dt)logs=logs.filter(e=>(e.occurredAt||'')<=dt+'T23:59');
+  logs.sort((a,b)=>(b.occurredAt||'').localeCompare(a.occurredAt||''));
+  const tbody=$i('srvListBody');
+  if(!logs.length){tbody.innerHTML='<tr><td colspan="8" class="empty">Ni zabeleženih napak.</td></tr>';return;}
+  tbody.innerHTML=logs.map(e=>{
+    const dur=(e.occurredAt&&e.fixedAt)?_fmtDur(new Date(e.fixedAt)-new Date(e.occurredAt)):'–';
+    const att=(e.attachments||[]).map(a=>'<span style="cursor:pointer" title="'+a.name+'" onclick="srvOpenAttachByPath(\''+String(a.path||'').replace(/'/g,"\\'")+'\')">&#128196;</span>').join(' ');
+    return '<tr><td>'+(e.occurredAt||'').replace('T',' ')+'</td><td><span class="badge badge-blue">'+e.device+'</span></td>'+
+      '<td>'+e.fault+(e.note?'<div class="muted" style="font-size:11px">'+e.note+'</div>':'')+'</td>'+
+      '<td>'+(e.nalogNum||'–')+(e.orderNum?'<div class="muted" style="font-size:11px">NAR: '+e.orderNum+'</div>':'')+'</td>'+
+      '<td>'+SRV_STATUS_LABEL[srvStatus(e)]+'</td><td>'+dur+'</td><td>'+(att||'–')+'</td>'+
+      '<td><button class="btn btn-g btn-sm" onclick="srvEdit(\''+e.id+'\')">&#9999;&#65039;</button> <button class="btn btn-d btn-sm" onclick="srvDelete(\''+e.id+'\')">&#128465;</button></td></tr>';
+  }).join('');
+}
+function srvDelete(id){
+  const e=(S.serviceLog||[]).find(x=>x.id===id);if(!e)return;
+  if(!confirm('Izbrišem vnos napake?\n\n'+e.device+' — '+e.fault))return;
+  S.serviceLog=S.serviceLog.filter(x=>x.id!==id);save();renderSrvList();notify('Vnos izbrisan','success');
+}
+function exportSrvCSV(){
+  const rows=[['Naprava','Napaka','Pojav napake','Servis obveščen','Servis odziv','Servis prišel','Odpravljena','Št. naloga','Naročilnica','Status','Čas do odprave','Opomba','Priponke']];
+  (S.serviceLog||[]).forEach(e=>{
+    const dur=(e.occurredAt&&e.fixedAt)?_fmtDur(new Date(e.fixedAt)-new Date(e.occurredAt)):'';
+    const stl={open:'Odprta',notified:'Servis obveščen',fixed:'Odpravljena'};
+    rows.push([e.device,e.fault,e.occurredAt,e.notifiedAt,e.respondedAt,e.arrivedAt,e.fixedAt,e.nalogNum,e.orderNum,stl[srvStatus(e)],dur,e.note,(e.attachments||[]).map(a=>a.name).join('; ')]);
+  });
+  const csv=rows.map(r=>r.map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(',')).join('\r\n');
+  const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='Napake_servisi_'+new Date().toISOString().slice(0,10)+'.csv';a.click();
+  notify('CSV izvožen','success');
+}
+/* ---- statistika servisov ---- */
+function srvStatsModeChange(){
+  const m=$i('ssMode').value;
+  $i('ssMonth').style.display=m==='month'?'':'none';
+  $i('ssYear').style.display=m==='year'?'':'none';
+  $i('ssFrom').style.display=m==='range'?'':'none';
+  $i('ssTo').style.display=m==='range'?'':'none';
+  if(m==='year'){
+    const years=new Set((S.serviceLog||[]).map(e=>(e.occurredAt||'').slice(0,4)).filter(Boolean));
+    years.add(String(new Date().getFullYear()));
+    $i('ssYear').innerHTML=[...years].sort().reverse().map(y=>'<option value="'+y+'">'+y+'</option>').join('');
+  }
+  renderSrvStats();
+}
+function _srvStatsFiltered(){
+  const m=$i('ssMode').value;let from='',to='';
+  if(m==='month'){const mv=$i('ssMonth').value;if(mv){from=mv+'-01';to=mv+'-31';}}
+  else if(m==='year'){const y=$i('ssYear').value;if(y){from=y+'-01-01';to=y+'-12-31';}}
+  else{from=$i('ssFrom').value;to=$i('ssTo').value;}
+  let logs=[...(S.serviceLog||[])];
+  if(from)logs=logs.filter(e=>(e.occurredAt||'')>=from);
+  if(to)logs=logs.filter(e=>(e.occurredAt||'')<=to+'T23:59');
+  return logs;
+}
+function renderSrvStats(){
+  const logs=_srvStatsFiltered();
+  const grp=$i('ssGroup').value;
+  const keyOf=e=>grp==='analyser'?srvDeviceGroup(e.device):e.device;
+  const groups={};
+  logs.forEach(e=>{
+    const k=keyOf(e);
+    if(!groups[k])groups[k]={total:0,fixed:0,open:0,durSum:0,durN:0};
+    const g=groups[k];g.total++;
+    if(srvStatus(e)==='fixed'){g.fixed++;if(e.occurredAt&&e.fixedAt){g.durSum+=(new Date(e.fixedAt)-new Date(e.occurredAt));g.durN++;}}
+    else g.open++;
+  });
+  const keys=Object.keys(groups).sort((a,b)=>groups[b].total-groups[a].total);
+  /* tabela */
+  const tbody=$i('srvStatsBody');
+  if(!keys.length){tbody.innerHTML='<tr><td colspan="5" class="empty">Ni napak v izbranem obdobju.</td></tr>';}
+  else tbody.innerHTML=keys.map(k=>{const g=groups[k];
+    return '<tr><td><span class="badge badge-blue">'+k+'</span></td><td>'+g.total+'</td><td>'+g.fixed+'</td><td>'+g.open+'</td><td>'+(g.durN?_fmtDur(g.durSum/g.durN):'–')+'</td></tr>';}).join('');
+  /* graf */
+  drawSrvChart(keys,groups);
+}
+function drawSrvChart(keys,groups){
+  const c=$i('srvStatsCanvas');if(!c)return;
+  const dpr=window.devicePixelRatio||1;
+  const W=c.clientWidth||c.parentElement.clientWidth||600,H=300;
+  c.width=W*dpr;c.height=H*dpr;
+  const x=c.getContext('2d');x.scale(dpr,dpr);x.clearRect(0,0,W,H);
+  const dark=document.body.classList.contains('dark');
+  const txtCol=dark?'#cbd5e1':'#334155',grid=dark?'rgba(148,163,184,.15)':'rgba(100,116,139,.15)';
+  if(!keys.length){x.fillStyle=txtCol;x.font='13px sans-serif';x.textAlign='center';x.fillText('Ni podatkov za izbrano obdobje',W/2,H/2);return;}
+  const padL=34,padB=58,padT=16,padR=8;
+  const maxV=Math.max(1,...keys.map(k=>groups[k].total));
+  const cw=(W-padL-padR)/keys.length;
+  /* mreža + osi */
+  x.strokeStyle=grid;x.fillStyle=txtCol;x.font='10px sans-serif';x.textAlign='right';
+  const steps=Math.min(maxV,5);
+  for(let i=0;i<=steps;i++){
+    const v=Math.round(maxV*i/steps),y=H-padB-(H-padB-padT)*i/steps;
+    x.beginPath();x.moveTo(padL,y);x.lineTo(W-padR,y);x.stroke();
+    x.fillText(String(v),padL-5,y+3);
+  }
+  keys.forEach((k,i)=>{
+    const g=groups[k];
+    const bx=padL+i*cw;
+    const bw=Math.min(28,cw/2.6);
+    const hT=(H-padB-padT)*g.total/maxV;
+    const hF=(H-padB-padT)*g.fixed/maxV;
+    /* napake skupaj (rdeča) + odpravljene (zelena) */
+    x.fillStyle='#dc2626';x.fillRect(bx+cw/2-bw-2,H-padB-hT,bw,hT);
+    x.fillStyle='#16a34a';x.fillRect(bx+cw/2+2,H-padB-hF,bw,hF);
+    x.fillStyle=txtCol;x.font='10px sans-serif';x.textAlign='center';
+    /* vrednosti nad stolpci */
+    if(g.total)x.fillText(String(g.total),bx+cw/2-bw/2-2,H-padB-hT-3);
+    if(g.fixed)x.fillText(String(g.fixed),bx+cw/2+bw/2+2,H-padB-hF-3);
+    /* oznaka naprave (poševno) */
+    x.save();x.translate(bx+cw/2,H-padB+10);x.rotate(-Math.PI/5);x.textAlign='right';x.fillText(k,0,8);x.restore();
+  });
+  /* legenda */
+  x.font='11px sans-serif';x.textAlign='left';
+  x.fillStyle='#dc2626';x.fillRect(padL,2,10,10);x.fillStyle=txtCol;x.fillText('Napake',padL+14,11);
+  x.fillStyle='#16a34a';x.fillRect(padL+74,2,10,10);x.fillStyle=txtCol;x.fillText('Odpravljene',padL+88,11);
+}
+function exportSrvStatsCSV(){
+  const logs=_srvStatsFiltered();const grp=$i('ssGroup').value;
+  const keyOf=e=>grp==='analyser'?srvDeviceGroup(e.device):e.device;
+  const groups={};
+  logs.forEach(e=>{const k=keyOf(e);if(!groups[k])groups[k]={total:0,fixed:0,open:0};const g=groups[k];g.total++;srvStatus(e)==='fixed'?g.fixed++:g.open++;});
+  const rows=[['Naprava','Napak','Odpravljenih','Odprtih']];
+  Object.keys(groups).sort().forEach(k=>rows.push([k,groups[k].total,groups[k].fixed,groups[k].open]));
+  const csv=rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');
+  const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='Statistika_servisov_'+new Date().toISOString().slice(0,10)+'.csv';a.click();
+  notify('CSV izvožen','success');
+}
+function renderMaintReview(){const tf=$i('mrFilterType').value,ig=$i('mrFilterInteg').value,df=$i('mrFilterFrom').value,dt=$i('mrFilterTo').value;let logs=[...(S.maintenanceLog||[])];if(tf)logs=logs.filter(m=>m.type===tf);if(ig)logs=logs.filter(m=>m.integration===ig);if(df)logs=logs.filter(m=>m.datetime>=df);if(dt)logs=logs.filter(m=>m.datetime<=dt+'T23:59:59');logs.sort((a,b)=>b.datetime.localeCompare(a.datetime));const tl={daily:'Dnevno',weekly:'Tedensko',monthly:'Mesečno',quarterly:'3-mesečno',triannual:'3-mesečno'};const tbody=$i('maintReviewBody');if(!logs.length){tbody.innerHTML='<tr><td colspan="7" class="empty">Ni podatkov.</td></tr>';return;}tbody.innerHTML=logs.map(m=>{const allDone=m.doneCount===m.totalSteps;const dt2=new Date(m.datetime);return '<tr><td>'+dt2.toLocaleString('sl-SI')+'</td><td>'+(tl[m.type]||m.type)+'</td><td>'+m.integration+'</td><td><span class="badge badge-blue">'+m.instrId+'</span></td><td><span class="badge '+(allDone?'badge-ok':'badge-2sd')+'">'+m.doneCount+'/'+m.totalSteps+'</span></td><td>'+getOpName(m.operatorId)+'</td><td style="font-size:12px" class="muted">'+(m.note||'')+'</td></tr>';}).join('');}
 function exportMaintCSV(){const rows=[['Datum','Čas','Tip','Integracija','Analizator','Korak','Opravljeno','Operater','Opomba']];(S.maintenanceLog||[]).forEach(m=>{const dt=new Date(m.datetime);(m.steps||[]).forEach(s=>{rows.push([dt.toLocaleDateString('sl-SI'),dt.toLocaleTimeString('sl-SI'),m.type,m.integration,m.instrId,s.text,s.done?'DA':'NE',getOpName(m.operatorId),m.note||'']);});});const csv=rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='Vzdrzevanje_'+new Date().toISOString().slice(0,10)+'.csv';a.click();notify('CSV izvožen','success');}
 
 /* ============================================================
@@ -1429,21 +1968,41 @@ function refreshSyncUI(){
 }
 function msSignIn(){if(!_hasBridge()){notify('Samo na napravi','warn');return;}try{AndroidBridge.msSignIn();}catch(e){notify('Napaka prijave','err');}}
 function msSignOut(){if(!_hasBridge()){notify('Samo na napravi','warn');return;}try{AndroidBridge.msSignOut();}catch(e){}}
-function msUpload(key){if(!_hasBridge()){notify('Samo na napravi','warn');return;}try{const data=key==='qclab_v2'?JSON.stringify(S):JSON.stringify(DB_PREGLED);notify('Nalagam '+key+'…','ok');AndroidBridge.msUpload(key,data);}catch(e){notify('Napaka nalaganja','err');}}
+function msUpload(key){if(!_hasBridge()){notify('Samo na napravi','warn');return;}try{const data=_exportPayload(key);notify('Nalagam '+key+'…','ok');AndroidBridge.msUpload(key,data);}catch(e){notify('Napaka nalaganja','err');}}
 function msDownload(key){if(!_hasBridge()){notify('Samo na napravi','warn');return;}try{notify('Prenašam '+key+'…','ok');AndroidBridge.msDownload(key);}catch(e){notify('Napaka prenosa','err');}}
 /* ---- Quick Share (Nearby) ---- */
+function _tsFilename(prefix){
+  const n=new Date();
+  const ts=n.getFullYear()+('0'+(n.getMonth()+1)).slice(-2)+('0'+n.getDate()).slice(-2)+'_'+('0'+n.getHours()).slice(-2)+('0'+n.getMinutes()).slice(-2)+('0'+n.getSeconds()).slice(-2);
+  return prefix+'_'+ts+'.json';
+}
+function _exportPayload(key){
+  /* enak format kot Zebra build 102: cela baza + exportedAt */
+  const src=key==='qclab_v2'?S:DB_PREGLED;
+  const o={};for(const k in src){if(Object.prototype.hasOwnProperty.call(src,k))o[k]=src[k];}
+  o.exportedAt=new Date().toISOString();
+  return JSON.stringify(o);
+}
 function quickShareDb(key){
-  const data=key==='qclab_v2'?JSON.stringify(S):JSON.stringify(DB_PREGLED);
+  const data=_exportPayload(key);
+  const fname=key==='qclab_v2'?_tsFilename('qclab_v2'):_tsFilename('Pregled_BK');
   if(_hasBridge()&&AndroidBridge.quickShare){
-    try{AndroidBridge.quickShare(key+'.json',data);notify('Odpiram Quick Share…','ok');}
+    try{AndroidBridge.quickShare(fname,data);notify('Odpiram Quick Share…','ok');}
     catch(e){notify('Napaka Quick Share','err');}
   }else{
     /* brskalnik: fallback na prenos datoteke */
-    try{const blob=new Blob([data],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=key+'.json';a.click();notify('Quick Share je na voljo na napravi; tu prenešeno kot datoteka','warn');}catch(e){notify('Napaka','err');}
+    try{const blob=new Blob([data],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fname;a.click();notify('Quick Share je na voljo na napravi; tu prenešeno kot datoteka','warn');}catch(e){notify('Napaka','err');}
   }
 }
 function onQuickShareError(msg){notify(msg||'Napaka Quick Share','err');}
-/* Sprejem deljene datoteke (iz Quick Share / odprtja .json) */
+/* Najnovejši časovni žig v zalogi (za primerjavo starosti — kot Zebra) */
+function _dbFreshness(o){
+  let t='';
+  ((o&&o.received)||[]).forEach(r=>{if(r&&r.receivedAt&&r.receivedAt>t)t=r.receivedAt;});
+  ((o&&o.lots)||[]).forEach(l=>{if(l&&l.firstReceivedAt&&l.firstReceivedAt>t)t=l.firstReceivedAt;});
+  return t;
+}
+/* Sprejem deljene datoteke (iz Quick Share / odprtja .json / gumba Uvozi iz datoteke) */
 function onSharedImport(filename,json){
   if(!json){notify('Prazna deljena datoteka','warn');return;}
   let obj;try{obj=JSON.parse(json);}catch(e){notify('Neveljaven JSON','err');return;}
@@ -1451,10 +2010,47 @@ function onSharedImport(filename,json){
   if(fn.includes('qclab'))key='qclab_v2';
   else if(fn.includes('pregledbk')||fn.includes('pregled_bk'))key='pregledBK_db';
   else if(obj.qcEntries||obj.assays||obj.operators||obj.qcMaterials)key='qclab_v2';
-  else if(obj.inventory||obj.gtins)key='pregledBK_db';
+  else if(obj.inventory||obj.gtins||obj.received||obj.sessions)key='pregledBK_db';
   if(!key){notify('Neznana vrsta deljenih podatkov','warn');return;}
-  if(key==='qclab_v2'){Object.assign(S,obj);save();initState();navMain('qc');navQc(currentQc||'dashboard');notify('Quick Share: QC podatki uvoženi ✓','success');}
-  else{DB_PREGLED=mergePregledDB(obj);savePregledDB();navMain('zaloga');notify('Quick Share: zaloga uvožena ✓','success');}
+  const fmt=s=>s?s.slice(0,16).replace('T',' '):'?';
+  if(key==='qclab_v2'){
+    const nQc=(obj.qcEntries||[]).length,nOp=(obj.operators||[]).length,nSrv=(obj.serviceLog||[]).length;
+    let msg='Datoteka'+(filename?' "'+filename+'"':'')+':\n• '+nQc+' QC vnosov, '+nOp+' operaterjev'+(nSrv?', '+nSrv+' servisnih':'');
+    if(obj.exportedAt)msg+='\n• ustvarjena: '+fmt(obj.exportedAt);
+    msg+='\n\nUvozim QC podatke? (obstoječi se prepišejo s temi)';
+    if(!confirm(msg)){notify('Uvoz preklican','warn');return;}
+    Object.assign(S,obj);delete S.exportedAt;save();initState();navMain('qc');navQc(currentQc||'dashboard');notify('Quick Share: QC podatki uvoženi ✓','success');
+  }else{
+    /* Varnostno opozorilo s povzetkom + opozorilo na starejše podatke (kot Zebra build 100) */
+    const inRec=(obj.received||[]).length,inLots=(obj.lots||[]).length,inGt=(obj.gtins||[]).length;
+    const fIn=_dbFreshness(obj),fCur=_dbFreshness(DB_PREGLED);
+    let sum='Datoteka'+(filename?' "'+filename+'"':'')+':\n• '+inRec+' sprejemov, '+inLots+' lotov, '+inGt+' GTIN';
+    if(obj.exportedAt)sum+='\n• ustvarjena: '+fmt(obj.exportedAt);
+    else if(fIn)sum+='\n• zadnji vnos: '+fmt(fIn);
+    let msg;
+    if(fIn&&fCur&&fIn<fCur){
+      msg='⚠ OPOZORILO: PODATKI V DATOTEKI SO STAREJŠI od trenutnih!\n\n'+sum+'\n• Trenutni zadnji vnos: '+fmt(fCur)+'\n\nUvoz NE izbriše obstoječih (le doda manjkajoče), a uvažaš starejše podatke. Vseeno nadaljujem?';
+    }else{
+      msg=sum+'\n\nZdružim te podatke v trenutno zalogo?';
+    }
+    if(!confirm(msg)){notify('Uvoz preklican','warn');return;}
+    const r=mergePregledDB(obj);savePregledDB();
+    try{renderZaloga();}catch(e){}
+    try{renderRoki();}catch(e){}
+    try{renderLoti();}catch(e){}
+    navMain('zaloga');
+    let nm='Uvoženo: +'+r.gtins+' GTIN, +'+r.received+' sprejem, +'+r.lots+' lotov, +'+r.sessions+' sej';
+    if(r.consumed)nm+=', +'+r.consumed+' poraba';
+    notify(nm+' ✓','success');
+  }
+}
+/* Gumb »Uvozi iz datoteke« — datoteka iz Prenosov gre skozi onSharedImport */
+function importSharedFile(input){
+  const f=input.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=e=>{onSharedImport(f.name,e.target.result);};
+  r.onerror=()=>{notify('Napaka pri branju datoteke','err');};
+  r.readAsText(f);input.value='';
 }
 /* Callbacks from Android */
 function onMsDeviceCode(userCode,verUri,message){notify('Koda: '+userCode+' na '+(verUri||'microsoft.com/devicelogin'),'ok');}
@@ -1465,24 +2061,104 @@ function onMsUploadDone(ok,msg){notify(msg||(ok?'Naloženo':'Napaka'),ok?'ok':'e
 function onMsDownloadDone(key,json,msg){
   if(json===null||json===undefined||json===''){notify(msg||'Ni podatkov v OneDrive','warn');return;}
   try{
-    if(key==='qclab_v2'){const cloud=JSON.parse(json);Object.assign(S,cloud);save();initState();notify('QC podatki združeni','ok');navQc(currentQc);}
-    else if(key==='pregledBK_db'){const cloud=JSON.parse(json);DB_PREGLED=mergePregledDB(cloud);savePregledDB();notify('Zaloga združena','ok');renderZaloga();}
+    if(key==='qclab_v2'){const cloud=JSON.parse(json);Object.assign(S,cloud);delete S.exportedAt;save();initState();notify('QC podatki združeni','ok');navQc(currentQc);}
+    else if(key==='pregledBK_db'){const cloud=JSON.parse(json);const r=mergePregledDB(cloud);savePregledDB();notify('Zaloga združena: +'+r.received+' sprejem, +'+r.lots+' lotov','ok');renderZaloga();}
     refreshSyncUI();
   }catch(e){notify('Napaka pri branju podatkov','err');}
 }
 function _arrUnion(a,b){const out=(a||[]).slice();(b||[]).forEach(x=>{if(out.indexOf(x)<0)out.push(x);});return out;}
+/* Pametno združevanje — enaka logika kot Zebra Pregled BK build 102 (mergeDB) */
 function mergePregledDB(cloud){
-  cloud=cloud||{};const db=DB_PREGLED;db.gtins=db.gtins||[];db.inventory=db.inventory||[];db.sessions=db.sessions||[];
-  const locG={};db.gtins.forEach(g=>{locG[g.gtin]=true;});(cloud.gtins||[]).forEach(g=>{if(g&&g.gtin&&!locG[g.gtin]){db.gtins.push(g);locG[g.gtin]=true;}});
-  const invKey=i=>(i.gtin||'')+'|'+(i.lot||'');const invMap={};db.inventory.forEach(i=>{invMap[invKey(i)]=i;});
-  (cloud.inventory||[]).forEach(ci=>{if(!ci)return;const k=invKey(ci),li=invMap[k];if(!li){db.inventory.push(ci);invMap[k]=ci;}else{li.serials=_arrUnion(li.serials,ci.serials);li.rfidEpcs=_arrUnion(li.rfidEpcs,ci.rfidEpcs);if(li.serials&&li.serials.length)li.qty=li.serials.length;else li.qty=Math.max(li.qty||0,ci.qty||0);if(!li.expiry&&ci.expiry)li.expiry=ci.expiry;}});
-  const locS={};db.sessions.forEach(s=>{locS[s.id]=true;});(cloud.sessions||[]).forEach(s=>{if(s&&s.id&&!locS[s.id]){db.sessions.push(s);locS[s.id]=true;}});
-  return db;
+  const stats={gtins:0,received:0,sessions:0,inventory:0,lots:0,consumed:0};
+  cloud=cloud||{};const db=DB_PREGLED;
+  db.gtins=db.gtins||[];db.inventory=db.inventory||[];db.sessions=db.sessions||[];
+  db.received=db.received||[];db.lots=db.lots||[];db.consumed=db.consumed||[];
+  /* GTINs — union po gtin, lokalni ima prednost */
+  const locG={};db.gtins.forEach(g=>{locG[g.gtin]=true;});
+  (cloud.gtins||[]).forEach(g=>{if(g&&g.gtin&&!locG[g.gtin]){db.gtins.push(g);locG[g.gtin]=true;stats.gtins++;}});
+  /* Received (sprejem) — union po identiteti (id / gtin+serial / gtin+epc) */
+  const recKey=r=>r.id||((r.gtin||'')+'|'+(r.serial||'')+'|'+(r.rfidEpc||''));
+  const locR={};db.received.forEach(r=>{locR[recKey(r)]=true;});
+  (cloud.received||[]).forEach(r=>{if(r&&!locR[recKey(r)]){db.received.push(r);locR[recKey(r)]=true;stats.received++;}});
+  /* Sessions — union po id; če seja že obstaja, dopolni items[] z novimi skeniranji */
+  const locS={};db.sessions.forEach(s=>{locS[s.id]=s;});
+  (cloud.sessions||[]).forEach(s=>{
+    if(!s||!s.id)return;
+    const ls=locS[s.id];
+    if(!ls){db.sessions.push(s);locS[s.id]=s;stats.sessions++;}
+    else{
+      const itemKey=i=>i.id||((i.gtin||'')+'|'+(i.serial||'')+'|'+(i.rfidEpc||''));
+      const im={};(ls.items||[]).forEach(i=>{im[itemKey(i)]=true;});
+      let added=0;
+      (s.items||[]).forEach(i=>{if(i&&!im[itemKey(i)]){(ls.items=ls.items||[]).push(i);im[itemKey(i)]=true;added++;}});
+      if(added){ls.scanned=(ls.items||[]).length;stats.sessions++;}
+      if(!ls.closed&&s.closed)ls.closed=s.closed;
+    }
+  });
+  /* Inventory — union po gtin+lot; serije/EPC kot množice; qty preračunan */
+  const invKey=i=>(i.gtin||'')+'|'+(i.lot||'');
+  let invMap={};db.inventory.forEach(i=>{invMap[invKey(i)]=i;});
+  (cloud.inventory||[]).forEach(ci=>{
+    if(!ci)return;
+    const k=invKey(ci),li=invMap[k];
+    if(!li){db.inventory.push(ci);invMap[k]=ci;stats.inventory++;}
+    else{
+      li.serials=_arrUnion(li.serials,ci.serials);
+      li.rfidEpcs=_arrUnion(li.rfidEpcs,ci.rfidEpcs);
+      if(li.serials&&li.serials.length)li.qty=li.serials.length;
+      else if(li.rfidEpcs&&li.rfidEpcs.length)li.qty=li.rfidEpcs.length;
+      else li.qty=Math.max(li.qty||0,ci.qty||0);
+      if(!li.expiry&&ci.expiry)li.expiry=ci.expiry;
+    }
+  });
+  /* Loti — union po gtin+lot; ohrani ovrednotenje z obeh naprav */
+  const lotKey=l=>(l.gtin||'')+'|'+(l.lot||'');
+  const locL={};db.lots.forEach(l=>{locL[lotKey(l)]=l;});
+  (cloud.lots||[]).forEach(cl=>{
+    if(!cl)return;
+    const k=lotKey(cl),ll=locL[k];
+    if(!ll){db.lots.push(cl);locL[k]=cl;stats.lots++;}
+    else{
+      if(!ll.checked&&cl.checked){
+        ll.checked=true;ll.checkedAt=cl.checkedAt||ll.checkedAt;
+        if(!ll.evalDate&&cl.evalDate)ll.evalDate=cl.evalDate;
+        if(!ll.evalDoc&&cl.evalDoc)ll.evalDoc=cl.evalDoc;
+      }
+      if(!ll.expiry&&cl.expiry)ll.expiry=cl.expiry;
+    }
+  });
+  /* Consumed (poraba) — union po gtin+lot+consumedAt; propagiraj restoredAt */
+  const consumedKey=c=>(c.gtin||'')+'|'+(c.lot||'')+'|'+(c.consumedAt||'');
+  const locC={};db.consumed.forEach(c=>{locC[consumedKey(c)]=c;});
+  (cloud.consumed||[]).forEach(cc=>{
+    if(!cc)return;
+    const k=consumedKey(cc),lc=locC[k];
+    if(!lc){db.consumed.push(cc);locC[k]=cc;stats.consumed++;}
+    else if(!lc.restoredAt&&cc.restoredAt){lc.restoredAt=cc.restoredAt;}
+  });
+  /* Inventory reconcile: consumed[] določa končno stanje zaloge */
+  invMap={};db.inventory.forEach(i=>{invMap[invKey(i)]=i;});
+  db.consumed.forEach(c=>{
+    if(!c)return;
+    const k=invKey(c);
+    if(!c.restoredAt){
+      if(invMap[k]){db.inventory=db.inventory.filter(i=>invKey(i)!==k);delete invMap[k];}
+    }else{
+      if(!invMap[k]){
+        const r={gtin:c.gtin,lot:c.lot,name:c.name,type:c.type,qty:c.qty||1,
+          serials:c.serials||[],rfidEpcs:c.rfidEpcs||[],expiry:c.expiry||''};
+        db.inventory.push(r);invMap[k]=r;
+      }
+    }
+  });
+  /* lastUsed — union, omeji na 20 */
+  db.lastUsed=_arrUnion(db.lastUsed,cloud.lastUsed).slice(0,20);
+  return stats;
 }
 
 /* ===== Local export/import ===== */
 function exportJson(key){const data=key==='qclab_v2'?JSON.stringify(S,null,2):JSON.stringify(DB_PREGLED,null,2);const blob=new Blob([data],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=key+'_'+new Date().toISOString().slice(0,10)+'.json';a.click();notify(key+' izvožen','success');}
-function importJson(input,key){const f=input.files[0];if(!f)return;const r=new FileReader();r.onload=e=>{try{const obj=JSON.parse(e.target.result);if(key==='qclab_v2'){Object.assign(S,obj);save();initState();notify('qclab_v2 uvožen','success');navQc(currentQc);}else{DB_PREGLED=obj;savePregledDB();notify('pregledBK_db uvožen','success');renderZaloga();}}catch(err){notify('Napaka pri uvozu JSON','error');}};r.readAsText(f);input.value='';}
+function importJson(input,key){const f=input.files[0];if(!f)return;const r=new FileReader();r.onload=e=>{try{if(key==='qclab_v2'){const obj=JSON.parse(e.target.result);Object.assign(S,obj);delete S.exportedAt;save();initState();notify('qclab_v2 uvožen','success');navQc(currentQc);}else{/* zaloga: skozi isti varni merge kot Quick Share */onSharedImport(f.name,e.target.result);}}catch(err){notify('Napaka pri uvozu JSON','error');}};r.readAsText(f);input.value='';}
 
 /* ============ POINT/VLINE CLICK on LJ ============ */
 document.addEventListener('DOMContentLoaded',()=>{
