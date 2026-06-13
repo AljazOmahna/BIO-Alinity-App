@@ -670,6 +670,11 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
   <div class="page srv-page active" id="srv-entry">
     <div class="sec-hdr"><div class="sec-title" style="font-size:16px" id="srvFormTitle">Vpis napake / servisa</div></div>
     <div class="card">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+        <input type="file" id="sfImportPdfInput" accept=".pdf" style="display:none" onchange="srvPdfImportChosen(this)">
+        <button class="btn btn-g btn-sm" onclick="document.getElementById('sfImportPdfInput').click()">&#128196; Uvozi iz PDF (Abbott DTS)</button>
+        <span class="muted" style="font-size:11px">Predizpolni vsa polja iz servisnega naloga</span>
+      </div>
       <div class="fr">
         <div class="fg" style="flex:1"><label>Naprava / modul *</label><select id="sfDevice"></select></div>
         <div class="fg" style="flex:2"><label>Napaka / okvara *</label><input id="sfFault" placeholder="Npr. Lifter error"></div>
@@ -1222,7 +1227,49 @@ const INSTRUMENTS = [
 const DEFAULT_BIOCHEM = ['Glukoza','Kalij','Natrij','Klorid','Magnezij','Fosfat','CRP','Proteini','Albumini','CK','GGT','AST','ALT','Lipaza','Alkalna fosfataza','Amilaza','Bilirubin direktni','Bilirubin totalni','Kreatinin','Sečnina','Etanol','Digoksin','Teofilin','Vankomicin','Gentamicin','U-Albumin','Kalcij','U/CSF Proteini','HDL-Holesterol','Holesterol','LDL-Holesterol','Trigliceridi','Urati','LDH','Laktat','CO2','UIBC','Železo'];
 const DEFAULT_IMMUNO = ['Troponin','Mioglobin','PCT','Beta-HCG','NT-ProBNP','CK-MB','Feritin','GFAP','UCHL'];
 const DEFAULT_OPERATORS = [
-  {id:"51056",first:"NIKOLA",last:"ALEKSIĆ"},{id:"35694",first:"MAJA",last:"ARSOV"},{id:"40801",first:"KATJA",last:"BAHAR"},{id:"43197",first:"ALJAŽ",last:"OMAHNA"},{id:"16984",first:"JOŠKO",last:"OSREDKAR"},{id:"16163",first:"MILAN",last:"SKITEK"},{id:"27289",first:"ALEŠ",last:"JERIN"}
+  {id:"51056",first:"NIKOLA",last:"ALEKSIĆ"},{id:"35694",first:"MAJA",last:"ARSOV"},{id:"40801",first:"KATJA",last:"BAHAR"},
+  {id:"51700",first:"BLAŽ",last:"BANDUR"},{id:"29611",first:"BARBARA",last:"BAŠA CIGOJ"},{id:"37559",first:"MAŠA TJAŠA",last:"BINTER"},
+  {id:"50533",first:"ANA",last:"BLAŽEVIČ ARKO"},{id:"48043",first:"DOMEN",last:"BOMBEK"},{id:"52609",first:"MARUŠA",last:"BOROVŠEK"},
+  {id:"29287",first:"ELIZABETA",last:"BOŽNAR ALIČ"},{id:"24748",first:"MOJCA",last:"BRENČIČ"},{id:"29836",first:"HERMINA",last:"BRODARIČ GRAŠIČ"},
+  {id:"52706",first:"MIHAELA",last:"BRODNIK"},{id:"45381",first:"MIRIAM",last:"BUČINEL"},{id:"47781",first:"JURE",last:"CANKAR"},
+  {id:"47782",first:"URŠKA",last:"CIGOJ"},{id:"47536",first:"DANIJELA NELI",last:"COLE"},{id:"37577",first:"DIANA",last:"CVIIČ"},
+  {id:"36033",first:"URŠKA",last:"ČEGOVNIK PRIMOŽIČ"},{id:"22194",first:"DARKO",last:"ČERNE"},{id:"29599",first:"MITJA",last:"DERENDA"},
+  {id:"39398",first:"JELENA",last:"DRAGOJEVIĆ"},{id:"38988",first:"MARKO",last:"DRAGOJEVIĆ"},{id:"20695",first:"VESNA MONIKA",last:"EINFALT"},
+  {id:"37276",first:"TEJA",last:"FABJAN"},{id:"48536",first:"TJAŠA",last:"FEMC"},{id:"29806",first:"PETRA",last:"FINDERLE"},
+  {id:"42116",first:"TINKARA",last:"FORTUNA"},{id:"27324",first:"ALENKA",last:"FRANCE ŠTIGLIC"},{id:"45913",first:"SVJETLANA",last:"GAJIĆ"},
+  {id:"42821",first:"SARA",last:"GOLOB"},{id:"46957",first:"ŽIVA",last:"GOLOB"},{id:"43198",first:"IRENA",last:"GRŽINA"},
+  {id:"11817",first:"RUŽA",last:"GUŽVIĆ"},{id:"49998",first:"KATARINA",last:"HAFNER"},{id:"24258",first:"NATAŠA",last:"HARISCH"},
+  {id:"29288",first:"KATARINA",last:"HROVATIN"},{id:"38482",first:"MAJA",last:"IMAMOVIĆ"},{id:"47290",first:"MOJCA",last:"IRŠIČ"},
+  {id:"11426",first:"DARJA",last:"JERAM"},{id:"27289",first:"ALEŠ",last:"JERIN"},{id:"37644",first:"MOJCA",last:"JURETIČ"},
+  {id:"27244",first:"SIMONA",last:"JUVAN"},{id:"46819",first:"DANIJELA NELI",last:"KALIŠE"},{id:"15727",first:"KARMEN",last:"KAPUN"},
+  {id:"39509",first:"KATARINA",last:"KLEŠNIK"},{id:"19049",first:"MATEJA",last:"KMETIČ"},{id:"19582",first:"ANDREJA",last:"KOBLAR"},
+  {id:"36292",first:"KSENJA",last:"KOLAR"},{id:"17389",first:"DRAGANA",last:"KOPRIVNIKAR"},{id:"17397",first:"VESNA",last:"KORADEJ"},
+  {id:"39240",first:"KLAVDIJA",last:"KOŠIR"},{id:"47790",first:"MATIJA",last:"KOVAČEVIĆ"},{id:"36417",first:"NATAŠA",last:"KRALJIČ"},
+  {id:"41705",first:"URŠKA",last:"KRAMBERGER"},{id:"27273",first:"ANITA",last:"KRAPEŽ"},{id:"17435",first:"MARTINA",last:"KRIVEC"},
+  {id:"36896",first:"KRISTINA",last:"KUMER"},{id:"25604",first:"SANDRA",last:"LAMPIČ"},{id:"46160",first:"JAKOB GAŠPER",last:"LAVRENČIČ"},
+  {id:"49053",first:"ŽIVA",last:"LAVRIČ"},{id:"45512",first:"JASNA",last:"LOJK"},{id:"46900",first:"BRANISLAV",last:"LUKIĆ"},
+  {id:"26917",first:"SILVIJA",last:"MACUH"},{id:"19929",first:"NADA",last:"MAHKOVIC"},{id:"42739",first:"JANJA",last:"MARC"},
+  {id:"40789",first:"ANAMARIJA",last:"MARKELJ"},{id:"17954",first:"ROZALIJA",last:"MARS"},{id:"36301",first:"VESNA",last:"MEDIĆ"},
+  {id:"20141",first:"MOJCA",last:"MEDVED"},{id:"50512",first:"HANA",last:"MELKAMU"},{id:"10301",first:"ZLATICA",last:"MERJASEC"},
+  {id:"16885",first:"HELENA",last:"MIKLAVC"},{id:"44628",first:"MOJCA",last:"MLINAR"},{id:"38733",first:"MATEJA",last:"MORE"},
+  {id:"27950",first:"KLEMEN",last:"NAGODE"},{id:"24460",first:"VESNA",last:"NUHANOVIĆ"},{id:"40349",first:"JASMINA",last:"OKRETIČ"},
+  {id:"43197",first:"ALJAŽ",last:"OMAHNA"},{id:"16889",first:"TANJA",last:"OMERS"},{id:"16984",first:"JOŠKO",last:"OSREDKAR"},
+  {id:"49761",first:"IZA",last:"OTOREPEC ČERNE"},{id:"41527",first:"NINA",last:"PIŠKUR"},{id:"37927",first:"SANDRA",last:"PLANINŠEK"},
+  {id:"47292",first:"JANA",last:"PLAVEC"},{id:"49076",first:"TINA",last:"POLANC"},{id:"27151",first:"MARJANA",last:"PRAH KRUMPAK"},
+  {id:"48105",first:"IRENA",last:"PRODAN ŽITNIK"},{id:"39838",first:"ŽAN",last:"PUŠNIK"},{id:"42087",first:"NEŽA",last:"RADOŠ"},
+  {id:"46651",first:"DOROTEJA",last:"RATKAJEC"},{id:"37935",first:"MAIDA",last:"REKIĆ"},{id:"42792",first:"NEŽA",last:"REMIC"},
+  {id:"44990",first:"KATJA",last:"ROKAVEC"},{id:"44772",first:"AMELA",last:"SELIMAGIĆ"},{id:"20604",first:"ALENKA",last:"SEŠEK BRIŠKI"},
+  {id:"14139",first:"STANISAVA",last:"SEVER"},{id:"16163",first:"MILAN",last:"SKITEK"},{id:"27641",first:"EMSUDA",last:"SMAJIĆ"},
+  {id:"37596",first:"MATEJ",last:"SOMRAK"},{id:"20142",first:"SUZANA",last:"SRŠA"},{id:"26812",first:"VANJA",last:"STRBAD"},
+  {id:"36437",first:"FRANKO",last:"STUDEN"},{id:"48604",first:"TEO",last:"STUPAR"},{id:"52657",first:"HANA",last:"SUCHY"},
+  {id:"47911",first:"LEJA",last:"ŠIMNOVEC"},{id:"45831",first:"ALJAŽ",last:"ŠINKOVEC"},{id:"47241",first:"KATARINA",last:"ŠKRABANJA"},
+  {id:"46731",first:"SARA",last:"ŠOŠTARIČ"},{id:"35287",first:"NEJC",last:"ŠPENDAL"},{id:"45380",first:"MAŠA",last:"ŠTEBIH"},
+  {id:"38758",first:"MAJA",last:"ŠTOK"},{id:"38914",first:"ŠPELA",last:"ŠVAJGER"},{id:"38891",first:"MEDINA",last:"TATAREVIĆ"},
+  {id:"38934",first:"ANKA",last:"TERGLAV"},{id:"33370",first:"DARJA",last:"TKALEC"},{id:"16118",first:"MOJCA-MARIJA",last:"TREVEN"},
+  {id:"39833",first:"KARMEN",last:"TRNJAK"},{id:"16051",first:"VERA",last:"TROHA POLJANČIČ"},{id:"29613",first:"KAROLINA",last:"VEBER"},
+  {id:"43766",first:"ALENKA",last:"VIDIC"},{id:"25420",first:"KATJA",last:"VIDMAR"},{id:"19980",first:"BREDA",last:"VRANKAR"},
+  {id:"22422",first:"MAJDA",last:"ZGONC"},{id:"38895",first:"AJDA",last:"ŽAGER"},{id:"37255",first:"MARKO",last:"ŽAVBI"},
+  {id:"47576",first:"AURELIJA",last:"ŽEKS"},{id:"47730",first:"PATRICIJA",last:"ŽIBERT"},{id:"36884",first:"ROZA MARJANA",last:"ŽNIDAR"}
 ];
 
 let S = { assays:[], qcMaterials:[], operators:[], entries:[], currentAssayTab:'biochem',
@@ -1799,6 +1846,49 @@ async function srvTryExtractNalog(base64){
     }
   }catch(e){console.log('pdf parse err',e);}
   return null;
+}
+function _slDateToIso(s){const n=s.match(/\d+/g);return n&&n.length>=3?n[2]+'-'+n[1].padStart(2,'0')+'-'+n[0].padStart(2,'0'):'';}
+function srvPdfImportChosen(input){
+  const f=input.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=ev=>{const b=new Uint8Array(ev.target.result);let s='';for(let i=0;i<b.length;i++)s+=String.fromCharCode(b[i]);srvImportDtsPdf(btoa(s));};
+  r.readAsArrayBuffer(f);input.value='';
+}
+async function srvImportDtsPdf(base64){
+  try{
+    const bin=atob(base64);const u8=new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++)u8[i]=bin.charCodeAt(i);
+    const txt=(await _pdfText(u8)).replace(/\x00/g,'');
+    let m,filled=0;
+    // Nalog
+    m=txt.match(/naloga[:\s]{0,10}(\d{2,5}\s*\/\s*\d{4})/i)||txt.match(/(\d{3,4}\/20\d{2})/);
+    if(m){$i('sfNalog').value=m[1].replace(/\s+/g,'');filled++;}
+    // Aparat → select sfDevice (iskanje po vrednosti ali predponi)
+    m=txt.match(/Alinity\s+\S+\s+(\S+)/);
+    if(m){
+      const dev=m[1];const sel=$i('sfDevice');
+      let opt=[...sel.options].find(o=>o.value===dev);
+      if(!opt)opt=[...sel.options].find(o=>dev.startsWith(o.value)||o.value.startsWith(dev.split('-')[0]));
+      if(opt){sel.value=opt.value;filled++;}
+    }
+    // Napaka
+    m=txt.match(/Prijavljena okvara[:\s]+(.+?)(?=\n|Opis)/s);
+    if(m){$i('sfFault').value=m[1].trim().split('\n')[0];filled++;}
+    // Čas prijave → occurredAt
+    m=txt.match(/Čas prijave napake[:\s]+(\d{1,2}[.]\d{1,2}[.]\d{4})\s+(\d{1,2}[.:]\d{2})/);
+    if(m){$i('sfOccurred').value=_slDateToIso(m[1])+'T'+m[2].replace('.',':').padStart(5,'0');filled++;}
+    // Delo: arrivedAt + fixedAt
+    const entries=[...txt.matchAll(/Popravilo\s+(\d{1,2}[.\s]+\d{1,2}[.\s]+\d{4})\s+(\d{2}:\d{2})\s+do\s+(\d{2}:\d{2})/g)];
+    if(entries.length){
+      $i('sfArrived').value=_slDateToIso(entries[0][1])+'T'+entries[0][2];
+      $i('sfFixed').value=_slDateToIso(entries[entries.length-1][1])+'T'+entries[entries.length-1][3];
+      filled+=2;
+    }
+    // Opis storitve → opomba
+    m=txt.match(/Opis storitve[:\s]+(.+?)(?=\nPostavke|\nDelo:)/s);
+    if(m){$i('sfNote').value=m[1].trim();filled++;}
+    notify(filled?'Uvoženo iz PDF (Abbott DTS) — preverite polja in shranite':'PDF ne vsebuje prepoznavnih polj (ni DTS nalog?)','success');
+  }catch(e){console.log('srvImportDtsPdf err',e);notify('Napaka pri branju PDF','err');}
 }
 /* ---- seznam napak ---- */
 function renderSrvList(){
