@@ -297,8 +297,11 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
   #orderPrintArea{display:block !important;padding:0}
   #orderPrintArea h2{font-size:15px;margin:0 0 8px}
   #orderPrintArea table{border-collapse:collapse;width:100%}
-  #orderPrintArea th,#orderPrintArea td{border:1px solid #000;padding:3px 5px;font-size:10px;text-align:center}
+  #orderPrintArea th,#orderPrintArea td{border:1px solid #000;padding:3px 5px;font-size:10px;text-align:center;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   #orderPrintArea td.l{text-align:left}
+  #orderPrintArea td.pe-exp{background:#f5b5b5 !important;color:#7f1d1d;font-weight:700}
+  #orderPrintArea td.pe-14{background:#fbc28a !important;color:#7c2d12;font-weight:700}
+  #orderPrintArea td.pe-28{background:#fce18b !important;color:#78350f}
   #orderPrintArea .pmeta{margin-bottom:8px;font-size:11px}
   #orderPrintArea .pmeta div{margin-bottom:2px}
   @page{size:A4 portrait;margin:12mm}
@@ -809,6 +812,15 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
     <div class="disabled-note">&#128683; Moč RFID (sprejem) &ndash; ni RFID čitalca</div>
     <div class="disabled-note">&#128683; Multi RFID &ndash; ni RFID čitalca</div>
     <div class="disabled-note">&#128683; Locate Tag &ndash; ni RFID čitalca</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">&#128100; Operaterji</div>
+    <div class="muted" style="font-size:12px;margin-bottom:10px">Dodaj, uredi ali odstrani operaterje. 5-mestna matična številka je PIN za podpis QC in vzdrževanja.</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <button class="btn btn-a btn-sm" onclick="navMain('qc');navQc('operators')">&#9999;&#65039; Upravljaj operaterje</button>
+      <span class="muted" style="font-size:12px" id="vecOpCount"></span>
+    </div>
   </div>
 
   <div class="card">
@@ -2041,6 +2053,7 @@ function renderVec(){
   }catch(e){}}
   else {$i('aboutDevice').textContent='Naprava: brskalnik (test)';$i('aboutBuild').textContent='Build: – (brskalnik; verzija vidna na napravi)';}
   try{const qcSize=(localStorage.getItem('qclab_v2')||'').length;const pbSize=(localStorage.getItem('pregledBK_db')||'').length;$i('aboutStorage').textContent='Pomnilnik: qclab_v2 '+(qcSize/1024).toFixed(1)+' KB, pregledBK_db '+(pbSize/1024).toFixed(1)+' KB';}catch(e){}
+  const oc=$i('vecOpCount');if(oc)oc.textContent='Registriranih: '+(S.operators||[]).length;
 }
 function toggleDark(){document.body.classList.toggle('dark',$i('darkToggle').checked);localStorage.setItem('bioAlinity_dark',$i('darkToggle').checked?'1':'0');}
 
@@ -2370,16 +2383,41 @@ function exportOrderCSV(){
   cat.items.forEach(it=>{const r=d[it.ident]||{};rows.push([it.ident,it.name,minOf(it)??'',r.z??'',r.n??'']);});
   dlCsv(rows,'Narocilo_'+cat.id+'_'+($i('ordMonth').value||'')+'.csv');
 }
+/* najbližji rok uporabe po identu (iz zaloge Pregled BK) */
+function soonestExpiryByIdent(){
+  loadPregledDB();const g2i=gtinToIdent();const m={};
+  (DB_PREGLED.inventory||[]).forEach(it=>{
+    if(!it.expiry||(it.qty||0)<=0)return;
+    const id=resolveIdent(it,g2i);if(!id)return;
+    if(!m[id]||it.expiry<m[id])m[id]=it.expiry;
+  });
+  return m;
+}
+/* razred za barvanje celice roka v PDF (rdeč=pretečen, oranžen=≤14, rumen=≤28) */
+function expiryPrintClass(dl){
+  if(dl===null)return '';
+  if(dl<0)return 'pe-exp';
+  if(dl<=14)return 'pe-14';
+  if(dl<=28)return 'pe-28';
+  return '';
+}
 function printOrder(){
   const cat=catById(currentOrdCat);if(!cat)return;const d=ORD.orderDrafts[currentOrdCat]||{};
   const mo=$i('ordMonth').value||'';
+  const expMap=soonestExpiryByIdent();
   const meta='<div class="pmeta">'+
     '<div><strong>NAROČILO ALINITY &ndash; '+cat.label.toUpperCase()+'</strong></div>'+
     '<div>Naročilo za mesec: '+mo+'</div>'+
     '<div>Datum popisa: '+($i('ordPopis1').value||'________')+' &nbsp; Datum naročila: '+($i('ordNarocilo1').value||'________')+' &nbsp; Št. naročila: '+($i('ordNum1').value||'____')+'</div>'+
     '<div>Predvidena dostava: '+($i('ordDostava1').value||'________')+'</div></div>';
-  const head='<tr><th>IDENT</th><th class="l">IME ARTIKLA</th><th>MIN.<br>ZALOGA</th><th>ZALOGA</th><th>NAROČILO</th></tr>';
-  const body=cat.items.map(it=>{const r=d[it.ident]||{};return '<tr><td>'+it.ident+'</td><td class="l">'+it.name+(it.catalog?' '+it.catalog:'')+'</td><td>'+(minOf(it)??'')+'</td><td>'+(r.z??'')+'</td><td>'+(r.n??'')+'</td></tr>';}).join('');
+  const head='<tr><th>IDENT</th><th class="l">IME ARTIKLA</th><th>MIN.<br>ZALOGA</th><th>ZALOGA</th><th>NAROČILO</th><th>NAJBLIŽJI<br>ROK</th></tr>';
+  const body=cat.items.map(it=>{
+    const r=d[it.ident]||{};
+    const exp=expMap[it.ident]||null;const dl=daysLeft(exp);
+    const ec=expiryPrintClass(dl);
+    const expCell=exp?(exp+(dl<0?' (poteklo)':(dl<=28?' ('+dl+' dni)':''))):'&ndash;';
+    return '<tr><td>'+it.ident+'</td><td class="l">'+it.name+(it.catalog?' '+it.catalog:'')+'</td><td>'+(minOf(it)??'')+'</td><td>'+(r.z??'')+'</td><td>'+(r.n??'')+'</td><td'+(ec?' class="'+ec+'"':'')+'>'+expCell+'</td></tr>';
+  }).join('');
   $i('orderPrintArea').innerHTML='<h2>'+cat.label+'</h2>'+meta+'<table><thead>'+head+'</thead><tbody>'+body+'</tbody></table>';
   if(_hasBridge()&&AndroidBridge.printPdf){try{AndroidBridge.printPdf('Narocilo_'+cat.id+'_'+mo,$i('orderPrintArea').innerHTML);return;}catch(e){}}
   window.print();
