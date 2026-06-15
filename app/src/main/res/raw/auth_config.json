@@ -1,0 +1,15 @@
+{
+  "client_id": "82b539ce-e064-4643-a0df-41dde15b39a4",
+  "authorization_user_agent": "DEFAULT",
+  "redirect_uri": "msauth://si.kclj.bioalinity/x6Bs7FV8WwzF7xTKyoQ8ZpLFPK4%3D",
+  "account_mode": "SINGLE",
+  "broker_redirect_uri_registered": false,
+  "authorities": [
+    {
+      "type": "AAD",
+      "audience": {
+        "type": "AzureADandPersonalMicrosoftAccount"
+      }
+    }
+  ]
+}

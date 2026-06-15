@@ -24,6 +24,13 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 
+    packagingOptions {
+        resources {
+            excludes += ['META-INF/LICENSE.md', 'META-INF/LICENSE-notice.md',
+                         'META-INF/DEPENDENCIES', 'META-INF/LICENSE', 'META-INF/NOTICE']
+        }
+    }
+
     signingConfigs {
         debug {
             storeFile file('../keystore/kclj_debug.jks')
@@ -48,4 +55,7 @@ android {
 
 dependencies {
     implementation 'androidx.appcompat:appcompat:1.6.1'
+    // OneDrive / Microsoft Graph sinhronizacija
+    implementation 'com.microsoft.identity.client:msal:5.+'
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
 }

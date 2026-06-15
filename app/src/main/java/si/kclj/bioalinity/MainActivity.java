@@ -16,14 +16,35 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.FileProvider;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+
+import com.microsoft.identity.client.AuthenticationCallback;
+import com.microsoft.identity.client.IAccount;
+import com.microsoft.identity.client.IAuthenticationResult;
+import com.microsoft.identity.client.IPublicClientApplication;
+import com.microsoft.identity.client.ISingleAccountPublicClientApplication;
+import com.microsoft.identity.client.PublicClientApplication;
+import com.microsoft.identity.client.SilentAuthenticationCallback;
+import com.microsoft.identity.client.exception.MsalException;
 
 import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStreamWriter;
+
+import okhttp3.Call;
+import okhttp3.Callback;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
+import okhttp3.ResponseBody;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -34,6 +55,20 @@ public class MainActivity extends AppCompatActivity {
     private boolean pageReady = false;
     private String pendingSharedName = null;
     private String pendingSharedJson = null;
+
+    // ---- OneDrive / Microsoft Graph (MSAL) ----
+    private ISingleAccountPublicClientApplication msalApp;
+    private volatile IAccount msalAccount;
+    private volatile String msalAccountName = "";
+    private volatile String msalLastSync = "";
+    private final OkHttpClient http = new OkHttpClient();
+    private static final String[] MS_SCOPES = {
+            "https://graph.microsoft.com/Files.ReadWrite",
+            "https://graph.microsoft.com/User.Read"
+    };
+    private static final String MS_AUTHORITY = "https://login.microsoftonline.com/common";
+    // Mapa v OneDrive, kamor se shranjuje baza (uporabnikova osebna mapa "DigiLab").
+    private static final String MS_FOLDER = "DigiLab";
 
     @SuppressLint({"SetJavaScriptEnabled", "AddJavascriptInterface"})
     @Override
@@ -70,7 +105,61 @@ public class MainActivity extends AppCompatActivity {
         webView.loadUrl("file:///android_asset/bio_alinity.html");
 
         handleIncomingIntent(getIntent());
+
+        initMsal();
     }
+
+    // =========================================================
+    // MSAL — inicializacija enojnega računa (OneDrive / Graph)
+    // =========================================================
+    private void initMsal() {
+        PublicClientApplication.createSingleAccountPublicClientApplication(
+            getApplicationContext(), R.raw.auth_config,
+            new IPublicClientApplication.ISingleAccountApplicationCreatedListener() {
+                @Override public void onCreated(ISingleAccountPublicClientApplication application) {
+                    msalApp = application;
+                    loadMsalAccount();
+                }
+                @Override public void onError(MsalException exception) {
+                    android.util.Log.e("MSAL", "init error", exception);
+                }
+            });
+    }
+
+    private void loadMsalAccount() {
+        if (msalApp == null) return;
+        msalApp.getCurrentAccountAsync(new ISingleAccountPublicClientApplication.CurrentAccountCallback() {
+            @Override public void onAccountLoaded(@Nullable IAccount activeAccount) {
+                msalAccount = activeAccount;
+                msalAccountName = activeAccount != null ? activeAccount.getUsername() : "";
+            }
+            @Override public void onAccountChanged(@Nullable IAccount prior, @Nullable IAccount current) {
+                msalAccount = current;
+                msalAccountName = current != null ? current.getUsername() : "";
+            }
+            @Override public void onError(@NonNull MsalException exception) {
+                android.util.Log.e("MSAL", "getCurrentAccount", exception);
+            }
+        });
+    }
+
+    // Pridobi žeton tiho in nato izvede Graph operacijo; ob potrebi po prijavi javi napako.
+    private void msAcquireToken(final String key, final TokenAction action) {
+        if (msalApp == null) {
+            action.onToken(null, "MSAL ni pripravljen");
+            return;
+        }
+        msalApp.acquireTokenSilentAsync(MS_SCOPES, MS_AUTHORITY, new SilentAuthenticationCallback() {
+            @Override public void onSuccess(IAuthenticationResult authenticationResult) {
+                action.onToken(authenticationResult.getAccessToken(), null);
+            }
+            @Override public void onError(MsalException exception) {
+                action.onToken(null, "Potrebna ponovna prijava: " + exception.getMessage());
+            }
+        });
+    }
+
+    private interface TokenAction { void onToken(String token, String error); }
 
     @Override
     protected void onNewIntent(Intent intent) {
@@ -297,50 +386,157 @@ public class MainActivity extends AppCompatActivity {
                     "\"appBuild\":" + verCode + "}";
         }
 
-        // ---- OneDrive / Microsoft Graph (placeholder) ----
-        // Implemented as stubs until IT UKCL approves Azure app registration.
-        // When Azure client_id is available, implement MSAL OAuth2 PKCE flow here.
+        // ---- OneDrive / Microsoft Graph (MSAL + Graph REST) ----
+        // Sinhronizacija prek osebnega OneDrive (mapa DigiLab).
+        // Žetoni se pridobivajo prek MSAL (single account, audience multitenant+personal).
 
         @JavascriptInterface
         public boolean msIsSignedIn() {
-            return false;
+            return msalAccount != null;
         }
 
         @JavascriptInterface
         public String msGetAccount() {
-            return "";
+            return msalAccountName == null ? "" : msalAccountName;
         }
 
         @JavascriptInterface
         public String msGetLastSync() {
-            return "";
+            return msalLastSync == null ? "" : msalLastSync;
         }
 
         @JavascriptInterface
         public void msSignIn() {
-            mainHandler.post(() -> callJs("onMsError('OneDrive: Čaka na Azure app registracijo IT UKCL')"));
+            mainHandler.post(() -> {
+                if (msalApp == null) { callJs("onMsError('MSAL ni pripravljen')"); return; }
+                AuthenticationCallback cb = new AuthenticationCallback() {
+                    @Override public void onSuccess(IAuthenticationResult result) {
+                        msalAccount = result.getAccount();
+                        msalAccountName = msalAccount != null ? msalAccount.getUsername() : "";
+                        callJs("onMsSignedIn(" + jsStr(msalAccountName) + ")");
+                    }
+                    @Override public void onError(MsalException exception) {
+                        callJs("onMsError(" + jsStr("Prijava: " + exception.getMessage()) + ")");
+                    }
+                    @Override public void onCancel() {
+                        callJs("onMsError('Prijava preklicana')");
+                    }
+                };
+                try {
+                    if (msalAccount != null) {
+                        msalApp.signInAgain(MainActivity.this, MS_SCOPES, null, cb);
+                    } else {
+                        msalApp.signIn(MainActivity.this, null, MS_SCOPES, cb);
+                    }
+                } catch (Exception e) {
+                    callJs("onMsError(" + jsStr("Prijava ni mogoča: " + e.getMessage()) + ")");
+                }
+            });
         }
 
         @JavascriptInterface
         public void msCancelSignIn() {
-            // no-op
+            // no-op (MSAL interaktivni tok prekine uporabnik v brskalniku)
         }
 
         @JavascriptInterface
         public void msSignOut() {
-            mainHandler.post(() -> callJs("onMsSignedOut()"));
+            mainHandler.post(() -> {
+                if (msalApp == null) { callJs("onMsSignedOut()"); return; }
+                msalApp.signOut(new ISingleAccountPublicClientApplication.SignOutCallback() {
+                    @Override public void onSignOut() {
+                        msalAccount = null; msalAccountName = "";
+                        callJs("onMsSignedOut()");
+                    }
+                    @Override public void onError(@NonNull MsalException exception) {
+                        callJs("onMsError(" + jsStr("Odjava: " + exception.getMessage()) + ")");
+                    }
+                });
+            });
         }
 
         @JavascriptInterface
         public void msUpload(String key, String json) {
-            // stub — notify JS that upload is not yet available
-            mainHandler.post(() -> callJs("onMsUploadDone(false,'OneDrive sync ni aktiven')"));
+            final String k = key, j = json;
+            mainHandler.post(() -> msAcquireToken(k, (token, err) -> {
+                if (token == null) { callJs("onMsUploadDone(false," + jsStr(err) + ")"); return; }
+                graphPut(k, j, token);
+            }));
         }
 
         @JavascriptInterface
         public void msDownload(String key) {
-            // stub — notify JS that download is not yet available
-            mainHandler.post(() -> callJs("onMsDownloadDone('" + key + "',null,'OneDrive sync ni aktiven')"));
+            final String k = key;
+            mainHandler.post(() -> msAcquireToken(k, (token, err) -> {
+                if (token == null) { callJs("onMsDownloadDone(" + jsStr(k) + ",null," + jsStr(err) + ")"); return; }
+                graphGet(k, token);
+            }));
         }
+    }
+
+    // =========================================================
+    // Graph REST — PUT/GET datoteke v mapi DigiLab uporabnikovega OneDrive
+    // =========================================================
+    private String graphContentUrl(String key) {
+        return "https://graph.microsoft.com/v1.0/me/drive/root:/" + MS_FOLDER + "/" + key + ".json:/content";
+    }
+
+    private void graphPut(final String key, String json, String token) {
+        RequestBody body = RequestBody.create(
+                json == null ? "" : json,
+                MediaType.parse("application/json; charset=utf-8"));
+        Request req = new Request.Builder()
+                .url(graphContentUrl(key))
+                .header("Authorization", "Bearer " + token)
+                .put(body)
+                .build();
+        http.newCall(req).enqueue(new Callback() {
+            @Override public void onFailure(@NonNull Call call, @NonNull IOException e) {
+                callJs("onMsUploadDone(false," + jsStr("Napaka mreže: " + e.getMessage()) + ")");
+            }
+            @Override public void onResponse(@NonNull Call call, @NonNull Response resp) {
+                int code = resp.code();
+                resp.close();
+                if (code >= 200 && code < 300) {
+                    msalLastSync = new java.util.Date().toString();
+                    callJs("onMsUploadDone(true," + jsStr("Naloženo v " + MS_FOLDER + "/" + key + ".json") + ")");
+                } else {
+                    callJs("onMsUploadDone(false," + jsStr("Graph napaka " + code) + ")");
+                }
+            }
+        });
+    }
+
+    private void graphGet(final String key, String token) {
+        Request req = new Request.Builder()
+                .url(graphContentUrl(key))
+                .header("Authorization", "Bearer " + token)
+                .get()
+                .build();
+        http.newCall(req).enqueue(new Callback() {
+            @Override public void onFailure(@NonNull Call call, @NonNull IOException e) {
+                callJs("onMsDownloadDone(" + jsStr(key) + ",null," + jsStr("Napaka mreže: " + e.getMessage()) + ")");
+            }
+            @Override public void onResponse(@NonNull Call call, @NonNull Response resp) {
+                int code = resp.code();
+                String bodyStr = null;
+                try {
+                    ResponseBody rb = resp.body();
+                    if (rb != null) bodyStr = rb.string();
+                } catch (IOException e) {
+                    bodyStr = null;
+                } finally {
+                    resp.close();
+                }
+                if (code == 404) {
+                    callJs("onMsDownloadDone(" + jsStr(key) + ",null," + jsStr("Datoteke še ni v " + MS_FOLDER) + ")");
+                } else if (code >= 200 && code < 300 && bodyStr != null) {
+                    msalLastSync = new java.util.Date().toString();
+                    callJs("onMsDownloadDone(" + jsStr(key) + "," + jsStr(bodyStr) + ",'ok')");
+                } else {
+                    callJs("onMsDownloadDone(" + jsStr(key) + ",null," + jsStr("Graph napaka " + code) + ")");
+                }
+            }
+        });
     }
 }
