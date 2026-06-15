@@ -6,6 +6,12 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["-y", "http-server", "app/src/main/assets", "-p", "8777", "-c-1"],
       "port": 8777
+    },
+    {
+      "name": "pregledbk",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["-y", "http-server", "C:/Users/aljaz/OneDrive - Univerzitetni Klinicni center Ljubljana/Dokumenti/GitHub/pregled-bk-android/app/src/main/assets", "-p", "8791", "-c-1"],
+      "port": 8791
     }
   ]
 }

@@ -56,6 +56,8 @@ android {
 dependencies {
     implementation 'androidx.appcompat:appcompat:1.6.1'
     // OneDrive / Microsoft Graph sinhronizacija
-    implementation 'com.microsoft.identity.client:msal:5.+'
+    implementation('com.microsoft.identity.client:msal:5.+') {
+        exclude group: 'com.microsoft.device.display', module: 'display-mask'
+    }
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
 }
