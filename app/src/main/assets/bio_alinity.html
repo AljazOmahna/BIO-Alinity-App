@@ -665,7 +665,8 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
 <div class="page-main" id="main-servis">
   <div class="qc-subnav" id="srvSubnav">
     <div class="tab active" data-srv="entry" onclick="navSrv('entry')">&#128221; Vpis napake</div>
-    <div class="tab" data-srv="list" onclick="navSrv('list')">&#128203; Napake</div>
+    <div class="tab" data-srv="open" onclick="navSrv('open')">&#9203; Nezaključene</div>
+    <div class="tab" data-srv="list" onclick="navSrv('list')">&#9989; Zaključene</div>
     <div class="tab" data-srv="stats" onclick="navSrv('stats')">&#128200; Statistika</div>
   </div>
 
@@ -705,16 +706,27 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
         </div>
         <div class="muted" style="font-size:11px;margin-top:6px">Datoteke se shranijo na tablico v mapo <b>ServisnaPorocila</b> (Android/data/si.kclj.bioalinity/files). Ob aktivaciji OneDrive se bo mapa sinhronizirala. Pri PDF poskusim samodejno prebrati št. naloga.</div>
       </div>
-      <div style="display:flex;gap:8px;justify-content:flex-end">
-        <button class="btn btn-g" id="srvCancelEdit" style="display:none" onclick="srvResetForm()">Prekliči urejanje</button>
-        <button class="btn btn-teal" onclick="srvSave()">&#10003; Shrani</button>
+      <div class="muted" style="font-size:11px;margin-top:4px">&#9203; Osnutek shraniš kadarkoli (obvezna naprava + opis). Za <b>zaključek</b> sta obvezni <b>št. naloga</b> in <b>naročilnica</b>, potrdiš pa ga s svojo matično številko.</div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:10px">
+        <button class="btn btn-g" id="srvCancelEdit" style="display:none" onclick="srvResetForm(true)">Prekliči urejanje</button>
+        <button class="btn btn-teal" onclick="srvSaveDraft()">&#128190; Shrani osnutek</button>
+        <button class="btn btn-a" onclick="srvFinalize()">&#9989; Zaključi</button>
       </div>
     </div>
   </div>
 
-  <!-- SRV LIST -->
+  <!-- SRV OPEN (nezaključene / osnutki) -->
+  <div class="page srv-page" id="srv-open">
+    <div class="sec-hdr"><div class="sec-title" style="font-size:16px">Nezaključene napake (osnutki)</div></div>
+    <div class="card">
+      <div class="muted" style="font-size:12px;margin-bottom:10px">Osnutki, ki čakajo na dopolnitev. Za zaključek sta obvezni <b>št. naloga</b> in <b>naročilnica</b>.</div>
+      <div class="tbl-wrap"><table><thead><tr><th>Pojav</th><th>Naprava</th><th>Napaka</th><th>Manjka za zaključek</th><th></th></tr></thead><tbody id="srvOpenBody"></tbody></table></div>
+    </div>
+  </div>
+
+  <!-- SRV LIST (zaključene) -->
   <div class="page srv-page" id="srv-list">
-    <div class="sec-hdr"><div class="sec-title" style="font-size:16px">Napake / servisi</div><button class="btn btn-g btn-sm" onclick="exportSrvCSV()">&#128190; CSV</button></div>
+    <div class="sec-hdr"><div class="sec-title" style="font-size:16px">Zaključene napake / servisi</div><button class="btn btn-g btn-sm" onclick="exportSrvCSV()">&#128190; CSV</button></div>
     <div class="card">
       <div class="fr">
         <select id="slDevice" onchange="renderSrvList()"><option value="">Vse naprave</option></select>
@@ -727,7 +739,7 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
         <input type="date" id="slFrom" onchange="renderSrvList()">
         <input type="date" id="slTo" onchange="renderSrvList()">
       </div>
-      <div class="tbl-wrap"><table><thead><tr><th>Pojav napake</th><th>Naprava</th><th>Napaka</th><th>Št. naloga</th><th>Status</th><th>Do odprave</th><th>&#128206;</th><th></th></tr></thead><tbody id="srvListBody"></tbody></table></div>
+      <div class="tbl-wrap"><table><thead><tr><th>Pojav napake</th><th>Naprava</th><th>Napaka</th><th>Št. naloga</th><th>Status</th><th>Zaključil</th><th>&#128206;</th><th></th></tr></thead><tbody id="srvListBody"></tbody></table></div>
     </div>
   </div>
 
@@ -950,6 +962,22 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
       <div style="text-align:center;margin-top:10px"><button class="btn btn-g btn-sm" onclick="clearMaintPin()">Pobriši</button></div>
     </div>
     <div class="mf"><button class="btn btn-g" onclick="closeMo('maintSignModal')">Prekliči</button><button class="btn btn-teal" onclick="saveMaintenance()">&#10003; Potrdi</button></div>
+  </div>
+</div>
+
+<!-- SRV CLOSE MODAL (zaključek vnosa napake z matično) -->
+<div class="mo" id="srvCloseModal">
+  <div class="modal" style="max-width:480px">
+    <div class="mh"><h3>&#9989; Zaključi vnos napake</h3><button class="mc" onclick="closeMo('srvCloseModal')">&#10005;</button></div>
+    <div class="mb">
+      <div id="srvCloseSummary" style="margin-bottom:14px"></div>
+      <div style="font-size:13px;font-weight:600;color:var(--abbott-blue);text-align:center;margin-bottom:6px">Matična številka za potrditev zaključka</div>
+      <div class="pin-display"><div class="pin-dot" id="spd0"></div><div class="pin-dot" id="spd1"></div><div class="pin-dot" id="spd2"></div><div class="pin-dot" id="spd3"></div><div class="pin-dot" id="spd4"></div></div>
+      <div id="srvPinName" style="text-align:center;font-size:13px;font-weight:600;color:var(--abbott-teal);min-height:20px;margin-bottom:10px"></div>
+      <div class="pin-grid" id="srvPinGrid"></div>
+      <div style="text-align:center;margin-top:10px"><button class="btn btn-g btn-sm" onclick="clearSrvPin()">Pobriši</button></div>
+    </div>
+    <div class="mf"><button class="btn btn-g" onclick="closeMo('srvCloseModal')">Prekliči</button><button class="btn btn-a" onclick="confirmSrvClose()">&#9989; Potrdi zaključek</button></div>
   </div>
 </div>
 
@@ -1719,6 +1747,7 @@ function navSrv(page){
   document.querySelector('#srvSubnav .tab[data-srv="'+page+'"]')?.classList.add('active');
   if(!_srvInit){_srvInit=true;srvInitSelects();}
   if(page==='entry'&&!srvEditId)srvResetForm(true);
+  if(page==='open')renderSrvOpen();
   if(page==='list')renderSrvList();
   if(page==='stats')renderSrvStats();
 }
@@ -1750,26 +1779,63 @@ function srvEdit(id){
   renderSrvAttach();
   navSrv('entry');
 }
-function srvSave(){
-  const device=$i('sfDevice').value,fault=$i('sfFault').value.trim(),occ=$i('sfOccurred').value;
-  if(!device){notify('Izberite napravo/modul','warning');return;}
-  if(!fault){notify('Vpišite opis napake','warning');return;}
-  if(!occ){notify('Vpišite, kdaj se je napaka pojavila','warning');return;}
-  const data={device,fault,occurredAt:occ,
+/* zberi trenutna polja obrazca */
+function _srvFormData(){
+  return {device:$i('sfDevice').value,fault:$i('sfFault').value.trim(),occurredAt:$i('sfOccurred').value||'',
     notifiedAt:$i('sfNotified').value||'',respondedAt:$i('sfResponded').value||'',
     arrivedAt:$i('sfArrived').value||'',fixedAt:$i('sfFixed').value||'',
     nalogNum:$i('sfNalog').value.trim(),orderNum:$i('sfOrder').value.trim(),
     note:$i('sfNote').value.trim(),attachments:srvAttachTemp.slice()};
+}
+/* shrani/posodobi OSNUTEK (nezaključen) — obvezna naprava + opis; po shranjevanju ostane v urejanju */
+function srvSaveDraft(silent){
+  const d=_srvFormData();
+  if(!d.device){notify('Izberite napravo/modul','warning');return null;}
+  if(!d.fault){notify('Vpišite opis napake','warning');return null;}
   if(!S.serviceLog)S.serviceLog=[];
+  let e;
   if(srvEditId){
-    const e=S.serviceLog.find(x=>x.id===srvEditId);
-    if(e)Object.assign(e,data,{updatedAt:new Date().toISOString()});
-    notify('Napaka posodobljena ✓','success');
+    e=S.serviceLog.find(x=>x.id===srvEditId);
+    if(e)Object.assign(e,d,{updatedAt:new Date().toISOString()});
   }else{
-    S.serviceLog.push(Object.assign({id:Date.now().toString(),createdAt:new Date().toISOString()},data));
-    notify('Napaka zabeležena ✓','success');
+    e=Object.assign({id:Date.now().toString(),createdAt:new Date().toISOString()},d);
+    S.serviceLog.push(e);srvEditId=e.id;
+    $i('srvCancelEdit').style.display='';$i('srvFormTitle').textContent='Urejanje osnutka — '+(d.device||'');
   }
-  save();srvResetForm(true);navSrv('list');
+  save();
+  if(!silent)notify('Osnutek shranjen ✓','success');
+  return e;
+}
+/* zaključek vnosa — obvezna št. naloga + naročilnica, nato potrditev z matično */
+function srvFinalize(){
+  const d=_srvFormData();
+  if(!d.device||!d.fault){notify('Najprej izberite napravo in vpišite opis napake','warning');return;}
+  if(!d.nalogNum){notify('Za zaključek je obvezna št. naloga','warning');$i('sfNalog').focus();return;}
+  if(!d.orderNum){notify('Za zaključek je obvezna naročilnica','warning');$i('sfOrder').focus();return;}
+  const e=srvSaveDraft(true);   /* shrani trenutno stanje kot osnutek */
+  if(e)openSrvClose(e.id);
+}
+/* ---- zaključek: PIN modal z matično ---- */
+let srvClosePinVal='';let srvCloseId=null;
+function openSrvClose(id){
+  const e=(S.serviceLog||[]).find(x=>x.id===id);if(!e)return;
+  if(!e.nalogNum||!e.orderNum){notify('Manjka št. naloga ali naročilnica — najprej dopolni osnutek','warning');srvEdit(id);return;}
+  srvCloseId=id;srvClosePinVal='';
+  $i('srvCloseSummary').innerHTML='<div style="background:rgba(0,48,135,.05);border-radius:8px;padding:10px 14px"><div style="font-weight:600;font-size:14px;color:var(--abbott-blue);margin-bottom:6px"><span class="badge badge-blue">'+e.device+'</span> '+e.fault+'</div><div style="font-size:13px">Št. naloga: <strong>'+e.nalogNum+'</strong> · Naročilnica: <strong>'+e.orderNum+'</strong></div></div>';
+  updateSrvPinDisplay();buildSrvPinGrid();showMo('srvCloseModal');
+}
+function buildSrvPinGrid(){const keys=[1,2,3,4,5,6,7,8,9,'',0,'⌫'];$i('srvPinGrid').innerHTML=keys.map(k=>'<div class="pin-key" onclick="srvPinPress(\''+k+'\')">'+k+'</div>').join('');}
+function srvPinPress(k){if(k===''||k==='undefined')return;if(k==='⌫')srvClosePinVal=srvClosePinVal.slice(0,-1);else if(srvClosePinVal.length<5)srvClosePinVal+=k;updateSrvPinDisplay();}
+function clearSrvPin(){srvClosePinVal='';updateSrvPinDisplay();}
+function updateSrvPinDisplay(){for(let i=0;i<5;i++)$i('spd'+i)?.classList.toggle('filled',i<srvClosePinVal.length);const op=S.operators.find(o=>o.id===srvClosePinVal);$i('srvPinName').textContent=op?'✓ '+op.first+' '+op.last:(srvClosePinVal.length===5?'⚠ Operater ni najden':'');}
+function confirmSrvClose(){
+  if(srvClosePinVal.length<5){notify('Vpišite matično številko','warning');return;}
+  const op=S.operators.find(o=>o.id===srvClosePinVal);
+  if(!op){notify('Operater ni registriran','error');return;}
+  const e=(S.serviceLog||[]).find(x=>x.id===srvCloseId);if(!e){closeMo('srvCloseModal');return;}
+  e.closedAt=new Date().toISOString();e.closedBy=srvClosePinVal;e.updatedAt=e.closedAt;
+  save();closeMo('srvCloseModal');srvResetForm(true);navSrv('list');
+  notify('Vnos napake zaključen ✓ ('+op.first+' '+op.last+')','success');
 }
 /* ---- priponke ---- */
 function renderSrvAttach(){
@@ -1903,37 +1969,55 @@ async function srvImportDtsPdf(base64){
   }catch(e){console.log('srvImportDtsPdf err',e);notify('Napaka pri branju PDF','err');}
 }
 /* ---- seznam napak ---- */
+/* nezaključene (osnutki) — brez closedAt */
+function renderSrvOpen(){
+  const logs=(S.serviceLog||[]).filter(e=>!e.closedAt).sort((a,b)=>(b.occurredAt||b.createdAt||'').localeCompare(a.occurredAt||a.createdAt||''));
+  const tbody=$i('srvOpenBody');
+  if(!logs.length){tbody.innerHTML='<tr><td colspan="5" class="empty">Ni nezaključenih napak.</td></tr>';return;}
+  tbody.innerHTML=logs.map(e=>{
+    const miss=[];if(!e.nalogNum)miss.push('št. naloga');if(!e.orderNum)miss.push('naročilnica');
+    const missHtml=miss.length?'<span class="badge badge-2sd">'+miss.join(' + ')+'</span>':'<span class="badge badge-ok">pripravljeno za zaključek</span>';
+    const canClose=!miss.length;
+    return '<tr><td>'+((e.occurredAt||'').replace('T',' ')||'–')+'</td><td><span class="badge badge-blue">'+e.device+'</span></td>'+
+      '<td>'+e.fault+'</td><td>'+missHtml+'</td>'+
+      '<td style="white-space:nowrap"><button class="btn btn-g btn-sm" onclick="srvEdit(\''+e.id+'\')">&#9999;&#65039; Uredi</button> '+
+      '<button class="btn '+(canClose?'btn-a':'btn-g')+' btn-sm" onclick="'+(canClose?'openSrvClose(\''+e.id+'\')':'srvEdit(\''+e.id+'\')')+'">&#9989; Zaključi</button> '+
+      '<button class="btn btn-d btn-sm" onclick="srvDelete(\''+e.id+'\')">&#128465;</button></td></tr>';
+  }).join('');
+}
 function renderSrvList(){
   const dev=$i('slDevice').value,st=$i('slStatus').value,df=$i('slFrom').value,dt=$i('slTo').value;
-  let logs=[...(S.serviceLog||[])];
+  let logs=(S.serviceLog||[]).filter(e=>e.closedAt);   /* samo zaključeni */
   if(dev)logs=logs.filter(e=>e.device===dev);
   if(st)logs=logs.filter(e=>srvStatus(e)===st);
   if(df)logs=logs.filter(e=>(e.occurredAt||'')>=df);
   if(dt)logs=logs.filter(e=>(e.occurredAt||'')<=dt+'T23:59');
   logs.sort((a,b)=>(b.occurredAt||'').localeCompare(a.occurredAt||''));
   const tbody=$i('srvListBody');
-  if(!logs.length){tbody.innerHTML='<tr><td colspan="8" class="empty">Ni zabeleženih napak.</td></tr>';return;}
+  if(!logs.length){tbody.innerHTML='<tr><td colspan="8" class="empty">Ni zaključenih napak.</td></tr>';return;}
   tbody.innerHTML=logs.map(e=>{
-    const dur=(e.occurredAt&&e.fixedAt)?_fmtDur(new Date(e.fixedAt)-new Date(e.occurredAt)):'–';
     const att=(e.attachments||[]).map(a=>'<span style="cursor:pointer" title="'+a.name+'" onclick="srvOpenAttachByPath(\''+String(a.path||'').replace(/'/g,"\\'")+'\')">&#128196;</span>').join(' ');
+    const closed=e.closedBy?(getOpName(e.closedBy)+'<div class="muted" style="font-size:11px">'+(e.closedAt||'').slice(0,16).replace('T',' ')+'</div>'):'–';
     return '<tr><td>'+(e.occurredAt||'').replace('T',' ')+'</td><td><span class="badge badge-blue">'+e.device+'</span></td>'+
       '<td>'+e.fault+(e.note?'<div class="muted" style="font-size:11px">'+e.note+'</div>':'')+'</td>'+
       '<td>'+(e.nalogNum||'–')+(e.orderNum?'<div class="muted" style="font-size:11px">NAR: '+e.orderNum+'</div>':'')+'</td>'+
-      '<td>'+SRV_STATUS_LABEL[srvStatus(e)]+'</td><td>'+dur+'</td><td>'+(att||'–')+'</td>'+
+      '<td>'+SRV_STATUS_LABEL[srvStatus(e)]+'</td><td>'+closed+'</td><td>'+(att||'–')+'</td>'+
       '<td><button class="btn btn-g btn-sm" onclick="srvEdit(\''+e.id+'\')">&#9999;&#65039;</button> <button class="btn btn-d btn-sm" onclick="srvDelete(\''+e.id+'\')">&#128465;</button></td></tr>';
   }).join('');
 }
 function srvDelete(id){
   const e=(S.serviceLog||[]).find(x=>x.id===id);if(!e)return;
   if(!confirm('Izbrišem vnos napake?\n\n'+e.device+' — '+e.fault))return;
-  S.serviceLog=S.serviceLog.filter(x=>x.id!==id);save();renderSrvList();notify('Vnos izbrisan','success');
+  S.serviceLog=S.serviceLog.filter(x=>x.id!==id);save();
+  if(currentSrv==='open')renderSrvOpen();else renderSrvList();
+  notify('Vnos izbrisan','success');
 }
 function exportSrvCSV(){
-  const rows=[['Naprava','Napaka','Pojav napake','Servis obveščen','Servis odziv','Servis prišel','Odpravljena','Št. naloga','Naročilnica','Status','Čas do odprave','Opomba','Priponke']];
+  const rows=[['Naprava','Napaka','Pojav napake','Servis obveščen','Servis odziv','Servis prišel','Odpravljena','Št. naloga','Naročilnica','Status','Čas do odprave','Zaključeno','Zaključil','Opomba','Priponke']];
   (S.serviceLog||[]).forEach(e=>{
     const dur=(e.occurredAt&&e.fixedAt)?_fmtDur(new Date(e.fixedAt)-new Date(e.occurredAt)):'';
     const stl={open:'Odprta',notified:'Servis obveščen',fixed:'Odpravljena'};
-    rows.push([e.device,e.fault,e.occurredAt,e.notifiedAt,e.respondedAt,e.arrivedAt,e.fixedAt,e.nalogNum,e.orderNum,stl[srvStatus(e)],dur,e.note,(e.attachments||[]).map(a=>a.name).join('; ')]);
+    rows.push([e.device,e.fault,e.occurredAt,e.notifiedAt,e.respondedAt,e.arrivedAt,e.fixedAt,e.nalogNum,e.orderNum,stl[srvStatus(e)],dur,e.closedAt||'',e.closedBy?getOpName(e.closedBy):'',e.note,(e.attachments||[]).map(a=>a.name).join('; ')]);
   });
   const csv=rows.map(r=>r.map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(',')).join('\r\n');
   const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
