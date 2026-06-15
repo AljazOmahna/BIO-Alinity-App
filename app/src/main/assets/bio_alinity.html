@@ -2198,20 +2198,36 @@ function mergePregledDB(cloud){
       if(!ls.closed&&s.closed)ls.closed=s.closed;
     }
   });
-  /* Inventory — union po gtin+lot; serije/EPC kot množice; qty preračunan */
+  /* Inventory — union po gtin+lot; ENOTE združimo po EPC (pravi unikat RFID; fallback SN),
+     iz njih izpeljemo serials/rfidEpcs/qty. Parity z Zebra Pregled BK build 113 — tako se
+     isti fizični kos (isti EPC) ne podvoji, dva kosa z istim SN a različnim EPC ostaneta ločena. */
   const invKey=i=>(i.gtin||'')+'|'+(i.lot||'');
+  const _pUnits=it=>{
+    if(it.units&&it.units.length)return it.units.map(u=>({sn:u.sn||'',epc:u.epc||''}));
+    const sns=it.serials||[],eps=it.rfidEpcs||[],n=Math.max(sns.length,eps.length),o=[];
+    for(let i=0;i<n;i++)o.push({sn:sns[i]||'',epc:eps[i]||''});
+    return o;
+  };
+  const _pUnitKey=u=>u.epc?('e:'+u.epc):(u.sn?('s:'+u.sn):'');
+  const _pApply=(it,units)=>{it.units=units;it.serials=units.map(u=>u.sn).filter(Boolean);it.rfidEpcs=units.map(u=>u.epc).filter(Boolean);it.qty=units.length||it.qty||0;};
   let invMap={};db.inventory.forEach(i=>{invMap[invKey(i)]=i;});
   (cloud.inventory||[]).forEach(ci=>{
     if(!ci)return;
     const k=invKey(ci),li=invMap[k];
-    if(!li){db.inventory.push(ci);invMap[k]=ci;stats.inventory++;}
+    if(!li){const u0=_pUnits(ci);if(u0.length)_pApply(ci,u0);db.inventory.push(ci);invMap[k]=ci;stats.inventory++;}
     else{
-      li.serials=_arrUnion(li.serials,ci.serials);
-      li.rfidEpcs=_arrUnion(li.rfidEpcs,ci.rfidEpcs);
-      if(li.serials&&li.serials.length)li.qty=li.serials.length;
-      else if(li.rfidEpcs&&li.rfidEpcs.length)li.qty=li.rfidEpcs.length;
+      const seen={},merged=[];
+      _pUnits(li).concat(_pUnits(ci)).forEach(u=>{
+        const uk=_pUnitKey(u);
+        if(!uk){merged.push(u);return;}
+        if(seen[uk]){const ex=seen[uk];if(!ex.sn&&u.sn)ex.sn=u.sn;if(!ex.epc&&u.epc)ex.epc=u.epc;return;}
+        seen[uk]=u;merged.push(u);
+      });
+      if(merged.length)_pApply(li,merged);
       else li.qty=Math.max(li.qty||0,ci.qty||0);
       if(!li.expiry&&ci.expiry)li.expiry=ci.expiry;
+      if(!li.name&&ci.name)li.name=ci.name;
+      if(!li.type&&ci.type)li.type=ci.type;
     }
   });
   /* Loti — union po gtin+lot; ohrani ovrednotenje z obeh naprav */
