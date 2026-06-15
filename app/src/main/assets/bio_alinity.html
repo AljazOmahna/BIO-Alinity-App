@@ -1106,11 +1106,26 @@ function savePregledDB(){localStorage.setItem('pregledBK_db',JSON.stringify(DB_P
 const TYPE_LABELS={'reagent-bio':'Reagent bio','reagent-imuno':'Reagent imuno','calibrator':'Kalibrator','control':'Kontrola','consumable':'Potrošni'};
 const TYPE_BADGE={'reagent-bio':'b-cal','reagent-imuno':'b-cal','calibrator':'b-cal','control':'b-ctrl','consumable':'b-gray'};
 
-function daysLeft(expiry){
+/* parse roka — enako kot Zebra: 6-mestni GS1 zapis YYMMDD ali ISO YYYY-MM-DD */
+function _expDate(expiry){
   if(!expiry) return null;
-  const d=new Date(expiry+'T00:00:00');
+  const s=String(expiry).trim();
+  if(/^\d{6}$/.test(s)) return new Date(2000+(+s.slice(0,2)), (+s.slice(2,4))-1, +s.slice(4,6));
+  const d=new Date(s.length<=10?s+'T00:00:00':s);
+  return isNaN(d)?null:d;
+}
+function daysLeft(expiry){
+  const d=_expDate(expiry);
+  if(!d) return null;
   const now=new Date();now.setHours(0,0,0,0);
   return Math.round((d-now)/86400000);
+}
+/* prikaz roka — 6-mestni YYMMDD pretvori v 20YY-MM-DD (kot Zebra fmtExp) */
+function fmtExp(expiry){
+  if(!expiry) return '&ndash;';
+  const s=String(expiry).trim();
+  if(/^\d{6}$/.test(s)) return '20'+s.slice(0,2)+'-'+s.slice(2,4)+'-'+s.slice(4,6);
+  return s;
 }
 function expiryClass(dl){
   if(dl===null) return '';
@@ -1160,7 +1175,7 @@ function renderZaloga(){
     return '<tr class="'+expiryClass(dl)+'" onclick="showItemDetail('+DB_PREGLED.inventory.indexOf(it)+')" style="cursor:pointer">'+
       '<td><strong>'+(it.name||'&ndash;')+'</strong><div class="gtin">'+(it.gtin||'')+'</div></td>'+
       '<td><span class="lot-n">'+(it.lot||'&ndash;')+'</span></td>'+
-      '<td>'+(it.expiry||'&ndash;')+'<br>'+expiryBadge(dl)+'</td>'+
+      '<td>'+fmtExp(it.expiry)+'<br>'+expiryBadge(dl)+'</td>'+
       '<td><strong>'+(it.qty||0)+'</strong></td>'+
       '<td><span class="badge '+(TYPE_BADGE[it.type]||'b-gray')+'">'+(TYPE_LABELS[it.type]||it.type||'&ndash;')+'</span></td>'+
       '<td style="font-size:11px" class="muted">'+(it.received?new Date(it.received).toLocaleDateString('sl-SI'):'&ndash;')+'</td>'+
@@ -1178,7 +1193,7 @@ function showItemDetail(idx){
     '<div><span class="muted" style="font-size:11px">GTIN</span><br><span class="gtin">'+(it.gtin||'&ndash;')+'</span></div>'+
     '<div><span class="muted" style="font-size:11px">Katalog</span><br>'+(it.catalog||'&ndash;')+'</div>'+
     '<div><span class="muted" style="font-size:11px">Lot</span><br><span class="lot-n">'+(it.lot||'&ndash;')+'</span></div>'+
-    '<div><span class="muted" style="font-size:11px">Rok</span><br>'+(it.expiry||'&ndash;')+' '+expiryBadge(dl)+'</div>'+
+    '<div><span class="muted" style="font-size:11px">Rok</span><br>'+fmtExp(it.expiry)+' '+expiryBadge(dl)+'</div>'+
     '<div><span class="muted" style="font-size:11px">Količina</span><br><strong>'+(it.qty||0)+'</strong></div>'+
     '<div><span class="muted" style="font-size:11px">Tip</span><br><span class="badge '+(TYPE_BADGE[it.type]||'b-gray')+'">'+(TYPE_LABELS[it.type]||it.type||'&ndash;')+'</span></div>'+
     '</div>'+
@@ -1212,7 +1227,7 @@ function renderRoki(){
     html+='<div class="exp-group"><div class="exp-group-hdr" style="color:'+col+';border-bottom-color:'+col+'">'+lbl+' ('+groups[k].length+')</div>';
     groups[k].forEach(({it,dl})=>{
       html+='<div class="exp-item"><div class="exp-item-main"><div class="exp-item-name">'+(it.name||'&ndash;')+'</div>'+
-        '<div class="exp-item-sub"><span class="lot-n">'+(it.lot||'&ndash;')+'</span> &middot; '+(it.expiry||'&ndash;')+' &middot; '+(it.qty||0)+' kos</div></div>'+
+        '<div class="exp-item-sub"><span class="lot-n">'+(it.lot||'&ndash;')+'</span> &middot; '+fmtExp(it.expiry)+' &middot; '+(it.qty||0)+' kos</div></div>'+
         expiryBadge(dl)+'</div>';
     });
     html+='</div>';
@@ -1240,7 +1255,7 @@ function renderLoti(){
       const snCount=(it.units||it.serials||[]).length;
       const epcCount=(it.units?it.units.filter(u=>u.epc).length:(it.rfidEpcs||[]).length);
       return '<div class="lot-row"><div style="flex:1"><span class="lot-n">'+(it.lot||'&ndash;')+'</span>'+
-        '<div style="font-size:11px;color:var(--text3);margin-top:2px">'+(it.expiry||'&ndash;')+' &middot; '+(it.qty||0)+' kos'+(snCount?' &middot; '+snCount+' SN':'')+(epcCount?' &middot; '+epcCount+' EPC':'')+'</div></div>'+
+        '<div style="font-size:11px;color:var(--text3);margin-top:2px">'+fmtExp(it.expiry)+' &middot; '+(it.qty||0)+' kos'+(snCount?' &middot; '+snCount+' SN':'')+(epcCount?' &middot; '+epcCount+' EPC':'')+'</div></div>'+
         expiryBadge(dl)+'</div>';
     }).join('');
     return '<div class="prod-card" id="prod'+pi+'"><div class="prod-card-hdr" onclick="$i(\'prod'+pi+'\').classList.toggle(\'open\')">'+
@@ -2515,7 +2530,7 @@ function printOrder(){
     const r=d[it.ident]||{};
     const exp=expMap[it.ident]||null;const dl=daysLeft(exp);
     const ec=expiryPrintClass(dl);
-    const expCell=exp?(exp+(dl<0?' (poteklo)':(dl<=28?' ('+dl+' dni)':''))):'&ndash;';
+    const expCell=exp?(fmtExp(exp)+(dl<0?' (poteklo)':(dl<=28?' ('+dl+' dni)':''))):'&ndash;';
     return '<tr><td>'+it.ident+'</td><td class="l">'+it.name+(it.catalog?' '+it.catalog:'')+'</td><td>'+(minOf(it)??'')+'</td><td>'+(r.z??'')+'</td><td>'+(r.n??'')+'</td><td'+(ec?' class="'+ec+'"':'')+'>'+expCell+'</td></tr>';
   }).join('');
   $i('orderPrintArea').innerHTML='<h2>'+cat.label+'</h2>'+meta+'<table><thead>'+head+'</thead><tbody>'+body+'</tbody></table>';
