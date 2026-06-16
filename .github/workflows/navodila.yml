@@ -1,0 +1,64 @@
+name: Navodila (Word)
+
+# Samodejno (re)generira Word navodila ob spremembi vira navodil ali aplikacije.
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'navodila/**'
+      - 'app/src/main/assets/bio_alinity.html'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  navodila:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Namesti odvisnosti
+        run: |
+          python -m pip install --upgrade pip
+          pip install python-docx
+          cd navodila
+          npm install puppeteer-core
+
+      - name: Namesti Chromium za zajem zaslonov
+        uses: browser-actions/setup-chrome@v1
+        id: chrome
+
+      - name: Zajem zaslonov iz aplikacije (best-effort)
+        continue-on-error: true
+        env:
+          PUPPETEER_EXECUTABLE_PATH: ${{ steps.chrome.outputs.chrome-path }}
+        run: |
+          cd navodila
+          node capture_screens.js
+
+      - name: Generiraj Word navodila
+        env:
+          APP_BUILD: ${{ github.run_number }}
+          APP_SHA: ${{ github.sha }}
+        run: |
+          cd navodila
+          python generate_navodila.py
+
+      - name: Naloži navodila kot artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Navodila_BioAlinity
+          path: navodila/Navodila_BioAlinity.docx
+          retention-days: 90
