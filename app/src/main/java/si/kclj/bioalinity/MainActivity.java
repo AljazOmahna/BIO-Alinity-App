@@ -33,13 +33,19 @@ import com.microsoft.identity.client.exception.MsalException;
 
 import org.json.JSONObject;
 
+import android.content.ContentValues;
+import android.os.Environment;
+import android.provider.MediaStore;
+
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.OutputStreamWriter;
+import java.nio.charset.StandardCharsets;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
@@ -513,6 +519,25 @@ public class MainActivity extends AppCompatActivity {
             final String l = lot;
             mainHandler.post(() -> qcFetchXml(l));
         }
+
+        // ---- QC XML: shrani v javne Prenose (Downloads) + OneDrive arhiv ----
+        @JavascriptInterface
+        public void saveQcXmlToDownloads(String filename, String xml, String lot) {
+            final String fn = filename;
+            final String lotKey = (lot != null && !lot.isEmpty()) ? lot : stripExt(fn);
+            final byte[] bytes = xml == null ? new byte[0] : xml.getBytes(StandardCharsets.UTF_8);
+            new Thread(() -> {
+                try {
+                    String savedPath = _saveXmlToDownloads(fn, bytes);
+                    callJs("if(typeof onQcXmlSaved==='function')onQcXmlSaved(" + jsStr(savedPath) + ",true," + jsStr("ok") + ")");
+                    msAcquireToken("qcxml", (token, err) -> {
+                        if (token != null) graphUploadGeneric("QC_vrednosti/" + lotKey + "/" + fn, bytes, "application/xml", token, fn);
+                    });
+                } catch (Exception e) {
+                    callJs("if(typeof onQcXmlSaved==='function')onQcXmlSaved(null,false," + jsStr(e.getMessage()) + ")");
+                }
+            }).start();
+        }
     }
 
     // =========================================================
@@ -856,5 +881,30 @@ public class MainActivity extends AppCompatActivity {
         if (xmlText == null) return null;
         Matcher m = QC_LOT_RE.matcher(xmlText);
         return m.find() ? m.group(1).trim() : null;
+    }
+
+    private String _saveXmlToDownloads(String filename, byte[] bytes) throws Exception {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ContentValues cv = new ContentValues();
+            cv.put(MediaStore.Downloads.DISPLAY_NAME, filename);
+            cv.put(MediaStore.Downloads.MIME_TYPE, "application/xml");
+            cv.put(MediaStore.Downloads.IS_PENDING, 1);
+            android.net.Uri uri = getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, cv);
+            if (uri == null) throw new Exception("MediaStore.Downloads: insert vrnil null");
+            try (OutputStream os = getContentResolver().openOutputStream(uri)) {
+                if (os == null) throw new Exception("Ni mogoče odpreti izhodnega toka");
+                os.write(bytes);
+            }
+            cv.clear();
+            cv.put(MediaStore.Downloads.IS_PENDING, 0);
+            getContentResolver().update(uri, cv, null, null);
+            return uri.toString();
+        } else {
+            File dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+            if (!dir.exists()) dir.mkdirs();
+            File f = new File(dir, filename);
+            writeFile(f, bytes);
+            return f.getAbsolutePath();
+        }
     }
 }
