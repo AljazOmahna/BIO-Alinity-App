@@ -3223,7 +3223,54 @@ function mergePregledDB(cloud){
   });
   /* lastUsed — union, omeji na 20 */
   db.lastUsed=_arrUnion(db.lastUsed,cloud.lastUsed).slice(0,20);
+  /* Po združevanju zalogo uskladi z zadnjim ZAPRTIM popisom (sicer bi union le prištel
+     stare/potekle kose, ki jih popis ni več zajel). */
+  _reconcileInvFromLatestSession(db);
   return stats;
+}
+/* Trenutna zaloga = zadnji ZAPRT popis (+ sprejemi po zaprtju popisa). closeSession porabljenih
+   ne zapiše v consumed, zato jih consumed-reconcile ne odstrani — to je edino mesto, ki odpravi
+   nakopičene kose iz union-združevanja. Upošteva typeScope: zalogo izven obsega popisa ohrani. */
+function _reconcileInvFromLatestSession(db){
+  const closed=(db.sessions||[]).filter(s=>s&&s.closed);
+  if(!closed.length)return; // brez zaprte seje zalogo pustimo pri miru
+  closed.sort((a,b)=>(b.closed||'').localeCompare(a.closed||''));
+  const sess=closed[0];
+  const prevInv=(db.inventory||[]).slice();
+  const scope=(sess.typeScope&&sess.typeScope.length)?sess.typeScope:null;
+  const inScope=t=>!scope||scope.indexOf(t)>=0;
+  const prevUnits={};
+  prevInv.forEach(pi=>{prevUnits[(pi.gtin||'')+'|'+(pi.lot||'')]=(pi.units&&pi.units.length)?pi.units:(pi.serials||[]).map(s=>({sn:s,epc:''}));});
+  const invMap={};
+  if(scope)prevInv.forEach(pi=>{if(!inScope(pi.type))invMap[(pi.gtin||'')+'|'+(pi.lot||'')]=pi;});
+  (sess.items||[]).filter(i=>i.valid!==false).forEach(si=>{
+    const k=(si.gtin||'')+'|'+(si.lot||'');
+    if(!invMap[k])invMap[k]={gtin:si.gtin,lot:si.lot||'',expiry:si.expiry||'',qty:0,name:si.name,type:si.type,serials:[],lastScan:si.dt};
+    const e=invMap[k];e.qty++;
+    if(si.serial&&e.serials.indexOf(si.serial)<0)e.serials.push(si.serial);
+    if(si.expiry)e.expiry=si.expiry;
+    if(si.dt&&(!e.lastScan||si.dt>e.lastScan))e.lastScan=si.dt;
+  });
+  /* sprejemi PO zaprtju popisa = nova zaloga, ki je popis še ni zajel — ohrani (po serijski) */
+  const closedAt=sess.closed;
+  (db.received||[]).forEach(r=>{
+    if(!r||r.status!=='active'||!r.serial||!r.receivedAt||r.receivedAt<=closedAt)return;
+    const k=(r.gtin||'')+'|'+(r.lot||'');
+    if(!invMap[k])invMap[k]={gtin:r.gtin,lot:r.lot||'',expiry:r.expiry||'',qty:0,name:r.name,type:r.type,serials:[],lastScan:r.receivedAt};
+    const e=invMap[k];
+    if(e.serials.indexOf(r.serial)>=0)return; // že zajeto v popisu
+    e.serials.push(r.serial);e.qty++;
+  });
+  const newInv=Object.keys(invMap).map(k=>invMap[k]);
+  /* ohrani SN→EPC povezave (Locate Tag) */
+  newInv.forEach(it=>{
+    const pu=prevUnits[(it.gtin||'')+'|'+(it.lot||'')];
+    if(pu&&pu.length&&it.serials&&it.serials.length){
+      it.units=it.serials.map(sn=>{const f=pu.filter(u=>u.sn===sn)[0];return {sn:sn,epc:f?f.epc:''};});
+      it.rfidEpcs=it.units.map(u=>u.epc).filter(Boolean);
+    }
+  });
+  db.inventory=newInv;
 }
 
 /* ===== Local export/import ===== */
