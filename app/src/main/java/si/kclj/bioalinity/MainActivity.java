@@ -5,15 +5,12 @@ import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.CancellationSignal;
+import android.graphics.Canvas;
+import android.graphics.pdf.PdfDocument;
 import android.os.Handler;
 import android.os.Looper;
-import android.os.ParcelFileDescriptor;
-import android.print.PageRange;
-import android.print.PrintAttributes;
-import android.print.PrintDocumentAdapter;
-import android.print.PrintDocumentInfo;
 import android.provider.OpenableColumns;
+import android.view.View;
 import android.database.Cursor;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
@@ -569,6 +566,7 @@ public class MainActivity extends AppCompatActivity {
         try {
             final WebView wv = new WebView(this);
             wv.getSettings().setJavaScriptEnabled(false);
+            wv.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
             reportWebView = wv;
             wv.setWebViewClient(new WebViewClient() {
                 @Override public void onPageFinished(WebView view, String url) {
@@ -585,45 +583,40 @@ public class MainActivity extends AppCompatActivity {
 
     private void writeWebViewPdf(WebView view, final String subfolder, final String filename) {
         try {
-            PrintAttributes attrs = new PrintAttributes.Builder()
-                    .setMediaSize(PrintAttributes.MediaSize.ISO_A4.asLandscape())
-                    .setResolution(new PrintAttributes.Resolution("pdf", "pdf", 300, 300))
-                    .setMinMargins(PrintAttributes.Margins.NO_MARGINS)
-                    .build();
-            final PrintDocumentAdapter adapter = view.createPrintDocumentAdapter("report");
+            // A4 landscape: 842×595 PostScript points. Render at 2x for quality.
+            final int PDF_W = 842, PDF_H = 595;
+            final int VW = PDF_W * 2, VH_PAGE = PDF_H * 2;
+
+            int cH = view.getContentHeight();
+            if (cH <= 0) cH = VH_PAGE;
+            view.layout(0, 0, VW, cH);
+
+            int pages = Math.max(1, (int) Math.ceil((double) cH / VH_PAGE));
+
+            PdfDocument doc = new PdfDocument();
+            for (int i = 0; i < pages; i++) {
+                PdfDocument.PageInfo info = new PdfDocument.PageInfo.Builder(PDF_W, PDF_H, i + 1).create();
+                PdfDocument.Page pg = doc.startPage(info);
+                Canvas canvas = pg.getCanvas();
+                canvas.save();
+                canvas.scale(0.5f, 0.5f);
+                canvas.translate(0, -(float)(i * VH_PAGE));
+                view.draw(canvas);
+                canvas.restore();
+                doc.finishPage(pg);
+            }
+
             File dir = getExternalFilesDir(subfolder);
             if (dir == null) dir = new File(getFilesDir(), subfolder);
             if (!dir.exists()) dir.mkdirs();
-            final File outFile = new File(dir, filename);
-            final ParcelFileDescriptor pfd = ParcelFileDescriptor.open(outFile,
-                    ParcelFileDescriptor.MODE_READ_WRITE | ParcelFileDescriptor.MODE_CREATE
-                            | ParcelFileDescriptor.MODE_TRUNCATE);
+            File outFile = new File(dir, filename);
+            try (FileOutputStream fos = new FileOutputStream(outFile)) {
+                doc.writeTo(fos);
+            }
+            doc.close();
 
-            adapter.onStart();
-            adapter.onLayout(null, attrs, new CancellationSignal(),
-                new PrintDocumentAdapter.LayoutResultCallback() {
-                    @Override public void onLayoutFinished(PrintDocumentInfo info, boolean changed) {
-                        adapter.onWrite(new PageRange[]{PageRange.ALL_PAGES}, pfd, new CancellationSignal(),
-                            new PrintDocumentAdapter.WriteResultCallback() {
-                                @Override public void onWriteFinished(PageRange[] pages) {
-                                    try { adapter.onFinish(); } catch (Exception ignored) {}
-                                    try { pfd.close(); } catch (Exception ignored) {}
-                                    reportWebView = null;
-                                    uploadReportPdf(subfolder, filename, outFile);
-                                }
-                                @Override public void onWriteFailed(CharSequence error) {
-                                    try { pfd.close(); } catch (Exception ignored) {}
-                                    reportWebView = null;
-                                    reportDone(filename, false, "PDF zapis ni uspel: " + error, null);
-                                }
-                            });
-                    }
-                    @Override public void onLayoutFailed(CharSequence error) {
-                        try { pfd.close(); } catch (Exception ignored) {}
-                        reportWebView = null;
-                        reportDone(filename, false, "Postavitev ni uspela: " + error, null);
-                    }
-                }, null);
+            reportWebView = null;
+            uploadReportPdf(subfolder, filename, outFile);
         } catch (Exception e) {
             reportWebView = null;
             reportDone(filename, false, "Napaka PDF: " + e.getMessage(), null);
