@@ -564,7 +564,7 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
 
   <!-- QC MAINT REVIEW -->
   <div class="page qc-page" id="page-maint-review">
-    <div class="sec-hdr"><div class="sec-title" style="font-size:16px">Pregled vzdrževanja</div><button class="btn btn-g btn-sm" onclick="exportMaintCSV()">&#128190; CSV</button></div>
+    <div class="sec-hdr"><div class="sec-title" style="font-size:16px">Pregled vzdrževanja</div><span style="display:flex;gap:6px"><button class="btn btn-a btn-sm" onclick="openReportModal()">&#128196; Mesečno poročilo</button><button class="btn btn-g btn-sm" onclick="exportMaintCSV()">&#128190; CSV</button></span></div>
     <div class="card">
       <div class="fr">
         <select id="mrFilterType" onchange="renderMaintReview()"><option value="">Vsi tipi</option><option value="daily">Dnevno</option><option value="weekly">Tedensko</option><option value="monthly">Mesečno</option><option value="quarterly">3-mesečno/po potrebi</option></select>
@@ -806,6 +806,15 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
   </div>
 
   <div class="card">
+    <div class="card-title">&#128196; Mesečna poročila (OneDrive)</div>
+    <div class="muted" style="font-size:12px;margin-bottom:10px">Uradni obrazci se sestavijo iz vpisanega vzdrževanja in QC ter shranijo v OneDrive (DigiLab/Poročila). Ob koncu meseca se naredijo samodejno; tu jih lahko ustvariš tudi ročno.</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+      <button class="btn btn-a btn-sm" onclick="openReportModal()">&#128196; Mesečno poročilo</button>
+    </div>
+    <div id="reportsList" class="muted" style="font-size:12px">Še ni generiranih poročil.</div>
+  </div>
+
+  <div class="card">
     <div class="card-title">&#128190; Lokalni izvoz / uvoz podatkov</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn btn-g btn-sm" onclick="exportJson('qclab_v2')">&#8595; Izvozi qclab_v2</button>
@@ -1009,6 +1018,31 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
     <div class="mf">
       <button class="btn btn-d btn-sm" onclick="maintEditRestore()">&#8634; Povrni privzeto</button>
       <button class="btn btn-blue" onclick="closeMo('maintEditModal');renderMaintContent()">Zapri</button>
+    </div>
+  </div>
+</div>
+
+<!-- REPORT MODAL (mesečno poročilo) -->
+<div class="mo" id="reportModal">
+  <div class="modal" style="max-width:560px">
+    <div class="mh"><h3>&#128196; Mesečno poročilo</h3><button class="mc" onclick="closeMo('reportModal')">&#10005;</button></div>
+    <div class="mb">
+      <div class="fg" style="margin-bottom:12px"><label>Za kateri mesec</label><select id="repMonthSel"></select></div>
+      <div style="font-size:12px;font-weight:700;text-transform:uppercase;color:var(--text3);margin:4px 0 6px;letter-spacing:.5px">Vrsta poročila</div>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:12px">
+        <label style="display:flex;align-items:center;gap:7px;font-size:13px"><input type="checkbox" class="repType" value="vzdrzevanje" checked style="width:16px;height:16px"> Vzdrževanje</label>
+        <label style="display:flex;align-items:center;gap:7px;font-size:13px"><input type="checkbox" class="repType" value="kontrole" checked style="width:16px;height:16px"> Neskladja QC</label>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin:4px 0 6px">
+        <span style="font-size:12px;font-weight:700;text-transform:uppercase;color:var(--text3);letter-spacing:.5px">Analizatorji</span>
+        <span style="display:flex;gap:6px"><button class="btn btn-g btn-sm" onclick="repSelectAll(true)">✔ Vse</button><button class="btn btn-g btn-sm" onclick="repSelectAll(false)">☐ Počisti</button></span>
+      </div>
+      <div id="repInstrList" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;max-height:34vh;overflow-y:auto"></div>
+      <div class="muted" style="font-size:11px;margin-top:10px">Poročila se naložijo v OneDrive: DigiLab/Poročila/&lt;leto&gt;. Imena: leto-mesec_aparat_vrsta.pdf</div>
+    </div>
+    <div class="mf">
+      <button class="btn btn-g" onclick="closeMo('reportModal')">Prekliči</button>
+      <button class="btn btn-blue" onclick="doGenerateReports()">Potrdi in generiraj</button>
     </div>
   </div>
 </div>
@@ -1337,6 +1371,9 @@ function initState(){
   const sv=localStorage.getItem('qclab_v2');
   if(sv){try{const p=JSON.parse(sv);Object.assign(S,p);if(!S.assayRules)S.assayRules={};if(!S.maintenanceLog)S.maintenanceLog=[];if(!S.ljRules['10_x'])S.ljRules['10_x']=true;}catch(e){}}
   if(!S.serviceLog)S.serviceLog=[];
+  if(!S.reports)S.reports=[];
+  if(!S.pendingReports)S.pendingReports=[];
+  if(typeof S.lastReportMonth!=='string')S.lastReportMonth='';
   /* vzdrževalna opravila: privzeta iz OB-KIKKB obrazcev, urejljiva */
   if(!S.maintSteps)S.maintSteps=JSON.parse(JSON.stringify(MAINT_DEFAULTS));
   ['daily','weekly','monthly','quarterly'].forEach(t=>{if(!S.maintSteps[t])S.maintSteps[t]={c:[],i:[]};if(!S.maintSteps[t].c)S.maintSteps[t].c=[];if(!S.maintSteps[t].i)S.maintSteps[t].i=[];});
@@ -1748,6 +1785,265 @@ function maintEditRestore(){
 }
 
 /* ============================================================
+   POROČILA — mesečni PDF po obrazcih OB KIKKB (vzdrževanje + neskladja QC)
+   Builderji vrnejo samostojen HTML dokument; Java (generateAndUploadReport)
+   ga izriše v PDF (ležeče A4), shrani lokalno in naloži v OneDrive.
+   ============================================================ */
+const REP_MONTHS=['januar','februar','marec','april','maj','junij','julij','avgust','september','oktober','november','december'];
+function _rp2(n){return (n<10?'0':'')+n;}
+function _repDaysInMonth(y,m){return new Date(y,m,0).getDate();} // m=1..12
+function _instrTag(instrId){return String(instrId).replace(/\s+/g,'-');} // 'AL01 C1' -> 'AL01-C1'
+function _repEsc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function _opParafa(opId){const op=S.operators.find(o=>o.id===opId);return op?(((op.first||'')[0]||'')+((op.last||'')[0]||'')).toUpperCase():'';}
+
+const REPORT_CSS=`
+*{box-sizing:border-box}
+@page{size:A4 landscape;margin:6mm}
+body{font-family:'Segoe UI',Arial,sans-serif;color:#000;margin:0;padding:0;font-size:8px}
+.rtitle{text-align:center;font-weight:700;font-size:13px;margin:0 0 6px;text-transform:uppercase}
+.rhdr{margin-bottom:6px}
+table.meta{border-collapse:collapse;width:100%;font-size:10px}
+table.meta td{padding:2px 5px;border:1px solid #000}
+table.meta .k{font-weight:700;background:#eee;white-space:nowrap}
+.grid{border-collapse:collapse;width:100%;table-layout:fixed;margin-bottom:4px}
+.grid th,.grid td{border:1px solid #000;padding:1px 2px;text-align:center;font-size:7px;overflow:hidden;vertical-align:middle;word-wrap:break-word}
+.grid th{background:#e8e8e8;font-weight:700}
+.grid td.lbl,.grid th.lbl{text-align:left;font-size:7.5px;width:118px}
+.grid.daily th:not(.lbl),.grid.daily td:not(.lbl){width:17px}
+.grid.datum td:not(.lbl),.grid.datum th:not(.lbl){width:60px}
+.grid .day{font-weight:700;width:16px;background:#f3f3f3}
+.grid .sub{text-align:left;font-size:6.5px;width:52px;background:#fafafa}
+.grid .db td{border-bottom:2px solid #000}
+.sechd{font-weight:700;font-size:9px;margin:6px 0 2px;text-transform:uppercase}
+.gap{height:4px}
+.legend{font-size:8px;margin-top:6px;font-style:italic}
+.rfoot{margin-top:8px;font-size:8px;color:#333;border-top:1px solid #999;padding-top:3px;text-align:center}
+thead{display:table-header-group}
+tr{page-break-inside:avoid}
+`;
+
+function _reportDoc(title,inner){
+  return '<!DOCTYPE html><html lang="sl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>'+REPORT_CSS+'</style></head><body><div class="rtitle">'+title+'</div>'+inner+'</body></html>';
+}
+
+/* ---- VZDRŽEVANJE (OB KIKKB 213/64) ---- */
+function _maintRecordsFor(instrId,type,year,month){
+  return (S.maintenanceLog||[]).filter(function(r){
+    if(r.instrId!==instrId||r.type!==type)return false;
+    var d=new Date(r.datetime);return d.getFullYear()===year&&(d.getMonth()+1)===month;
+  });
+}
+function _stepDoneIn(rec,stepId){var s=(rec.steps||[]).find(function(x){return x.id===stepId;});return !!(s&&s.done);}
+
+function _maintDailyTable(instrId,instrType,year,month){
+  var steps=getMaintSteps('daily',instrType);if(!steps.length)return '';
+  var dim=_repDaysInMonth(year,month);
+  var recs=_maintRecordsFor(instrId,'daily',year,month);
+  var byDay={};recs.forEach(function(r){var d=new Date(r.datetime).getDate();(byDay[d]=byDay[d]||[]).push(r);});
+  var head='<tr><th class="lbl">DNEVNO VZDRŽEVANJE</th>';
+  for(var d=1;d<=dim;d++)head+='<th>'+d+'</th>';
+  head+='</tr>';
+  var body='';
+  steps.forEach(function(st){
+    body+='<tr><td class="lbl">'+_repEsc(st.text)+'</td>';
+    for(var d=1;d<=dim;d++){var done=(byDay[d]||[]).some(function(r){return _stepDoneIn(r,st.id);});body+='<td>'+(done?'✓':'')+'</td>';}
+    body+='</tr>';
+  });
+  body+='<tr><td class="lbl">Podpis/parafa</td>';
+  for(var d2=1;d2<=dim;d2++){var rec=(byDay[d2]||[])[0];body+='<td>'+(rec?_opParafa(rec.operatorId):'')+'</td>';}
+  body+='</tr>';
+  return '<div class="sechd">Dnevno vzdrževanje</div><table class="grid daily"><thead>'+head+'</thead><tbody>'+body+'</tbody></table>';
+}
+
+function _maintWeeklyTable(instrId,instrType,year,month){
+  var steps=getMaintSteps('weekly',instrType);if(!steps.length)return '';
+  var recs=_maintRecordsFor(instrId,'weekly',year,month);
+  var weekOf=function(d){return Math.min(4,Math.ceil(d/7));};
+  var byWeek={};recs.forEach(function(r){var w=weekOf(new Date(r.datetime).getDate());(byWeek[w]=byWeek[w]||[]).push(r);});
+  var wl=['PRVI TEDEN','DRUGI TEDEN','TRETJI TEDEN','ČETRTI TEDEN'];
+  var head='<tr><th class="lbl">TEDENSKO VZDRŽEVANJE</th>'+wl.map(function(t){return '<th>'+t+'</th>';}).join('')+'</tr>';
+  var body='';
+  steps.forEach(function(st){
+    body+='<tr><td class="lbl">'+_repEsc(st.text)+'</td>'+[1,2,3,4].map(function(w){var done=(byWeek[w]||[]).some(function(r){return _stepDoneIn(r,st.id);});return '<td>'+(done?'✓':'')+'</td>';}).join('')+'</tr>';
+  });
+  body+='<tr><td class="lbl">Podpis/parafa</td>'+[1,2,3,4].map(function(w){var rec=(byWeek[w]||[])[0];return '<td>'+(rec?_opParafa(rec.operatorId):'')+'</td>';}).join('')+'</tr>';
+  return '<div class="sechd">Tedensko vzdrževanje</div><table class="grid weekly"><thead>'+head+'</thead><tbody>'+body+'</tbody></table>';
+}
+
+function _maintDatumTable(instrId,instrType,year,month,type,heading){
+  var steps=getMaintSteps(type,instrType);if(!steps.length)return '';
+  var recs=_maintRecordsFor(instrId,type,year,month);
+  var body='';
+  steps.forEach(function(st){
+    var rec=recs.find(function(r){return _stepDoneIn(r,st.id);});
+    var dt=rec?new Date(rec.datetime):null;
+    var datum=dt?(_rp2(dt.getDate())+'.'+_rp2(dt.getMonth()+1)+'.'+dt.getFullYear()):'';
+    var par=rec?_opParafa(rec.operatorId):'';
+    body+='<tr><td class="lbl">'+_repEsc(st.text)+'</td><td>'+datum+'</td><td>'+par+'</td></tr>';
+  });
+  return '<div class="sechd">'+_repEsc(heading)+'</div><table class="grid datum"><thead><tr><th class="lbl">'+_repEsc(heading)+'</th><th>DATUM</th><th>Parafa</th></tr></thead><tbody>'+body+'</tbody></table>';
+}
+
+function buildMaintReportHtml(instrId,year,month){
+  var instr=INSTRUMENTS.find(function(i){return i.id===instrId;})||{id:instrId,name:'',type:'c'};
+  var moName=REP_MONTHS[month-1].toUpperCase()+' '+year;
+  var head='<div class="rhdr"><table class="meta"><tr><td class="k">ANALIZATOR/APARAT:</td><td>Alinity '+_repEsc(instr.id)+'</td><td class="k">MESEC/LETO:</td><td>'+moName+'</td><td class="k">Zap. št./oddelek:</td><td>&nbsp;</td></tr></table></div>';
+  var secs=[
+    _maintDailyTable(instr.id,instr.type,year,month),
+    _maintWeeklyTable(instr.id,instr.type,year,month),
+    _maintDatumTable(instr.id,instr.type,year,month,'monthly','Mesečno vzdrževanje'),
+    _maintDatumTable(instr.id,instr.type,year,month,'quarterly','3-mesečno vzdrževanje oz. po potrebi')
+  ].filter(Boolean).join('<div class="gap"></div>');
+  var foot='<div class="rfoot">e-verzija 4.0 &nbsp;·&nbsp; klas. znak izpolnjenega obrazca: 78431 &nbsp;·&nbsp; OB KIKKB 213/64</div>';
+  return _reportDoc('Evidenca periodičnega vzdrževanja opreme',head+secs+foot);
+}
+
+/* ---- NESKLADJA NOTRANJE QC (OB KIKKB 216/64) ---- */
+function buildQcNonconfHtml(instrId,year,month){
+  var instr=INSTRUMENTS.find(function(i){return i.id===instrId;})||{id:instrId,type:'c'};
+  var oddelek=instr.type==='i'?'Imunokemija':'Biokemija';
+  var moName=REP_MONTHS[month-1].toUpperCase()+' '+year;
+  var dim=_repDaysInMonth(year,month);
+  var ents=(S.entries||[]).filter(function(e){if(e.instrId!==instrId)return false;var d=new Date(e.datetime);return d.getFullYear()===year&&(d.getMonth()+1)===month;});
+  var controls=[];ents.forEach(function(e){if(e.qcName&&controls.indexOf(e.qcName)<0)controls.push(e.qcName);});
+  var cols=controls.slice(0,4);while(cols.length<4)cols.push('');
+  var head='<tr><th class="lbl" style="width:32px">Dan</th><th style="width:52px"></th>'+cols.map(function(c,i){return '<th>'+(c?_repEsc(c):((i+1)+'.kontrola'))+'</th>';}).join('')+'<th style="width:60px">Pregledano</th></tr>';
+  var body='';
+  for(var d=1;d<=dim;d++){
+    var dayEnts=ents.filter(function(e){return new Date(e.datetime).getDate()===d;});
+    var izpad=[],ukrep=[],podpis=[];
+    cols.forEach(function(c){
+      var ce=c?dayEnts.filter(function(e){return e.qcName===c;}):[];
+      var fails=[],notes=[],op='';
+      ce.forEach(function(e){(e.results||[]).forEach(function(r){if(r.sd&&r.sd!=='ok'){fails.push(_repEsc(r.assay)+' N'+r.level+' ('+r.sd.toUpperCase()+')');if(r.note)notes.push(_repEsc(r.note));}});if(e.operatorId)op=_opParafa(e.operatorId);});
+      izpad.push(fails.join('<br>'));ukrep.push(Array.from(new Set(notes)).join('<br>'));podpis.push(op);
+    });
+    body+='<tr><td class="day" rowspan="3">'+d+'</td><td class="sub">IZPAD,NIVO</td>'+izpad.map(function(x){return '<td>'+x+'</td>';}).join('')+'<td rowspan="3"></td></tr>';
+    body+='<tr><td class="sub">UKREP</td>'+ukrep.map(function(x){return '<td>'+x+'</td>';}).join('')+'</tr>';
+    body+='<tr class="db"><td class="sub">PODPIS</td>'+podpis.map(function(x){return '<td>'+x+'</td>';}).join('')+'</tr>';
+  }
+  var head2='<div class="rhdr"><table class="meta"><tr><td class="k">Oddelek:</td><td>'+oddelek+'</td><td class="k">Analizator:</td><td>Alinity '+_repEsc(instr.id)+'</td><td class="k">Mesec, Leto:</td><td>'+moName+'</td></tr></table></div>';
+  var table='<table class="grid nc"><thead>'+head+'</thead><tbody>'+body+'</tbody></table>';
+  var legend='<div class="legend">Vzrok neskladja in ukrepi — Legenda: A – Ponovitev kontrole; B – Preventivna kalibracija; C – Menjava reagenta; D – Servis</div>';
+  var foot='<div class="rfoot">e-verzija 3.0 &nbsp;·&nbsp; klas. znak izpolnjenega obrazca: 7832 &nbsp;·&nbsp; OB KIKKB 216/64</div>';
+  return _reportDoc('Vodenje neskladij pri notranji kontroli kakovosti',head2+table+legend+foot);
+}
+
+/* ---- ORKESTRACIJA: vrsta, samodejni sprožilec, čakalna vrsta ---- */
+const REP_TYPES={vzdrzevanje:'Vzdrževanje',kontrole:'Neskladja QC'};
+function _reportFilename(instrId,year,month,type){return year+'-'+_rp2(month)+'_'+_instrTag(instrId)+'_'+type+'.pdf';}
+function _reportSubfolder(year){return 'Porocila/'+year;}
+function _monthKey(y,m){return y+'-'+_rp2(m);}
+function _hasMsSignedIn(){try{return !!(_hasBridge()&&AndroidBridge.msIsSignedIn&&AndroidBridge.msIsSignedIn());}catch(e){return false;}}
+function _hasMonthData(year,month){
+  var md=(S.maintenanceLog||[]).some(function(r){var d=new Date(r.datetime);return d.getFullYear()===year&&(d.getMonth()+1)===month;});
+  if(md)return true;
+  return (S.entries||[]).some(function(e){var d=new Date(e.datetime);return d.getFullYear()===year&&(d.getMonth()+1)===month;});
+}
+
+var _repQueue=[],_repCurrent=null,_repBusy=false;
+function generateMonthlyReports(year,month,opts){
+  opts=opts||{};
+  var instrs=opts.instrIds||INSTRUMENTS.map(function(i){return i.id;});
+  var types=opts.types||['vzdrzevanje','kontrole'];
+  var jobs=[];
+  instrs.forEach(function(id){types.forEach(function(t){jobs.push({instrId:id,year:year,month:month,type:t,filename:_reportFilename(id,year,month,t),subfolder:_reportSubfolder(year)});});});
+  if(!jobs.length){notify('Ni izbranih poročil','warn');return;}
+  _repQueue=_repQueue.concat(jobs);
+  notify((opts.auto?'Samodejno generiram ':'Generiram ')+jobs.length+' poročil…','ok');
+  _repPump();
+}
+function _repPump(){
+  if(_repBusy)return;
+  if(!_repQueue.length)return;
+  if(!_hasBridge()||!AndroidBridge.generateAndUploadReport){notify('Generiranje PDF je na voljo le na napravi','warn');_repQueue=[];return;}
+  if(!_hasMsSignedIn()){
+    S.pendingReports=(S.pendingReports||[]).concat(_repQueue.map(function(j){return {instrId:j.instrId,year:j.year,month:j.month,type:j.type};}));
+    _repQueue=[];save();
+    notify('Ni prijave v OneDrive — '+(S.pendingReports.length)+' poročil čaka (Več → Sinhronizacija)','warn');
+    if(typeof renderReportsList==='function')renderReportsList();
+    return;
+  }
+  _repBusy=true;
+  var job=_repQueue.shift();_repCurrent=job;
+  var html;
+  try{html=(job.type==='kontrole')?buildQcNonconfHtml(job.instrId,job.year,job.month):buildMaintReportHtml(job.instrId,job.year,job.month);}
+  catch(e){_repBusy=false;_repCurrent=null;_repFinishJob(job,false,'Napaka sestave: '+e.message);setTimeout(_repPump,100);return;}
+  try{AndroidBridge.generateAndUploadReport(job.subfolder,job.filename,html);}
+  catch(e){_repBusy=false;_repCurrent=null;_repFinishJob(job,false,'Bridge napaka: '+e.message);setTimeout(_repPump,100);}
+}
+function _repFinishJob(job,ok,msg,localPath){
+  S.reports=S.reports||[];
+  S.reports=S.reports.filter(function(r){return r.filename!==job.filename;});
+  S.reports.unshift({filename:job.filename,instrId:job.instrId,year:job.year,month:job.month,type:job.type,ok:!!ok,msg:msg||'',path:localPath||'',at:new Date().toISOString()});
+  if(S.reports.length>300)S.reports=S.reports.slice(0,300);
+  save();
+  if(typeof renderReportsList==='function')renderReportsList();
+}
+function onReportGenerated(filename,ok,msg,localPath){
+  var job=_repCurrent;_repCurrent=null;_repBusy=false;
+  if(job)_repFinishJob(job,ok,msg,localPath);
+  notify((ok?'✓ ':'⚠ ')+filename+(msg?(' — '+msg):''),ok?'ok':'warn');
+  setTimeout(_repPump,150);
+}
+
+/* ---- UI: modal mesečnih poročil + seznam ---- */
+function _repLast12(){var out=[];var now=new Date();for(var k=1;k<=12;k++){var d=new Date(now.getFullYear(),now.getMonth()-k,1);out.push({y:d.getFullYear(),m:d.getMonth()+1});}return out;}
+function openReportModal(){
+  var sel=$i('repMonthSel');
+  sel.innerHTML=_repLast12().map(function(o){return '<option value="'+o.y+'-'+_rp2(o.m)+'">'+REP_MONTHS[o.m-1]+' '+o.y+'</option>';}).join('');
+  $i('repInstrList').innerHTML=INSTRUMENTS.map(function(i){return '<label style="display:flex;align-items:center;gap:7px;font-size:13px;background:var(--bg2);border:1px solid var(--border);border-radius:7px;padding:6px 8px"><input type="checkbox" class="repInstr" value="'+i.id+'" checked style="width:16px;height:16px"> '+i.id+' ('+_repEsc(i.name)+')</label>';}).join('');
+  showMo('reportModal');
+}
+function repSelectAll(v){document.querySelectorAll('#repInstrList .repInstr').forEach(function(c){c.checked=v;});}
+function doGenerateReports(){
+  var mv=$i('repMonthSel').value;if(!mv){notify('Izberi mesec','warn');return;}
+  var parts=mv.split('-'),year=parseInt(parts[0],10),month=parseInt(parts[1],10);
+  var instrIds=Array.prototype.slice.call(document.querySelectorAll('#repInstrList .repInstr:checked')).map(function(c){return c.value;});
+  var types=Array.prototype.slice.call(document.querySelectorAll('.repType:checked')).map(function(c){return c.value;});
+  if(!instrIds.length){notify('Izberi vsaj en analizator','warn');return;}
+  if(!types.length){notify('Izberi vsaj eno vrsto poročila','warn');return;}
+  closeMo('reportModal');
+  generateMonthlyReports(year,month,{instrIds:instrIds,types:types});
+}
+function renderReportsList(){
+  var el=$i('reportsList');if(!el)return;
+  var pend=(S.pendingReports||[]).length;
+  var reps=(S.reports||[]).slice(0,40);
+  var html='';
+  if(pend)html+='<div style="background:var(--gbg);border:1px solid var(--warning);border-radius:6px;padding:6px 10px;margin-bottom:8px;color:var(--warning)">&#9203; '+pend+' poročil čaka na prijavo v OneDrive</div>';
+  if(!reps.length){el.innerHTML=html+(pend?'':'Še ni generiranih poročil.');return;}
+  html+='<div class="tbl-wrap"><table style="width:100%;font-size:12px"><thead><tr><th style="text-align:left">Datoteka</th><th>Status</th><th></th></tr></thead><tbody>'+
+    reps.map(function(r){
+      var st=r.ok?'<span class="badge badge-ok">naloženo</span>':'<span class="badge badge-2sd" title="'+_repEsc(r.msg||'')+'">'+_repEsc((r.msg||'napaka')).slice(0,24)+'</span>';
+      var btn=(r.ok&&r.path)?'<button class="btn btn-g btn-sm" onclick="openReport('+JSON.stringify(r.path).replace(/"/g,'&quot;')+')">Odpri</button>'
+        :'<button class="btn btn-g btn-sm" onclick="regenReport('+JSON.stringify(r.instrId).replace(/"/g,'&quot;')+','+r.year+','+r.month+',\''+r.type+'\')">Ponovi</button>';
+      return '<tr><td style="text-align:left">'+_repEsc(r.filename)+'</td><td>'+st+'</td><td>'+btn+'</td></tr>';
+    }).join('')+'</tbody></table></div>';
+  el.innerHTML=html;
+}
+function openReport(path){if(!path){notify('Pot ni znana','warn');return;}try{if(_hasBridge()&&AndroidBridge.openReportFile){AndroidBridge.openReportFile(path);}else{notify('Odpiranje le na napravi','warn');}}catch(e){notify('Napaka odpiranja','err');}}
+function regenReport(instrId,year,month,type){generateMonthlyReports(year,month,{instrIds:[instrId],types:[type]});}
+function autoGenerateReports(){
+  var now=new Date();
+  var prevD=new Date(now.getFullYear(),now.getMonth()-1,1);
+  var py=prevD.getFullYear(),pm=prevD.getMonth()+1;
+  var key=_monthKey(py,pm);
+  if(S.lastReportMonth===key)return;
+  if(!_hasMonthData(py,pm)){S.lastReportMonth=key;save();return;}
+  S.lastReportMonth=key;save();
+  generateMonthlyReports(py,pm,{auto:true});
+}
+function retryPendingReports(){
+  if(!S.pendingReports||!S.pendingReports.length)return;
+  if(!_hasMsSignedIn())return;
+  var pend=S.pendingReports;S.pendingReports=[];save();
+  pend.forEach(function(j){_repQueue.push({instrId:j.instrId,year:j.year,month:j.month,type:j.type,filename:_reportFilename(j.instrId,j.year,j.month,j.type),subfolder:_reportSubfolder(j.year)});});
+  notify('Nalagam '+pend.length+' čakajočih poročil…','ok');
+  _repPump();
+}
+
+/* ============================================================
    SERVIS / NAPAKE — vpis napak, servisna poročila, statistika
    ============================================================ */
 const GLP_MODULES=['IOM-1','IOM-2','IOM-3','TAC','BM-1','BM-2','AM','DM','CM-1','CM-2','RM','REM','SM-1','SM-2','LINIJA'];
@@ -2149,6 +2445,7 @@ function exportMaintCSV(){const rows=[['Datum','Čas','Tip','Integracija','Anali
    ============================================================ */
 function renderVec(){
   refreshSyncUI();
+  renderReportsList();
   if(_hasBridge()){try{const info=JSON.parse(AndroidBridge.getDeviceInfo());
     $i('aboutDevice').textContent='Naprava: '+info.manufacturer+' '+info.model+' (Android '+info.release+', SDK '+info.sdk+')';
     if(info.appVersion){$i('aboutVersion').textContent='v'+info.appVersion;}
@@ -2260,7 +2557,7 @@ function importSharedFile(input){
 }
 /* Callbacks from Android */
 function onMsDeviceCode(userCode,verUri,message){notify('Koda: '+userCode+' na '+(verUri||'microsoft.com/devicelogin'),'ok');}
-function onMsSignedIn(account){notify('Prijavljen: '+(account||'OneDrive'),'ok');refreshSyncUI();}
+function onMsSignedIn(account){notify('Prijavljen: '+(account||'OneDrive'),'ok');refreshSyncUI();setTimeout(retryPendingReports,400);}
 function onMsSignedOut(){notify('Odjavljen iz OneDrive','ok');refreshSyncUI();}
 function onMsError(msg){notify(msg||'Napaka OneDrive','err');refreshSyncUI();}
 function onMsUploadDone(ok,msg){notify(msg||(ok?'Naloženo':'Napaka'),ok?'ok':'err');refreshSyncUI();}
@@ -2648,6 +2945,8 @@ if(localStorage.getItem('bioAlinity_dark')==='1'){$i('darkToggle').checked=true;
 renderZaloga();
 renderDashboard();
 refreshSyncUI();
+/* samodejna mesečna poročila + ponovni poskus čakajočih (po zagonu, ko je MSAL pripravljen) */
+setTimeout(function(){try{retryPendingReports();autoGenerateReports();}catch(e){}},2500);
 </script>
 </body>
 </html>

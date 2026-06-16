@@ -5,8 +5,14 @@ import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.CancellationSignal;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.ParcelFileDescriptor;
+import android.print.PageRange;
+import android.print.PrintAttributes;
+import android.print.PrintDocumentAdapter;
+import android.print.PrintDocumentInfo;
 import android.provider.OpenableColumns;
 import android.database.Cursor;
 import android.webkit.JavascriptInterface;
@@ -32,6 +38,7 @@ import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -472,6 +479,13 @@ public class MainActivity extends AppCompatActivity {
                 graphGet(k, token);
             }));
         }
+
+        // Sestavi PDF iz HTML-ja, shrani lokalno (Porocila/<leto>) in naloži v OneDrive DigiLab/<subfolder>/<filename>.
+        @JavascriptInterface
+        public void generateAndUploadReport(String subfolder, String filename, String html) {
+            final String sf = subfolder, fn = filename, h = html;
+            mainHandler.post(() -> renderReportToPdf(sf, fn, h));
+        }
     }
 
     // =========================================================
@@ -535,6 +549,147 @@ public class MainActivity extends AppCompatActivity {
                     callJs("onMsDownloadDone(" + jsStr(key) + "," + jsStr(bodyStr) + ",'ok')");
                 } else {
                     callJs("onMsDownloadDone(" + jsStr(key) + ",null," + jsStr("Graph napaka " + code) + ")");
+                }
+            }
+        });
+    }
+
+    // =========================================================
+    // Poročila — HTML → PDF (offscreen WebView) → lokalno + OneDrive
+    // =========================================================
+    private WebView reportWebView; // referenca, da se WebView ne sprosti med async izrisom
+
+    private void reportDone(String filename, boolean ok, String msg, String localPath) {
+        callJs("if(typeof onReportGenerated==='function')onReportGenerated("
+                + jsStr(filename) + "," + (ok ? "true" : "false") + "," + jsStr(msg) + "," + jsStr(localPath) + ")");
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
+    private void renderReportToPdf(final String subfolder, final String filename, String html) {
+        try {
+            final WebView wv = new WebView(this);
+            wv.getSettings().setJavaScriptEnabled(false);
+            reportWebView = wv;
+            wv.setWebViewClient(new WebViewClient() {
+                @Override public void onPageFinished(WebView view, String url) {
+                    // počakaj kratek hip, da se postavitev ustali, nato izriši v PDF
+                    mainHandler.postDelayed(() -> writeWebViewPdf(view, subfolder, filename), 300);
+                }
+            });
+            wv.loadDataWithBaseURL("file:///android_asset/", html, "text/html", "UTF-8", null);
+        } catch (Exception e) {
+            reportWebView = null;
+            reportDone(filename, false, "Napaka izrisa: " + e.getMessage(), null);
+        }
+    }
+
+    private void writeWebViewPdf(WebView view, final String subfolder, final String filename) {
+        try {
+            PrintAttributes attrs = new PrintAttributes.Builder()
+                    .setMediaSize(PrintAttributes.MediaSize.ISO_A4.asLandscape())
+                    .setResolution(new PrintAttributes.Resolution("pdf", "pdf", 300, 300))
+                    .setMinMargins(PrintAttributes.Margins.NO_MARGINS)
+                    .build();
+            final PrintDocumentAdapter adapter = view.createPrintDocumentAdapter("report");
+            File dir = getExternalFilesDir(subfolder);
+            if (dir == null) dir = new File(getFilesDir(), subfolder);
+            if (!dir.exists()) dir.mkdirs();
+            final File outFile = new File(dir, filename);
+            final ParcelFileDescriptor pfd = ParcelFileDescriptor.open(outFile,
+                    ParcelFileDescriptor.MODE_READ_WRITE | ParcelFileDescriptor.MODE_CREATE
+                            | ParcelFileDescriptor.MODE_TRUNCATE);
+
+            adapter.onStart();
+            adapter.onLayout(null, attrs, new CancellationSignal(),
+                new PrintDocumentAdapter.LayoutResultCallback() {
+                    @Override public void onLayoutFinished(PrintDocumentInfo info, boolean changed) {
+                        adapter.onWrite(new PageRange[]{PageRange.ALL_PAGES}, pfd, new CancellationSignal(),
+                            new PrintDocumentAdapter.WriteResultCallback() {
+                                @Override public void onWriteFinished(PageRange[] pages) {
+                                    try { adapter.onFinish(); } catch (Exception ignored) {}
+                                    try { pfd.close(); } catch (Exception ignored) {}
+                                    reportWebView = null;
+                                    uploadReportPdf(subfolder, filename, outFile);
+                                }
+                                @Override public void onWriteFailed(CharSequence error) {
+                                    try { pfd.close(); } catch (Exception ignored) {}
+                                    reportWebView = null;
+                                    reportDone(filename, false, "PDF zapis ni uspel: " + error, null);
+                                }
+                            });
+                    }
+                    @Override public void onLayoutFailed(CharSequence error) {
+                        try { pfd.close(); } catch (Exception ignored) {}
+                        reportWebView = null;
+                        reportDone(filename, false, "Postavitev ni uspela: " + error, null);
+                    }
+                }, null);
+        } catch (Exception e) {
+            reportWebView = null;
+            reportDone(filename, false, "Napaka PDF: " + e.getMessage(), null);
+        }
+    }
+
+    private void uploadReportPdf(final String subfolder, final String filename, final File file) {
+        final String localPath = file.getAbsolutePath();
+        final byte[] bytes;
+        try {
+            bytes = readFileBytes(file);
+        } catch (Exception e) {
+            reportDone(filename, false, "Branje PDF: " + e.getMessage(), localPath);
+            return;
+        }
+        mainHandler.post(() -> msAcquireToken("report", (token, err) -> {
+            if (token == null) {
+                // PDF je shranjen lokalno, a brez OneDrive (ni prijave/seje)
+                reportDone(filename, false, "Shranjeno lokalno; OneDrive: " + err, localPath);
+                return;
+            }
+            graphPutBytes(subfolder + "/" + filename, bytes, "application/pdf", token, filename, localPath);
+        }));
+    }
+
+    private byte[] readFileBytes(File f) throws IOException {
+        try (InputStream in = new FileInputStream(f)) {
+            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            byte[] buf = new byte[8192];
+            int r;
+            while ((r = in.read(buf)) != -1) bos.write(buf, 0, r);
+            return bos.toByteArray();
+        }
+    }
+
+    // Graph content URL za poljubno pot pod DigiLab (vsak segment URL-kodiran).
+    private String graphPathUrl(String relPath) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(Uri.encode(MS_FOLDER));
+        for (String seg : relPath.split("/")) {
+            if (seg.isEmpty()) continue;
+            sb.append("/").append(Uri.encode(seg));
+        }
+        return "https://graph.microsoft.com/v1.0/me/drive/root:/" + sb + ":/content";
+    }
+
+    private void graphPutBytes(final String relPath, byte[] bytes, String contentType,
+                               String token, final String filename, final String localPath) {
+        RequestBody body = RequestBody.create(bytes, MediaType.parse(contentType));
+        Request req = new Request.Builder()
+                .url(graphPathUrl(relPath))
+                .header("Authorization", "Bearer " + token)
+                .put(body)
+                .build();
+        http.newCall(req).enqueue(new Callback() {
+            @Override public void onFailure(@NonNull Call call, @NonNull IOException e) {
+                reportDone(filename, false, "Shranjeno lokalno; mreža: " + e.getMessage(), localPath);
+            }
+            @Override public void onResponse(@NonNull Call call, @NonNull Response resp) {
+                int code = resp.code();
+                resp.close();
+                if (code >= 200 && code < 300) {
+                    msalLastSync = new java.util.Date().toString();
+                    reportDone(filename, true, "Naloženo: " + MS_FOLDER + "/" + relPath, localPath);
+                } else {
+                    reportDone(filename, false, "Shranjeno lokalno; Graph napaka " + code, localPath);
                 }
             }
         });
