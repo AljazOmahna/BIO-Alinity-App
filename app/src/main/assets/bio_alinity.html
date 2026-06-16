@@ -919,9 +919,28 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
         <div class="fg"><label>Lot</label><input id="qcLot"></div>
         <div class="fg"><label>Nivoji</label><select id="qcLevels"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option></select></div>
       </div>
+      <div class="fg"><label>Povezava z zalogo (GTIN)</label><div style="font-size:11px;color:var(--text3);margin-bottom:4px">Označi kontrole/kalibratorje iz zaloge, ki pripadajo temu materialu — aplikacija samodejno potegne pravi lot in rok.</div><div id="qcGtinList" style="display:grid;grid-template-columns:1fr;gap:3px;max-height:160px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:6px"></div></div>
       <div class="fg"><label>Preiskave</label><div id="qcAssayList" style="display:grid;grid-template-columns:1fr 1fr;gap:4px;max-height:240px;overflow-y:auto"></div></div>
     </div>
     <div class="mf"><button class="btn btn-g" onclick="closeMo('qcModal')">Prekliči</button><button class="btn btn-a" onclick="saveQcMaterial()">Shrani</button></div>
+  </div>
+</div>
+
+<!-- QC VREDNOSTI MODAL (uradne Abbott vrednosti lota + preslikava preiskav/enot) -->
+<div class="mo" id="qcValModal">
+  <div class="modal" style="max-width:760px">
+    <div class="mh"><h3 id="qcValTitle">QC vrednosti</h3><button class="mc" onclick="closeMo('qcValModal')">&#10005;</button></div>
+    <div class="mb">
+      <div id="qcValInfo" style="font-size:13px;margin-bottom:10px"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+        <button class="btn btn-a btn-sm" onclick="importQcValuesUI()">&#11014;&#65039; Uvozi vrednosti (ZIP/XML)</button>
+        <button class="btn btn-g btn-sm" onclick="refreshQcFromOneDrive()">&#9729; Preveri OneDrive</button>
+        <button class="btn btn-g btn-sm" id="qcValPdfBtn" onclick="openQcValPdf()" style="display:none">&#128196; Odpri PDF</button>
+        <input type="file" id="qcValFile" accept=".xml,.zip" style="display:none" onchange="onQcValFileInput(this)">
+      </div>
+      <div id="qcValMapWrap"></div>
+    </div>
+    <div class="mf"><button class="btn btn-g" onclick="closeMo('qcValModal')">Zapri</button><button class="btn btn-a" id="qcValSaveBtn" onclick="saveQcMapping()" style="display:none">Shrani preslikavo</button></div>
   </div>
 </div>
 
@@ -1362,6 +1381,26 @@ const DEFAULT_OPERATORS = [
   {id:"47576",first:"AURELIJA",last:"ŽEKS"},{id:"47730",first:"PATRICIJA",last:"ŽIBERT"},{id:"36884",first:"ROZA MARJANA",last:"ŽNIDAR"}
 ];
 
+/* GTIN-i kontrol iz zaloge (Pregled BK) — povezava QC material → pravi lot */
+const QC_GTINS={
+  sPlusL1:'05391523440776', sPlusL2:'05391523440783', sPlusL3:'05391523440790',
+  ia:'05391523440745', mU:'05391523440752', pct:'00380740153946',
+  gfap:'00380740194864', uchl:'00380740194888'
+};
+/* Privzeti nabor QC materialov (z GTIN povezavo na zalogo) */
+function defaultQcMaterials(){return [
+  {name:'Multichem S Plus',type:'biochem',levels:3,lot:'',gtins:[QC_GTINS.sPlusL1,QC_GTINS.sPlusL2,QC_GTINS.sPlusL3],assays:[...DEFAULT_BIOCHEM]},
+  {name:'Multichem IA',type:'immuno',levels:2,lot:'',gtins:[QC_GTINS.ia],assays:[...DEFAULT_IMMUNO]},
+  {name:'Multichem U',type:'biochem',levels:2,lot:'',gtins:[QC_GTINS.mU],assays:['U-Albumin','U/CSF Proteini']},
+  {name:'Abbott PCT single QC',type:'single',levels:2,lot:'',gtins:[QC_GTINS.pct],assays:['PCT']},
+  {name:'GFAP single QC',type:'single',levels:2,lot:'',gtins:[QC_GTINS.gfap],assays:['GFAP']},
+  {name:'UCH-L1 single QC',type:'single',levels:2,lot:'',gtins:[QC_GTINS.uchl],assays:['UCHL']},
+  {name:'Myo single QC',type:'single',levels:2,lot:'',gtins:[],assays:['Mioglobin']},
+  {name:'Randox Humaser L1',type:'single',levels:1,lot:'',gtins:[],assays:[...DEFAULT_IMMUNO]},
+  {name:'Randox Humaser L2',type:'single',levels:1,lot:'',gtins:[],assays:[...DEFAULT_IMMUNO]},
+  {name:'Pool QC',type:'pool',levels:1,lot:'',gtins:[],assays:[]},
+];}
+
 let S = { assays:[], qcMaterials:[], operators:[], entries:[], currentAssayTab:'biochem',
   editingAssayIdx:null, editingQcIdx:null, editingOpIdx:null, wiz:{}, pinValue:'',
   ljRules:{'1_2s':true,'1_3s':true,'2_2s':true,'R_4s':true,'4_1s':true,'10_x':true},
@@ -1380,16 +1419,32 @@ function initState(){
   /* migracija starih zapisov: triannual → quarterly (3-mesečno) */
   (S.maintenanceLog||[]).forEach(m=>{if(m.type==='triannual')m.type='quarterly';});
   if(!S.assays.length) S.assays=[...DEFAULT_BIOCHEM.map(n=>({name:n,type:'biochem'})),...DEFAULT_IMMUNO.map(n=>({name:n,type:'immuno'}))];
-  if(!S.qcMaterials.length) S.qcMaterials=[
-    {name:'Multichem S Plus',type:'biochem',levels:2,lot:'LOT2024A',assays:[...DEFAULT_BIOCHEM]},
-    {name:'Multichem IA',type:'immuno',levels:2,lot:'LOT2024B',assays:[...DEFAULT_IMMUNO]},
-    {name:'Abbott PCT single QC',type:'single',levels:2,lot:'LOT2024C',assays:['PCT']},
-    {name:'Randox Humaser L1',type:'single',levels:1,lot:'LOT2024D',assays:[...DEFAULT_IMMUNO]},
-    {name:'Randox Humaser L2',type:'single',levels:1,lot:'LOT2024E',assays:[...DEFAULT_IMMUNO]},
-    {name:'Abbott GFAP/UCHL single QC',type:'single',levels:2,lot:'LOT2024F',assays:['GFAP','UCHL']},
-    {name:'Pool QC',type:'pool',levels:1,lot:'POOL2024',assays:[]},
-  ];
+  if(!S.qcMaterials.length) S.qcMaterials=defaultQcMaterials();
+  migrateQcMaterials();
+  if(!S.qcValues)S.qcValues={};
+  if(!S.qcAssayMap)S.qcAssayMap={};
+  if(!S.qcUnitMap)S.qcUnitMap={};
   if(!S.operators.length) S.operators=DEFAULT_OPERATORS;
+}
+/* Idempotentna nadgradnja QC materialov na shemo z GTIN povezavo + ločenima GFAP/UCHL + Multichem U/Myo.
+   Ne briše uporabniških dodatkov; ne dira S.entries (zgodovinski qcName ostane). */
+function migrateQcMaterials(){
+  if(S.qcMatSchema>=2)return;
+  const byName=n=>S.qcMaterials.find(q=>q.name===n);
+  S.qcMaterials.forEach(q=>{if(!Array.isArray(q.gtins))q.gtins=[];});
+  const sPlus=byName('Multichem S Plus');if(sPlus){sPlus.levels=3;sPlus.gtins=[QC_GTINS.sPlusL1,QC_GTINS.sPlusL2,QC_GTINS.sPlusL3];}
+  const ia=byName('Multichem IA');if(ia&&!ia.gtins.length)ia.gtins=[QC_GTINS.ia];
+  const pct=byName('Abbott PCT single QC');if(pct&&!pct.gtins.length)pct.gtins=[QC_GTINS.pct];
+  /* razdeli kombinirani GFAP/UCHL na ločena materiala */
+  const combo=byName('Abbott GFAP/UCHL single QC');
+  if(combo){const i=S.qcMaterials.indexOf(combo);
+    const repl=[{name:'GFAP single QC',type:'single',levels:2,lot:combo.lot||'',gtins:[QC_GTINS.gfap],assays:['GFAP']},
+                {name:'UCH-L1 single QC',type:'single',levels:2,lot:'',gtins:[QC_GTINS.uchl],assays:['UCHL']}];
+    S.qcMaterials.splice(i,1,...repl);}
+  else{const g=byName('GFAP single QC');if(g&&!g.gtins.length)g.gtins=[QC_GTINS.gfap];const u=byName('UCH-L1 single QC');if(u&&!u.gtins.length)u.gtins=[QC_GTINS.uchl];}
+  if(!byName('Multichem U'))S.qcMaterials.push({name:'Multichem U',type:'biochem',levels:2,lot:'',gtins:[QC_GTINS.mU],assays:['U-Albumin','U/CSF Proteini']});
+  if(!byName('Myo single QC'))S.qcMaterials.push({name:'Myo single QC',type:'single',levels:2,lot:'',gtins:[],assays:['Mioglobin']});
+  S.qcMatSchema=2;save();
 }
 function save(){localStorage.setItem('qclab_v2',JSON.stringify(S));}
 
@@ -1430,16 +1485,27 @@ function populateEntryQcMaterials(){
   const instrId=$i('entryInstr').value;const instr=INSTRUMENTS.find(i=>i.id===instrId);
   const list=$i('qcMatCheckList');if(!list)return;
   const qcs=instr?compatibleQcs(instr.type):S.qcMaterials;
-  list.innerHTML=qcs.map(q=>{const ri=S.qcMaterials.indexOf(q);
-    return '<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;cursor:pointer;background:var(--bg2)"><input type="checkbox" value="'+ri+'" data-qcname="'+q.name+'" data-lot="'+(q.lot||'')+'" data-levels="'+(q.levels||2)+'" class="qc-mat-cb" style="width:17px;height:17px;accent-color:var(--abbott-teal)"><span style="flex:1"><span style="font-weight:600;font-size:13px">'+q.name+'</span>'+(q.lot?'<span style="font-size:11px;color:var(--text3);margin-left:8px">Lot: '+q.lot+pregledLotHint(q)+'</span>':'')+'</span><span style="font-size:11px;color:var(--text3)">'+(q.levels||2)+' nivo(i)</span></label>';
+  list.innerHTML=qcs.map(q=>{const ri=S.qcMaterials.indexOf(q);const curLot=qcCurrentLot(q);
+    return '<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;cursor:pointer;background:var(--bg2)"><input type="checkbox" value="'+ri+'" data-qcname="'+q.name+'" data-lot="'+(curLot||'')+'" data-levels="'+(q.levels||2)+'" class="qc-mat-cb" style="width:17px;height:17px;accent-color:var(--abbott-teal)"><span style="flex:1"><span style="font-weight:600;font-size:13px">'+q.name+'</span>'+(curLot?'<span style="font-size:11px;color:var(--text3);margin-left:8px">Lot: '+curLot+pregledLotHint(q)+'</span>':pregledLotHint(q))+'</span><span style="font-size:11px;color:var(--text3)">'+(q.levels||2)+' nivo(i)</span></label>';
   }).join('');
 }
-/* Integration: show matching Pregled BK inventory lots for this QC material */
+/* Povezava QC material → zaloga po GTIN: vrne postavke v zalogi (FEFO, najprej najkrajši rok) */
+function qcStockLots(q){
+  try{
+    const gt=(q&&q.gtins)||[];if(!gt.length)return [];
+    const items=DB_PREGLED.inventory.filter(it=>gt.includes(it.gtin)).map(it=>({name:it.name,lot:it.lot,expiry:it.expiry,qty:it.qty,daysLeft:daysLeft(it.expiry)}));
+    items.sort((a,b)=>{const da=a.daysLeft,db=b.daysLeft;if(da===null)return 1;if(db===null)return -1;return da-db;});
+    return items;
+  }catch(e){return [];}
+}
+/* FEFO lot (v uporabi) za material — najprej v zalogi po GTIN, sicer ročni q.lot */
+function qcCurrentLot(q){const s=qcStockLots(q);return s.length?s[0].lot:(q&&q.lot)||'';}
+/* Integration: prikaži prave lote iz zaloge (po GTIN) z rokom in barvo */
 function pregledLotHint(q){
   try{
-    const matches=DB_PREGLED.inventory.filter(it=>(it.type==='control'||it.type==='calibrator')&&(it.name||'').toLowerCase().includes(q.name.toLowerCase().split(' ')[0]));
-    const lots=[...new Set(matches.map(m=>m.lot).filter(Boolean))];
-    if(lots.length) return ' <span style="color:var(--accent2)">&middot; zaloga: '+lots.slice(0,3).join(', ')+'</span>';
+    const s=qcStockLots(q);if(!s.length)return '';
+    const parts=s.slice(0,4).map(it=>{const cls=expiryClass(it.daysLeft);const col=cls==='r-exp'?'var(--red)':cls==='r-14'?'var(--orange)':cls==='r-28'?'var(--yellow)':'var(--accent2)';return '<span style="color:'+col+'">'+it.lot+' ('+fmtExp(it.expiry)+')</span>';}).join(', ');
+    return ' <span style="color:var(--text3)">&middot; zaloga: </span>'+parts;
   }catch(e){}
   return '';
 }
@@ -1566,13 +1632,15 @@ function checkWestgard(pts,rules){
   return viol;
 }
 function _drawVLine(ctx,x,yTop,yBot,vl){const color=vl.type==='cal'?'#f97316':vl.type==='note'?'#8b5cf6':'#dc2626';const dash=vl.type==='cal'?[6,3]:vl.type==='note'?[3,3]:[];ctx.save();ctx.beginPath();ctx.strokeStyle=color;ctx.lineWidth=2;ctx.setLineDash(dash);ctx.moveTo(x,yTop);ctx.lineTo(x,yBot);ctx.stroke();ctx.setLineDash([]);ctx.beginPath();ctx.moveTo(x-6,yTop);ctx.lineTo(x+6,yTop);ctx.lineTo(x,yTop+10);ctx.closePath();ctx.fillStyle=color;ctx.fill();ctx.save();ctx.translate(x+4,yTop+32);ctx.rotate(Math.PI/2);ctx.fillStyle=color;ctx.font='bold 9px system-ui';ctx.textAlign='left';ctx.fillText((vl.type==='cal'?'KAL':'QC')+(vl.lotNum?' '+vl.lotNum:''),0,0);ctx.restore();ctx.restore();}
-function drawLJCanvas(canvasId,pts,title,level,statsContainerId,vlines){
+/* formatiraj koncentracijo glede na velikost (smiselno število decimalk) */
+function _fmtConc(v){if(!isFinite(v))return '';const a=Math.abs(v);const d=a>=100?0:a>=10?1:a>=1?2:a>=0.1?3:4;return v.toFixed(d);}
+function drawLJCanvas(canvasId,pts,title,level,statsContainerId,vlines,qcv){
   const canvas=$i(canvasId);if(!canvas)return;const ctx=canvas.getContext('2d');
   const W=canvas.offsetWidth||700,H=canvas.height||380;canvas.width=W;ctx.clearRect(0,0,W,H);
   const pad={l:58,r:24,t:30,b:56},cH=H-pad.t-pad.b,cW=W-pad.l-pad.r,midY=pad.t+cH/2;
   const sdToY=v=>midY-(v/4.5)*(cH/2);
   [[4.5,3,'rgba(180,20,20,0.07)'],[3,2,'rgba(245,158,11,0.1)'],[2,-2,'rgba(16,185,129,0.06)'],[-2,-3,'rgba(245,158,11,0.1)'],[-3,-4.5,'rgba(180,20,20,0.07)']].forEach(([t,b,c])=>{ctx.fillStyle=c;ctx.fillRect(pad.l,sdToY(t),cW,sdToY(b)-sdToY(t));});
-  [-4,-3,-2,-1,0,1,2,3,4].forEach(sd=>{const y=sdToY(sd);ctx.beginPath();ctx.strokeStyle=sd===0?'rgba(0,48,135,0.4)':Math.abs(sd)>=3?'rgba(220,38,38,0.55)':Math.abs(sd)===2?'rgba(245,158,11,0.55)':'rgba(0,0,0,0.1)';ctx.lineWidth=sd===0?2:Math.abs(sd)>=3?1.5:1;ctx.setLineDash(sd===0?[]:[5,3]);ctx.moveTo(pad.l,y);ctx.lineTo(pad.l+cW,y);ctx.stroke();ctx.setLineDash([]);ctx.fillStyle=Math.abs(sd)>=3?'#dc2626':Math.abs(sd)===2?'#d97706':'#6b7280';ctx.font='10px system-ui';ctx.textAlign='right';ctx.fillText(sd===0?'Mean':sd>0?'+'+sd+'SD':sd+'SD',pad.l-4,y+4);});
+  [-4,-3,-2,-1,0,1,2,3,4].forEach(sd=>{const y=sdToY(sd);ctx.beginPath();ctx.strokeStyle=sd===0?'rgba(0,48,135,0.4)':Math.abs(sd)>=3?'rgba(220,38,38,0.55)':Math.abs(sd)===2?'rgba(245,158,11,0.55)':'rgba(0,0,0,0.1)';ctx.lineWidth=sd===0?2:Math.abs(sd)>=3?1.5:1;ctx.setLineDash(sd===0?[]:[5,3]);ctx.moveTo(pad.l,y);ctx.lineTo(pad.l+cW,y);ctx.stroke();ctx.setLineDash([]);ctx.fillStyle=Math.abs(sd)>=3?'#dc2626':Math.abs(sd)===2?'#d97706':'#6b7280';ctx.font='10px system-ui';ctx.textAlign='right';ctx.fillText(sd===0?'Mean':sd>0?'+'+sd+'SD':sd+'SD',pad.l-4,y+4);if(qcv&&isFinite(qcv.mean)&&isFinite(qcv.sd)){ctx.textAlign='left';ctx.fillStyle='#9ca3af';ctx.font='8px system-ui';ctx.fillText(_fmtConc(qcv.mean+sd*qcv.sd),pad.l+3,y-2);}});
   ctx.fillStyle='#003087';ctx.font='bold 12px system-ui';ctx.textAlign='center';ctx.fillText(title,W/2,18);
   if(!pts.length){ctx.fillStyle='#9ca3af';ctx.font='13px system-ui';ctx.textAlign='center';ctx.fillText('Ni podatkov za izbrano kombinacijo.',W/2,midY);if(vlines&&vlines.length){vlines.forEach((vl,vi)=>{const x=pad.l+cW*0.1+vi*(cW*0.15);_drawVLine(ctx,x,pad.t,pad.t+cH,vl);});}return;}
   const n=pts.length,step=Math.max(22,Math.min(cW/(n+1),56));
@@ -1583,7 +1651,7 @@ function drawLJCanvas(canvasId,pts,title,level,statsContainerId,vlines){
   ctx.beginPath();ctx.strokeStyle='rgba(0,48,135,0.25)';ctx.lineWidth=1.5;ctx.setLineDash([]);pts.forEach((p,i)=>{if(i===0)ctx.moveTo(xOf(i),sdToY(p.sdV));else ctx.lineTo(xOf(i),sdToY(p.sdV));});ctx.stroke();
   pts.forEach((p,i)=>{const x=xOf(i),y=sdToY(p.sdV),abs=Math.abs(p.sdV);let color=abs>=3?'#dc2626':abs>=2?'#f59e0b':'#059669',ring=null;if(viol[i]){ring=viol[i].color;if(ring==='#dc2626')color='#dc2626';}if(ring){ctx.beginPath();ctx.arc(x,y,9,0,Math.PI*2);ctx.strokeStyle=ring;ctx.lineWidth=2.5;ctx.setLineDash([]);ctx.stroke();}ctx.beginPath();ctx.arc(x,y,5.5,0,Math.PI*2);ctx.fillStyle=color;ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.stroke();if(viol[i]){ctx.fillStyle=ring;ctx.font='bold 8px system-ui';ctx.textAlign='center';ctx.fillText(viol[i].rule,x,y-12);}if(p.note){ctx.fillStyle='#6366f1';ctx.font='9px system-ui';ctx.textAlign='center';ctx.fillText('📝',x+8,y-6);}ctx.save();ctx.translate(x,H-pad.b+10);ctx.rotate(-Math.PI/3.5);ctx.fillStyle='#6b7280';ctx.font='8px system-ui';ctx.textAlign='right';ctx.fillText(p.dt.toLocaleDateString('sl-SI',{day:'2-digit',month:'2-digit'}),0,0);ctx.restore();});
   canvas._pts=pts.map((p,i)=>({...p,x:xOf(i),y:sdToY(p.sdV)}));
-  if(statsContainerId){const el=$i(statsContainerId);if(el){const n2=pts.length,cnt2sd=pts.filter(p=>Math.abs(p.sdV)>=2&&Math.abs(p.sdV)<3).length,cnt3sd=pts.filter(p=>Math.abs(p.sdV)>=3).length,cntOk=n2-cnt2sd-cnt3sd,violCount=Object.keys(viol).length;el.innerHTML='<div style="display:flex;gap:12px;flex-wrap:wrap;font-size:12px;padding:8px 0;align-items:center"><span><strong>N:</strong> '+n2+'</span><span><strong>OK:</strong> <span style="color:var(--success)">'+cntOk+'</span></span><span><strong>±2SD:</strong> <span style="color:var(--warning)">'+cnt2sd+'</span></span><span><strong>±3SD:</strong> <span style="color:var(--danger)">'+cnt3sd+'</span></span><span><strong>Westgard:</strong> <span style="color:var(--danger)">'+violCount+'</span></span></div>';}}
+  if(statsContainerId){const el=$i(statsContainerId);if(el){const n2=pts.length,cnt2sd=pts.filter(p=>Math.abs(p.sdV)>=2&&Math.abs(p.sdV)<3).length,cnt3sd=pts.filter(p=>Math.abs(p.sdV)>=3).length,cntOk=n2-cnt2sd-cnt3sd,violCount=Object.keys(viol).length;let qcvHtml='';if(qcv&&isFinite(qcv.mean)){qcvHtml='<span style="border-left:1px solid var(--border);padding-left:12px"><strong>Mean:</strong> '+_fmtConc(qcv.mean)+' '+(qcv.unit||'')+'</span><span><strong>SD:</strong> '+_fmtConc(qcv.sd)+' <span class="muted">(proizv. '+_fmtConc(qcv.sdMfr)+')</span></span><span class="muted">lot '+qcv.lot+'</span>';}el.innerHTML='<div style="display:flex;gap:12px;flex-wrap:wrap;font-size:12px;padding:8px 0;align-items:center"><span><strong>N:</strong> '+n2+'</span><span><strong>OK:</strong> <span style="color:var(--success)">'+cntOk+'</span></span><span><strong>±2SD:</strong> <span style="color:var(--warning)">'+cnt2sd+'</span></span><span><strong>±3SD:</strong> <span style="color:var(--danger)">'+cnt3sd+'</span></span><span><strong>Westgard:</strong> <span style="color:var(--danger)">'+violCount+'</span></span>'+qcvHtml+'</div>';}}
 }
 function buildVLines(qcObj){if(!qcObj)return [];const lots=qcObj.lotHistory||[];return lots.slice(1).filter(l=>l.date).map(l=>({dt:new Date(l.date+'T00:00:00'),type:l.type||'qc',lotNum:l.lot||'',note:l.note||''}));}
 function getAssayRules(qcMat,assay,level){const key=('wg_'+qcMat+'_'+assay+'_'+level).replace(/[^a-zA-Z0-9_]/g,'_');return S.assayRules?.[key]||{...S.ljRules};}
@@ -1597,7 +1665,9 @@ function renderLJ(){
   S.entries.filter(e=>e.qcName===qcMat&&e.levels?.includes(level)).forEach(e=>{const res=(e.results||[]).find(r=>r.assay===assay&&r.level===level);const sd=res?.sd||'ok';pts.push({dt:new Date(e.datetime),sdV:sdToVal(sd),sd,note:res?.note||'',instrId:e.instrId,operatorId:e.operatorId,entryId:e.id});});
   pts.sort((a,b)=>a.dt-b.dt);
   const qcObj=S.qcMaterials.find(q=>q.name===qcMat),vlines=buildVLines(qcObj);
-  const orig=S.ljRules;S.ljRules=perRules;drawLJCanvas('ljCanvas',pts,assay+' – '+qcMat+' – Nivo '+level.replace('L',''),level,'ljStats',vlines);S.ljRules=orig;
+  const qcv=resolveQcValue(qcObj,assay,level);
+  const title=assay+' – '+qcMat+' – Nivo '+level.replace('L','')+(qcv?(' ['+qcv.unit+']'):'');
+  const orig=S.ljRules;S.ljRules=perRules;drawLJCanvas('ljCanvas',pts,title,level,'ljStats',vlines,qcv);S.ljRules=orig;
 }
 
 /* ===== LJ MULTI ===== */
@@ -1613,7 +1683,7 @@ function renderLJMulti(){
     wrap.appendChild(div);
     const pts=[];S.entries.filter(e=>e.qcName===qcMat&&e.levels?.includes(lvl)).forEach(e=>{const res=(e.results||[]).find(r=>r.assay===assay&&r.level===lvl);const sd=res?.sd||'ok';pts.push({dt:new Date(e.datetime),sdV:sdToVal(sd),sd,note:res?.note||'',instrId:e.instrId,operatorId:e.operatorId});});
     pts.sort((a,b)=>a.dt-b.dt);
-    setTimeout(()=>{const c=$i(cid);if(!c)return;c.height=260;const qcObjM=S.qcMaterials.find(q=>q.name===qcMat);drawLJCanvas(cid,pts,assay+' – '+qcMat+' – Nivo '+lvl.replace('L',''),lvl,sid,buildVLines(qcObjM));},50);
+    setTimeout(()=>{const c=$i(cid);if(!c)return;c.height=260;const qcObjM=S.qcMaterials.find(q=>q.name===qcMat);const qcvM=resolveQcValue(qcObjM,assay,lvl);drawLJCanvas(cid,pts,assay+' – '+qcMat+' – Nivo '+lvl.replace('L','')+(qcvM?(' ['+qcvM.unit+']'):''),lvl,sid,buildVLines(qcObjM),qcvM);},50);
   });});
 }
 
@@ -1625,10 +1695,19 @@ function deleteAssay(i){if(!confirm('Izbriši?'))return;S.assays.splice(i,1);sav
 function saveAssay(){const n=$i('assayName').value.trim(),t=$i('assayType').value;if(!n){notify('Vnesite naziv','warning');return;}if(S.editingAssayIdx!=null)S.assays[S.editingAssayIdx]={name:n,type:t};else S.assays.push({name:n,type:t});save();closeMo('assayModal');renderAssays();notify('Preiskava shranjena','success');}
 
 /* ===== QC MATERIALS ===== */
-function renderQcMats(){$i('qcMatBody').innerHTML=S.qcMaterials.map((q,i)=>'<tr><td><strong>'+q.name+'</strong></td><td><span class="badge badge-gray">'+q.type+'</span></td><td>'+q.levels+'</td><td>'+(q.lot||'–')+'</td><td style="font-size:12px">'+((q.assays||[]).slice(0,3).join(', ')+(q.assays?.length>3?' +'+(q.assays.length-3):''))+'</td><td><button class="btn btn-outline btn-sm" onclick="openQcModal('+i+')">✏️</button> <button class="btn btn-g btn-sm" onclick="openLotHistory('+i+')">📋</button> <button class="btn btn-d btn-sm" onclick="deleteQcMat('+i+')">🗑️</button></td></tr>').join('')||'<tr><td colspan="6" class="empty">Ni materialov.</td></tr>';}
-function openQcModal(idx){S.editingQcIdx=idx??null;$i('qcModalTitle').textContent=idx!=null?'Uredi QC material':'Nov QC material';if(idx!=null){const q=S.qcMaterials[idx];$i('qcName').value=q.name;$i('qcType').value=q.type;$i('qcLot').value=q.lot||'';$i('qcLevels').value=q.levels||2;}else{$i('qcName').value='';$i('qcType').value='biochem';$i('qcLot').value='';$i('qcLevels').value=2;}const sel=idx!=null?(S.qcMaterials[idx].assays||[]):[];$i('qcAssayList').innerHTML=S.assays.map(a=>'<label class="assay-check"><input type="checkbox" value="'+a.name+'" '+(sel.includes(a.name)?'checked':'')+'> '+a.name+' <span style="font-size:10px;color:var(--text3)">('+(a.type==='biochem'?'c':'i')+')</span></label>').join('');showMo('qcModal');}
+function renderQcMats(){$i('qcMatBody').innerHTML=S.qcMaterials.map((q,i)=>{const curLot=qcCurrentLot(q);const linked=(q.gtins||[]).length;return '<tr><td><strong>'+q.name+'</strong></td><td><span class="badge badge-gray">'+q.type+'</span></td><td>'+q.levels+'</td><td>'+(curLot||'–')+(linked?' <span style="font-size:10px;color:var(--accent2)">🔗</span>':'')+'</td><td style="font-size:12px">'+((q.assays||[]).slice(0,3).join(', ')+(q.assays?.length>3?' +'+(q.assays.length-3):''))+'</td><td><button class="btn btn-outline btn-sm" onclick="openQcModal('+i+')">✏️</button> <button class="btn btn-teal btn-sm" onclick="openQcValuesModal('+i+')">📊</button> <button class="btn btn-g btn-sm" onclick="openLotHistory('+i+')">📋</button> <button class="btn btn-d btn-sm" onclick="deleteQcMat('+i+')">🗑️</button></td></tr>';}).join('')||'<tr><td colspan="6" class="empty">Ni materialov.</td></tr>';}
+/* GTIN-povezovalnik: seznam različnih kontrol+kalibratorjev iz zaloge s kljukicami */
+function renderQcGtinPicker(sel){
+  sel=sel||[];const seen={};const opts=[];
+  (DB_PREGLED.inventory||[]).forEach(it=>{if((it.type==='control'||it.type==='calibrator')&&it.gtin&&!seen[it.gtin]){seen[it.gtin]=1;opts.push({gtin:it.gtin,name:it.name,type:it.type});}});
+  /* vključi tudi že izbrane GTIN-e, ki jih (še) ni v zalogi */
+  sel.forEach(g=>{if(!seen[g]){seen[g]=1;opts.push({gtin:g,name:'(ni v zalogi)',type:''});}});
+  opts.sort((a,b)=>a.name.localeCompare(b.name));
+  $i('qcGtinList').innerHTML=opts.length?opts.map(o=>'<label class="assay-check" style="display:flex;align-items:center;gap:8px"><input type="checkbox" class="qc-gtin-cb" value="'+o.gtin+'" '+(sel.includes(o.gtin)?'checked':'')+'> <span style="flex:1">'+o.name+(o.type?' <span style="font-size:10px;color:var(--text3)">'+(o.type==='control'?'kontrola':'kalibrator')+'</span>':'')+'</span><span style="font-size:10px;color:var(--text3)">'+o.gtin+'</span></label>').join(''):'<div class="muted" style="font-size:12px">Ni kontrol v zalogi (sinhronizirajte z Zebro).</div>';
+}
+function openQcModal(idx){S.editingQcIdx=idx??null;$i('qcModalTitle').textContent=idx!=null?'Uredi QC material':'Nov QC material';let sel=[],gsel=[];if(idx!=null){const q=S.qcMaterials[idx];$i('qcName').value=q.name;$i('qcType').value=q.type;$i('qcLot').value=q.lot||'';$i('qcLevels').value=q.levels||2;sel=q.assays||[];gsel=q.gtins||[];}else{$i('qcName').value='';$i('qcType').value='biochem';$i('qcLot').value='';$i('qcLevels').value=2;}$i('qcAssayList').innerHTML=S.assays.map(a=>'<label class="assay-check"><input type="checkbox" value="'+a.name+'" '+(sel.includes(a.name)?'checked':'')+'> '+a.name+' <span style="font-size:10px;color:var(--text3)">('+(a.type==='biochem'?'c':'i')+')</span></label>').join('');renderQcGtinPicker(gsel);showMo('qcModal');}
 function deleteQcMat(i){if(!confirm('Izbriši?'))return;S.qcMaterials.splice(i,1);save();renderQcMats();notify('Material izbrisan');}
-function saveQcMaterial(){const name=$i('qcName').value.trim(),type=$i('qcType').value,lot=$i('qcLot').value.trim(),levels=parseInt($i('qcLevels').value);const assays=[...$i('qcAssayList').querySelectorAll('input:checked')].map(el=>el.value);if(!name){notify('Vnesite naziv','warning');return;}const obj={name,type,lot,levels,assays};if(S.editingQcIdx!=null)S.qcMaterials[S.editingQcIdx]=obj;else S.qcMaterials.push(obj);save();closeMo('qcModal');renderQcMats();notify('Material shranjen','success');}
+function saveQcMaterial(){const name=$i('qcName').value.trim(),type=$i('qcType').value,lot=$i('qcLot').value.trim(),levels=parseInt($i('qcLevels').value);const assays=[...$i('qcAssayList').querySelectorAll('input:checked')].map(el=>el.value);const gtins=[...$i('qcGtinList').querySelectorAll('.qc-gtin-cb:checked')].map(el=>el.value);if(!name){notify('Vnesite naziv','warning');return;}const obj={name,type,lot,levels,gtins,assays};if(S.editingQcIdx!=null){const old=S.qcMaterials[S.editingQcIdx];if(old&&old.lotHistory)obj.lotHistory=old.lotHistory;S.qcMaterials[S.editingQcIdx]=obj;}else S.qcMaterials.push(obj);save();closeMo('qcModal');renderQcMats();notify('Material shranjen','success');}
 
 /* ===== OPERATORS ===== */
 function renderOperators(){const q=($i('opSearch')?.value||'').toLowerCase();const filtered=S.operators.filter(o=>(o.first+' '+o.last+' '+o.id).toLowerCase().includes(q));$i('operatorBody').innerHTML=filtered.map(o=>{const ri=S.operators.indexOf(o);return '<tr><td><span class="badge badge-blue">'+o.id+'</span></td><td>'+o.first+'</td><td>'+o.last+'</td><td><button class="btn btn-outline btn-sm" onclick="openOperatorModal('+ri+')">✏️</button> <button class="btn btn-d btn-sm" onclick="deleteOperator('+ri+')">🗑️</button></td></tr>';}).join('')||'<tr><td colspan="4" class="empty">Ni rezultatov.</td></tr>';}
@@ -1651,6 +1730,173 @@ function renderLotHistory(qc){const lots=qc.lotHistory||[{lot:qc.lot||'–',date
 function toggleLotTypeFields(){const type=$i('newLotType').value;const numWrap=$i('newLotNumWrap');if(type==='note'){numWrap.style.display='none';}else{numWrap.style.display='';$i('newLotNumLabel').textContent=type==='cal'?'Nova lot številka kalibratorja':'Nova lot številka QC kontrole';}}
 function addLot(){const type=$i('newLotType').value,lot=$i('newLotNum').value.trim(),date=$i('newLotDate').value,note=$i('newLotNote').value.trim();if(type!=='note'&&!lot){notify('Vpišite lot številko','warning');return;}if(!date){notify('Izberite datum','warning');return;}const qc=S.qcMaterials[currentLotQcIdx];if(!qc.lotHistory)qc.lotHistory=[{lot:qc.lot||'–',date:'',type:'qc',note:'Začetni lot'}];qc.lotHistory.push({lot:lot||'–',date,type,note});if(type==='qc'&&lot)qc.lot=lot;save();renderLotHistory(qc);renderQcMats();notify('Vnos zabeležen','success');$i('newLotNum').value='';$i('newLotNote').value='';}
 function deleteLot(i){if(!confirm('Izbriši lot?'))return;const qc=S.qcMaterials[currentLotQcIdx];if(qc.lotHistory)qc.lotHistory.splice(i,1);save();renderLotHistory(qc);notify('Lot izbrisan');}
+
+/* ===== QC VREDNOSTI (uradne Abbott vrednosti lotov: XML + PDF) ===== */
+/* Naš SD = 2/3 proizvajalčevega (Mean nespremenjen): naš ±3SD = proizvajalčev ±2SD (ožje meje). */
+const QC_SD_FACTOR=2/3;
+/* normaliziraj lot za ujemanje med zalogo (10-mesten z nivojsko končnico) in XML (9-mesten base) */
+function qcLotKey(lot){return String(lot==null?'':lot).trim();}
+function qcFindValues(lot){
+  lot=qcLotKey(lot);if(!lot||!S.qcValues)return null;
+  if(S.qcValues[lot])return S.qcValues[lot];
+  if(lot.length>=10&&S.qcValues[lot.slice(0,-1)])return S.qcValues[lot.slice(0,-1)];
+  const keys=Object.keys(S.qcValues);
+  const m=keys.find(k=>k&&(lot.startsWith(k)||k.startsWith(lot)));
+  return m?S.qcValues[m]:null;
+}
+/* Razčleni Abbott ADD/Architect QC XML → {control,lot,expiry,fileVersion,fileDate,assays:{num:{name,levels:{"1":{units:{unit:{mean,sdMfr,sd,low,high}}}}}}} */
+function parseAbbottQcXml(xmlText){
+  const doc=new DOMParser().parseFromString(xmlText,'text/xml');
+  if(doc.getElementsByTagName('parsererror').length)throw new Error('Neveljaven XML');
+  const ctrl=doc.getElementsByTagName('Control')[0];
+  if(!ctrl)throw new Error('XML brez <Control>');
+  const root=doc.documentElement;
+  const out={control:ctrl.getAttribute('Name')||'',lot:qcLotKey(ctrl.getAttribute('LotNumber')),
+    expiry:ctrl.getAttribute('ExpirationDate')||'',
+    fileVersion:(root&&root.getAttribute('FileVersionNumber'))||'',
+    fileDate:(root&&root.getAttribute('FileCreationDate'))||'',assays:{}};
+  if(!out.lot)throw new Error('XML brez LotNumber');
+  const assays=ctrl.getElementsByTagName('Assay');
+  for(let i=0;i<assays.length;i++){const a=assays[i];
+    const num=a.getAttribute('Number'),name=a.getAttribute('Name')||num;const levels={};
+    const units=a.getElementsByTagName('DataUnit');
+    for(let j=0;j<units.length;j++){const du=units[j];const unit=du.getAttribute('Unit')||'';
+      const cls=du.getElementsByTagName('ControlLevel');
+      for(let k=0;k<cls.length;k++){const cl=cls[k];const lv=cl.getAttribute('Name');
+        const mean=parseFloat(cl.getAttribute('Mean')),sdMfr=parseFloat(cl.getAttribute('StandardDeviation'));
+        const low=parseFloat(cl.getAttribute('LowRangeValue')),high=parseFloat(cl.getAttribute('HighRangeValue'));
+        if(!levels[lv])levels[lv]={units:{}};
+        levels[lv].units[unit]={mean,sdMfr,sd:isNaN(sdMfr)?NaN:sdMfr*QC_SD_FACTOR,low,high};
+      }
+    }
+    out.assays[num]={name,levels};
+  }
+  return out;
+}
+/* shrani razčlenjene vrednosti v bazo (po lotu) */
+function storeQcValues(parsed,source){
+  if(!S.qcValues)S.qcValues={};
+  let assayCount=0;for(const k in parsed.assays)assayCount++;
+  S.qcValues[parsed.lot]={control:parsed.control,lot:parsed.lot,expiry:parsed.expiry,
+    fileVersion:parsed.fileVersion,fileDate:parsed.fileDate,assays:parsed.assays,
+    assayCount,importedAt:new Date().toISOString(),source:source||'manual'};
+  save();
+  return {lot:parsed.lot,control:parsed.control,assays:assayCount};
+}
+/* uvozi XML besedilo (parsiraj+shrani) — skupna pot za ročni in samodejni uvoz */
+function importQcXmlText(xmlText,source){
+  const parsed=parseAbbottQcXml(xmlText);return storeQcValues(parsed,source);
+}
+/* razreši uradno vrednost za (material, app-preiskava, nivo) prek preslikav */
+function resolveQcValue(q,assay,level){
+  if(!q)return null;const vals=qcFindValues(qcCurrentLot(q));if(!vals)return null;
+  const amap=(S.qcAssayMap&&S.qcAssayMap[q.name])||{};const num=amap[assay];if(!num)return null;
+  const a=vals.assays[num];if(!a)return null;
+  const lvKey=String(level==null?'':level).replace(/^L/i,'');const lv=a.levels[lvKey];if(!lv)return null;
+  const umap=(S.qcUnitMap&&S.qcUnitMap[q.name])||{};
+  const unit=umap[assay]||Object.keys(lv.units)[0];
+  const u=lv.units[unit]||lv.units[Object.keys(lv.units)[0]];if(!u)return null;
+  return {mean:u.mean,sd:u.sd,sdMfr:u.sdMfr,low:u.low,high:u.high,unit:unit,lot:vals.lot,fileVersion:vals.fileVersion};
+}
+
+/* --- QC vrednosti: UI modal + preslikava preiskav/enot --- */
+let qcValIdx=null, qcValCur=null;
+const QC_SYN={'Glukoza':'glucose','Kalij':'potassium','Natrij':'sodium','Klorid':'chloride','Kalcij':'calcium','Magnezij':'magnesium','Fosfat':'phosphor','Kreatinin':'creatinine','Sečnina':'urea nitrogen','Železo':'iron','Holesterol':'cholesterol, total','HDL-Holesterol':'cholesterol, hdl','LDL-Holesterol':'cholesterol, ldl','Trigliceridi':'triglyc','Proteini':'protein','Albumini':'albumin','U-Albumin':'microalbumin','U/CSF Proteini':'protein','Amilaza':'amylase','Lipaza':'lipase','Laktat':'lactate','Urati':'uric acid','CRP':'crp','Bilirubin direktni':'bilirubin direct','Bilirubin totalni':'bilirubin, total','GGT':'glutamyltransferase','AST':'aspartate','ALT':'alanine','LDH':'lactate dehydrogenase','CK':'creatine kinase','CK-MB':'ck-mb','Alkalna fosfataza':'alkaline phosphatase','CO2':'carbon dioxide','UIBC':'uibc','Etanol':'ethanol','Digoksin':'digoxin','Teofilin':'theophylline','Vankomicin':'vancomycin','Gentamicin':'gentamicin','Troponin':'troponin','Mioglobin':'myoglobin','PCT':'procalcitonin','Beta-HCG':'hcg','NT-ProBNP':'nt-probnp','Feritin':'ferritin'};
+function qcSuggestAbbott(appAssay,vals){
+  const tok=(QC_SYN[appAssay]||appAssay).toLowerCase();const al=appAssay.toLowerCase();
+  let best='';for(const num in vals.assays){const nm=vals.assays[num].name.toLowerCase();if(nm.includes(tok)||nm.includes(al)){best=num;break;}}
+  return best;
+}
+function qcUnitsForAssay(vals,num){const set={};const a=vals.assays[num];if(!a)return [];for(const lv in a.levels)for(const u in a.levels[lv].units)set[u]=1;return Object.keys(set);}
+function openQcValuesModal(idx){
+  qcValIdx=idx;const q=S.qcMaterials[idx];$i('qcValTitle').textContent='QC vrednosti – '+q.name;
+  const lot=qcCurrentLot(q);qcValCur=qcFindValues(lot);
+  let info='<div>Material: <strong>'+q.name+'</strong> · trenutni lot: <strong>'+(lot||'–')+'</strong></div>';
+  if(qcValCur){info+='<div style="color:var(--accent2);margin-top:4px">✓ Uradne vrednosti: '+qcValCur.control+' · lot '+qcValCur.lot+' · '+(qcValCur.assayCount||Object.keys(qcValCur.assays).length)+' preiskav · verzija '+(qcValCur.fileVersion||'?')+' · vir '+(qcValCur.source||'?')+'</div>';}
+  else{info+='<div class="muted" style="margin-top:4px">Ni uvoženih uradnih vrednosti za ta lot. Uvozite ZIP/XML.</div>';}
+  $i('qcValInfo').innerHTML=info;
+  $i('qcValPdfBtn').style.display=(qcValCur&&qcValCur.pdfPath)?'':'none';
+  renderQcValMapping(q);
+  showMo('qcValModal');
+}
+function renderQcValMapping(q){
+  const wrap=$i('qcValMapWrap');
+  if(!qcValCur){wrap.innerHTML='';$i('qcValSaveBtn').style.display='none';return;}
+  const amap=(S.qcAssayMap&&S.qcAssayMap[q.name])||{};const umap=(S.qcUnitMap&&S.qcUnitMap[q.name])||{};
+  const abOpts=Object.keys(qcValCur.assays).map(num=>({num,name:qcValCur.assays[num].name})).sort((a,b)=>a.name.localeCompare(b.name));
+  let html='<div style="font-size:12px;color:var(--text3);margin-bottom:6px">Poveži preiskave v aplikaciji z Abbott preiskavami in izberi enoto:</div><div class="tbl-wrap"><table><thead><tr><th>Preiskava</th><th>Abbott preiskava</th><th>Enota</th></tr></thead><tbody>';
+  (q.assays||[]).forEach((a,i)=>{
+    const cur=amap[a]||qcSuggestAbbott(a,qcValCur);
+    const opts='<option value="">—</option>'+abOpts.map(o=>'<option value="'+o.num+'" '+(o.num===cur?'selected':'')+'>'+_repEsc(o.name)+'</option>').join('');
+    const units=cur?qcUnitsForAssay(qcValCur,cur):[];const curU=umap[a]||units[0]||'';
+    const uOpts=units.map(u=>'<option value="'+u+'" '+(u===curU?'selected':'')+'>'+u+'</option>').join('')||'<option value="">—</option>';
+    html+='<tr><td style="font-size:13px"><strong>'+_repEsc(a)+'</strong></td><td><select class="qcmap-ab" data-assay="'+_repEsc(a)+'" data-i="'+i+'" onchange="qcOnAbbottChange('+i+')" style="font-size:12px;max-width:300px">'+opts+'</select></td><td><select class="qcmap-unit" data-i="'+i+'" style="font-size:12px">'+uOpts+'</select></td></tr>';
+  });
+  html+='</tbody></table></div>';wrap.innerHTML=html;$i('qcValSaveBtn').style.display='';
+}
+function qcOnAbbottChange(i){
+  const ab=document.querySelector('.qcmap-ab[data-i="'+i+'"]');const us=document.querySelector('.qcmap-unit[data-i="'+i+'"]');
+  if(!ab||!us||!qcValCur)return;const units=ab.value?qcUnitsForAssay(qcValCur,ab.value):[];
+  us.innerHTML=units.map(u=>'<option value="'+u+'">'+u+'</option>').join('')||'<option value="">—</option>';
+}
+function saveQcMapping(){
+  if(qcValIdx==null)return;const q=S.qcMaterials[qcValIdx];
+  if(!S.qcAssayMap)S.qcAssayMap={};if(!S.qcUnitMap)S.qcUnitMap={};
+  const am={},um={};
+  document.querySelectorAll('.qcmap-ab').forEach(sel=>{const a=sel.dataset.assay;if(sel.value){am[a]=sel.value;}});
+  document.querySelectorAll('.qcmap-unit').forEach(sel=>{const i=sel.dataset.i;const ab=document.querySelector('.qcmap-ab[data-i="'+i+'"]');if(ab&&ab.value&&sel.value){um[ab.dataset.assay]=sel.value;}});
+  S.qcAssayMap[q.name]=am;S.qcUnitMap[q.name]=um;save();
+  notify('Preslikava shranjena ✓','success');
+}
+/* uvoz: na tablici prek Java (zip/xml), v brskalniku prek <input type=file> (xml) */
+function importQcValuesUI(){
+  if(_hasBridge()&&AndroidBridge.pickQcValuesFile){try{AndroidBridge.pickQcValuesFile();notify('Izberite datoteko…','ok');return;}catch(e){}}
+  $i('qcValFile').click();
+}
+function onQcValFileInput(input){
+  const f=input.files[0];if(!f)return;const lower=f.name.toLowerCase();
+  if(lower.endsWith('.xml')){const r=new FileReader();r.onload=e=>{try{const res=importQcXmlText(e.target.result,'manual');afterQcImport(res);}catch(err){notify('Napaka XML: '+err.message,'error');}};r.readAsText(f);}
+  else if(lower.endsWith('.zip')){notify('ZIP uvoz je na voljo na tablici; v brskalniku uvozite .xml','warn');}
+  else notify('Izberite .xml ali .zip','warn');
+  input.value='';
+}
+function afterQcImport(res){
+  notify('Uvoženo: '+res.control+' · lot '+res.lot+' · '+res.assays+' preiskav ✓','success');
+  if(qcValIdx!=null)openQcValuesModal(qcValIdx);renderQcMats();
+}
+/* callback iz Jave po izbiri datoteke (xml besedilo že izvlečeno iz zip) */
+function onQcValuesPicked(xmlText,lot,pdfName){
+  try{const res=importQcXmlText(xmlText,'manual');if(pdfName&&S.qcValues[res.lot])S.qcValues[res.lot].pdfPath=pdfName,save();afterQcImport(res);}
+  catch(err){notify('Napaka uvoza: '+err.message,'error');}
+}
+function onQcValuesPickError(msg){notify('Uvoz: '+msg,'error');}
+function onQcUploadDone(name,ok,msg){if(ok)notify('OneDrive: '+name+' ✓','ok');else notify('OneDrive: '+(msg||name),'warn');}
+function openQcValPdf(){const q=S.qcMaterials[qcValIdx];const v=q&&qcFindValues(qcCurrentLot(q));if(v&&v.pdfPath){if(_hasBridge()&&AndroidBridge.openReportFile){try{AndroidBridge.openReportFile(v.pdfPath);return;}catch(e){}}notify('PDF: '+v.pdfPath,'ok');}}
+/* Samodejni prenos uradnih vrednosti iz OneDrive za lote v zalogi (Faza C) */
+let _qcFetchTried={};
+function autoFetchQcValues(){
+  if(!_hasBridge()||!AndroidBridge.qcFetchXmlForLot)return;
+  try{if(!(AndroidBridge.msIsSignedIn&&AndroidBridge.msIsSignedIn()))return;}catch(e){return;}
+  (S.qcMaterials||[]).forEach(q=>{qcStockLots(q).forEach(s=>{
+    const lot=qcLotKey(s.lot);if(!lot||qcFindValues(lot))return;
+    const cands=[lot];if(lot.length>=10)cands.push(lot.slice(0,-1));
+    cands.forEach(c=>{if(!_qcFetchTried[c]){_qcFetchTried[c]=1;try{AndroidBridge.qcFetchXmlForLot(c);}catch(e){}}});
+  });});
+}
+function refreshQcFromOneDrive(){
+  if(!_hasBridge()||!AndroidBridge.qcFetchXmlForLot){notify('Samo na napravi','warn');return;}
+  try{if(!(AndroidBridge.msIsSignedIn&&AndroidBridge.msIsSignedIn())){notify('Najprej se prijavite v OneDrive','warn');return;}}catch(e){}
+  if(qcValIdx==null)return;const q=S.qcMaterials[qcValIdx];const lots=qcStockLots(q).map(s=>qcLotKey(s.lot)).filter(Boolean);
+  if(!lots.length){notify('Material nima lota v zalogi','warn');return;}
+  lots.forEach(lot=>{const cands=[lot];if(lot.length>=10)cands.push(lot.slice(0,-1));cands.forEach(c=>{try{AndroidBridge.qcFetchXmlForLot(c);}catch(e){}});});
+  notify('Preverjam OneDrive…','ok');
+}
+function onQcXmlFetched(lot,xmlText,msg){
+  if(!xmlText)return; /* 404/ni — tiho */
+  try{importQcXmlText(xmlText,'onedrive');
+    if($i('qcValModal').classList.contains('open')&&qcValIdx!=null)openQcValuesModal(qcValIdx);
+  }catch(e){}
+}
 
 /* ===== MAINTENANCE ===== */
 const MAINT_TYPES={daily:{label:'Dnevno vzdrževanje',icon:'📅',color:'#0891b2'},weekly:{label:'Tedensko vzdrževanje',icon:'📆',color:'#7c3aed'},monthly:{label:'Mesečno vzdrževanje',icon:'🗓️',color:'#b45309'},quarterly:{label:'3-mesečno / po potrebi',icon:'🔩',color:'#9f1239'}};
@@ -2557,7 +2803,7 @@ function importSharedFile(input){
 }
 /* Callbacks from Android */
 function onMsDeviceCode(userCode,verUri,message){notify('Koda: '+userCode+' na '+(verUri||'microsoft.com/devicelogin'),'ok');}
-function onMsSignedIn(account){notify('Prijavljen: '+(account||'OneDrive'),'ok');refreshSyncUI();setTimeout(retryPendingReports,400);}
+function onMsSignedIn(account){notify('Prijavljen: '+(account||'OneDrive'),'ok');refreshSyncUI();setTimeout(retryPendingReports,400);setTimeout(autoFetchQcValues,800);}
 function onMsSignedOut(){notify('Odjavljen iz OneDrive','ok');refreshSyncUI();}
 function onMsError(msg){notify(msg||'Napaka OneDrive','err');refreshSyncUI();}
 function onMsUploadDone(ok,msg){notify(msg||(ok?'Naloženo':'Napaka'),ok?'ok':'err');refreshSyncUI();}
@@ -2946,7 +3192,7 @@ renderZaloga();
 renderDashboard();
 refreshSyncUI();
 /* samodejna mesečna poročila + ponovni poskus čakajočih (po zagonu, ko je MSAL pripravljen) */
-setTimeout(function(){try{retryPendingReports();autoGenerateReports();}catch(e){}},2500);
+setTimeout(function(){try{retryPendingReports();autoGenerateReports();autoFetchQcValues();}catch(e){}},2500);
 </script>
 </body>
 </html>

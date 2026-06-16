@@ -40,6 +40,10 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStreamWriter;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 import okhttp3.Call;
 import okhttp3.Callback;
@@ -53,6 +57,7 @@ import okhttp3.ResponseBody;
 public class MainActivity extends AppCompatActivity {
 
     private static final int REQ_PICK_REPORT = 1001;
+    private static final int REQ_PICK_QCVAL = 1002;
 
     private WebView webView;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -247,9 +252,10 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode != REQ_PICK_REPORT) return;
         if (resultCode != RESULT_OK || data == null || data.getData() == null) return;
         Uri uri = data.getData();
+        if (requestCode == REQ_PICK_QCVAL) { handleQcValPick(uri); return; }
+        if (requestCode != REQ_PICK_REPORT) return;
         try {
             String name = queryName(uri);
             if (name == null || name.isEmpty()) name = "porocilo_" + System.currentTimeMillis() + ".pdf";
@@ -483,6 +489,30 @@ public class MainActivity extends AppCompatActivity {
             final String sf = subfolder, fn = filename, h = html;
             mainHandler.post(() -> renderReportToPdf(sf, fn, h));
         }
+
+        // ---- QC vrednosti: ročni uvoz lota (ZIP/XML/PDF) ----
+        @JavascriptInterface
+        public void pickQcValuesFile() {
+            mainHandler.post(() -> {
+                try {
+                    Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                    i.addCategory(Intent.CATEGORY_OPENABLE);
+                    i.setType("*/*");
+                    i.putExtra(Intent.EXTRA_MIME_TYPES,
+                            new String[]{"application/zip", "application/xml", "text/xml", "application/pdf"});
+                    startActivityForResult(i, REQ_PICK_QCVAL);
+                } catch (Exception e) {
+                    callJs("if(typeof onQcValuesPickError==='function')onQcValuesPickError(" + jsStr(e.getMessage()) + ")");
+                }
+            });
+        }
+
+        // ---- QC vrednosti: samodejni prenos XML za lot iz OneDrive ----
+        @JavascriptInterface
+        public void qcFetchXmlForLot(String lot) {
+            final String l = lot;
+            mainHandler.post(() -> qcFetchXml(l));
+        }
     }
 
     // =========================================================
@@ -686,5 +716,145 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         });
+    }
+
+    // =========================================================
+    // QC vrednosti — ročni uvoz (ZIP/XML/PDF) + OneDrive arhiv + samodejni prenos
+    // =========================================================
+    private static final Pattern QC_LOT_RE = Pattern.compile("LotNumber\\s*=\\s*\"([^\"]+)\"");
+
+    private void handleQcValPick(Uri uri) {
+        try {
+            String name = queryName(uri);
+            if (name == null || name.isEmpty()) name = "qc_" + System.currentTimeMillis();
+            byte[] raw = readUriBytes(uri);
+            byte[] xmlBytes = null, pdfBytes = null;
+            String xmlName = null, pdfName = null;
+            String low = name.toLowerCase();
+            if (low.endsWith(".zip")) {
+                ZipInputStream zin = new ZipInputStream(new java.io.ByteArrayInputStream(raw));
+                ZipEntry e;
+                while ((e = zin.getNextEntry()) != null) {
+                    String enl = e.getName().toLowerCase();
+                    ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                    byte[] buf = new byte[8192]; int r;
+                    while ((r = zin.read(buf)) != -1) bos.write(buf, 0, r);
+                    byte[] eb = bos.toByteArray();
+                    if (enl.endsWith(".xml")) { xmlBytes = eb; xmlName = baseName(e.getName()); }
+                    else if (enl.endsWith(".pdf")) { pdfBytes = eb; pdfName = baseName(e.getName()); }
+                    zin.closeEntry();
+                }
+                zin.close();
+            } else if (low.endsWith(".xml")) { xmlBytes = raw; xmlName = name; }
+            else if (low.endsWith(".pdf")) { pdfBytes = raw; pdfName = name; }
+
+            String xmlText = (xmlBytes != null) ? new String(xmlBytes, "UTF-8") : null;
+            String lot = extractLot(xmlText);
+            if (lot == null || lot.isEmpty()) lot = stripExt(name);
+
+            File dir = getExternalFilesDir("QC_vrednosti/" + lot);
+            if (dir == null) dir = new File(getFilesDir(), "QC_vrednosti/" + lot);
+            if (!dir.exists()) dir.mkdirs();
+            String localPdf = null;
+            if (xmlBytes != null) writeFile(new File(dir, lot + ".xml"), xmlBytes);
+            if (pdfBytes != null) {
+                File pf = new File(dir, pdfName != null ? pdfName : lot + ".pdf");
+                writeFile(pf, pdfBytes);
+                localPdf = pf.getAbsolutePath();
+            }
+
+            if (xmlText != null) {
+                callJs("if(typeof onQcValuesPicked==='function')onQcValuesPicked("
+                        + jsStr(xmlText) + "," + jsStr(lot) + "," + jsStr(localPdf) + ")");
+            } else {
+                callJs("if(typeof onQcValuesPickError==='function')onQcValuesPickError('Ni XML v datoteki')");
+            }
+
+            // OneDrive arhiv (best-effort): xml pod <lot>.xml (determinističen) + pdf
+            final String flot = lot;
+            final byte[] fxml = xmlBytes, fpdf = pdfBytes;
+            final String fpdfName = pdfName;
+            mainHandler.post(() -> msAcquireToken("qcval", (token, err) -> {
+                if (token == null) {
+                    callJs("if(typeof onQcUploadDone==='function')onQcUploadDone(" + jsStr(flot) + ",false," + jsStr("OneDrive: " + err) + ")");
+                    return;
+                }
+                if (fxml != null) graphUploadGeneric("QC_vrednosti/" + flot + "/" + flot + ".xml", fxml, "application/xml", token, flot + ".xml");
+                if (fpdf != null) graphUploadGeneric("QC_vrednosti/" + flot + "/" + (fpdfName != null ? fpdfName : flot + ".pdf"), fpdf, "application/pdf", token, fpdfName != null ? fpdfName : flot + ".pdf");
+            }));
+        } catch (Exception e) {
+            callJs("if(typeof onQcValuesPickError==='function')onQcValuesPickError(" + jsStr("Napaka: " + e.getMessage()) + ")");
+        }
+    }
+
+    private void graphUploadGeneric(final String relPath, byte[] bytes, String contentType, String token, final String label) {
+        RequestBody body = RequestBody.create(bytes, MediaType.parse(contentType));
+        Request req = new Request.Builder().url(graphPathUrl(relPath))
+                .header("Authorization", "Bearer " + token).put(body).build();
+        http.newCall(req).enqueue(new Callback() {
+            @Override public void onFailure(@NonNull Call call, @NonNull IOException e) {
+                callJs("if(typeof onQcUploadDone==='function')onQcUploadDone(" + jsStr(label) + ",false," + jsStr("mreža: " + e.getMessage()) + ")");
+            }
+            @Override public void onResponse(@NonNull Call call, @NonNull Response resp) {
+                int code = resp.code(); resp.close();
+                boolean ok = code >= 200 && code < 300;
+                if (ok) msalLastSync = new java.util.Date().toString();
+                callJs("if(typeof onQcUploadDone==='function')onQcUploadDone(" + jsStr(label) + "," + (ok ? "true" : "false") + "," + jsStr(ok ? "ok" : ("Graph " + code)) + ")");
+            }
+        });
+    }
+
+    // Samodejni prenos XML za lot iz OneDrive (determinističen <lot>.xml)
+    private void qcFetchXml(final String lot) {
+        if (lot == null || lot.isEmpty()) return;
+        msAcquireToken("qcfetch", (token, err) -> {
+            if (token == null) { callJs("if(typeof onQcXmlFetched==='function')onQcXmlFetched(" + jsStr(lot) + ",null," + jsStr(err) + ")"); return; }
+            Request req = new Request.Builder()
+                    .url(graphPathUrl("QC_vrednosti/" + lot + "/" + lot + ".xml"))
+                    .header("Authorization", "Bearer " + token).get().build();
+            http.newCall(req).enqueue(new Callback() {
+                @Override public void onFailure(@NonNull Call call, @NonNull IOException e) {
+                    callJs("if(typeof onQcXmlFetched==='function')onQcXmlFetched(" + jsStr(lot) + ",null," + jsStr("mreža: " + e.getMessage()) + ")");
+                }
+                @Override public void onResponse(@NonNull Call call, @NonNull Response resp) {
+                    int code = resp.code();
+                    String b = null;
+                    try { ResponseBody rb = resp.body(); if (rb != null) b = rb.string(); } catch (IOException ex) { b = null; } finally { resp.close(); }
+                    if (code >= 200 && code < 300 && b != null) {
+                        callJs("if(typeof onQcXmlFetched==='function')onQcXmlFetched(" + jsStr(lot) + "," + jsStr(b) + ",'ok')");
+                    } else {
+                        callJs("if(typeof onQcXmlFetched==='function')onQcXmlFetched(" + jsStr(lot) + ",null," + jsStr(code == 404 ? "ni v OneDrive" : ("Graph " + code)) + ")");
+                    }
+                }
+            });
+        });
+    }
+
+    private byte[] readUriBytes(Uri uri) throws Exception {
+        try (InputStream in = getContentResolver().openInputStream(uri)) {
+            if (in == null) throw new Exception("Ni mogoče odpreti datoteke");
+            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            byte[] buf = new byte[8192]; int r;
+            while ((r = in.read(buf)) != -1) bos.write(buf, 0, r);
+            return bos.toByteArray();
+        }
+    }
+    private void writeFile(File f, byte[] bytes) throws IOException {
+        try (FileOutputStream fos = new FileOutputStream(f)) { fos.write(bytes); }
+    }
+    private String baseName(String p) {
+        if (p == null) return null;
+        int s = Math.max(p.lastIndexOf('/'), p.lastIndexOf('\\'));
+        return s >= 0 ? p.substring(s + 1) : p;
+    }
+    private String stripExt(String n) {
+        if (n == null) return "";
+        int d = n.lastIndexOf('.');
+        return d > 0 ? n.substring(0, d) : n;
+    }
+    private String extractLot(String xmlText) {
+        if (xmlText == null) return null;
+        Matcher m = QC_LOT_RE.matcher(xmlText);
+        return m.find() ? m.group(1).trim() : null;
     }
 }
