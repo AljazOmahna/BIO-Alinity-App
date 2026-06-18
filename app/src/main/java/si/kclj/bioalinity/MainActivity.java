@@ -11,6 +11,8 @@ import android.os.Handler;
 import android.os.Looper;
 import android.provider.OpenableColumns;
 import android.view.View;
+import android.view.ViewGroup;
+import android.widget.FrameLayout;
 import android.database.Cursor;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
@@ -619,14 +621,26 @@ public class MainActivity extends AppCompatActivity {
     @SuppressLint("SetJavaScriptEnabled")
     private void renderReportToPdf(final String subfolder, final String filename, String html) {
         try {
+            final int VW = 842 * 2; // A4 landscape 2×
             final WebView wv = new WebView(this);
             wv.getSettings().setJavaScriptEnabled(false);
             wv.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
             reportWebView = wv;
+
+            // WebView mora biti pritrjen na window hierarchy — brez tega draw() vrne prazne strani
+            final FrameLayout container = new FrameLayout(this);
+            container.setAlpha(0f);
+            FrameLayout decor = (FrameLayout) getWindow().getDecorView();
+            decor.addView(container, new FrameLayout.LayoutParams(VW, FrameLayout.LayoutParams.WRAP_CONTENT));
+            container.addView(wv, new FrameLayout.LayoutParams(VW, FrameLayout.LayoutParams.WRAP_CONTENT));
+
             wv.setWebViewClient(new WebViewClient() {
                 @Override public void onPageFinished(WebView view, String url) {
-                    // počakaj kratek hip, da se postavitev ustali, nato izriši v PDF
-                    mainHandler.postDelayed(() -> writeWebViewPdf(view, subfolder, filename), 300);
+                    mainHandler.postDelayed(() -> {
+                        writeWebViewPdf(view, subfolder, filename);
+                        if (container.getParent() != null)
+                            ((ViewGroup) container.getParent()).removeView(container);
+                    }, 600);
                 }
             });
             wv.loadDataWithBaseURL("file:///android_asset/", html, "text/html", "UTF-8", null);
