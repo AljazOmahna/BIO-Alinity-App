@@ -917,7 +917,7 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
       </div>
       <div id="qcLotInUse" style="display:none;font-size:12px;background:var(--gbg);border:1px solid var(--green);border-radius:6px;padding:6px 10px;margin-bottom:8px;color:var(--accent2)"></div>
       <div class="frow">
-        <div class="fg"><label>Ročni lot <span style="font-weight:400;color:var(--text3);font-size:11px">(le brez povezave z zalogo)</span></label><input id="qcLot"></div>
+        <div class="fg" id="qcLotField"><label>Ročni lot <span style="font-weight:400;color:var(--text3);font-size:11px">(le brez povezave z zalogo)</span></label><input id="qcLot"></div>
         <div class="fg"><label>Nivoji</label><select id="qcLevels"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option></select></div>
       </div>
       <div class="fg"><label>Povezava z zalogo (GTIN)</label><div style="font-size:11px;color:var(--text3);margin-bottom:4px">Označi kontrole/kalibratorje iz zaloge, ki pripadajo temu materialu — aplikacija samodejno potegne pravi lot in rok.</div><div id="qcGtinList" style="display:grid;grid-template-columns:1fr;gap:3px;max-height:160px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:6px"></div></div>
@@ -1085,7 +1085,7 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
         <span style="display:flex;gap:6px"><button class="btn btn-g btn-sm" onclick="repSelectAll(true)">✔ Vse</button><button class="btn btn-g btn-sm" onclick="repSelectAll(false)">☐ Počisti</button></span>
       </div>
       <div id="repInstrList" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;max-height:34vh;overflow-y:auto"></div>
-      <div class="muted" style="font-size:11px;margin-top:10px">Poročila se naložijo v OneDrive: DigiLab/Poročila/&lt;leto&gt;. Imena: leto-mesec_aparat_vrsta.pdf</div>
+      <div class="muted" style="font-size:11px;margin-top:10px">Poročila se naložijo v OneDrive: DigiLab/Poročila/&lt;Vzdrževanje|Pregled QC&gt;/&lt;leto&gt;/&lt;mesec&gt;. Imena: leto-mesec_aparat_vrsta.pdf</div>
     </div>
     <div class="mf">
       <button class="btn btn-g" onclick="closeMo('reportModal')">Prekliči</button>
@@ -1740,7 +1740,7 @@ function renderQcGtinPicker(sel){
   opts.sort((a,b)=>a.name.localeCompare(b.name));
   $i('qcGtinList').innerHTML=opts.length?opts.map(o=>'<label class="assay-check" style="display:flex;align-items:center;gap:8px"><input type="checkbox" class="qc-gtin-cb" value="'+o.gtin+'" '+(sel.includes(o.gtin)?'checked':'')+'> <span style="flex:1">'+o.name+(o.type?' <span style="font-size:10px;color:var(--text3)">'+(o.type==='control'?'kontrola':'kalibrator')+'</span>':'')+'</span><span style="font-size:10px;color:var(--text3)">'+o.gtin+'</span></label>').join(''):'<div class="muted" style="font-size:12px">Ni kontrol v zalogi (sinhronizirajte z Zebro).</div>';
 }
-function openQcModal(idx){S.editingQcIdx=idx??null;$i('qcModalTitle').textContent=idx!=null?'Uredi QC material':'Nov QC material';let sel=[],gsel=[];const inUse=$i('qcLotInUse');inUse.style.display='none';inUse.innerHTML='';if(idx!=null){const q=S.qcMaterials[idx];$i('qcName').value=q.name;$i('qcType').value=q.type;$i('qcLot').value=q.lot||'';$i('qcLevels').value=q.levels||2;sel=q.assays||[];gsel=q.gtins||[];const stock=qcStockLotsDistinct(q);if(stock.length){const lots=stock.map(s=>s.lot+' (rok '+fmtExp(s.expiry)+')').join(', ');inUse.innerHTML='🔗 Lot v uporabi (iz zaloge): <strong>'+lots+'</strong>';inUse.style.display='';}}else{$i('qcName').value='';$i('qcType').value='biochem';$i('qcLot').value='';$i('qcLevels').value=2;}$i('qcAssayList').innerHTML=S.assays.map(a=>'<label class="assay-check"><input type="checkbox" value="'+a.name+'" '+(sel.includes(a.name)?'checked':'')+'> '+a.name+' <span style="font-size:10px;color:var(--text3)">('+(a.type==='biochem'?'c':'i')+')</span></label>').join('');renderQcGtinPicker(gsel);showMo('qcModal');}
+function openQcModal(idx){S.editingQcIdx=idx??null;$i('qcModalTitle').textContent=idx!=null?'Uredi QC material':'Nov QC material';let sel=[],gsel=[];const inUse=$i('qcLotInUse');inUse.style.display='none';inUse.innerHTML='';if(idx!=null){const q=S.qcMaterials[idx];$i('qcName').value=q.name;$i('qcType').value=q.type;$i('qcLot').value=q.lot||'';$i('qcLevels').value=q.levels||2;sel=q.assays||[];gsel=q.gtins||[];const stock=qcStockLotsDistinct(q);if(stock.length){const lots=stock.map(s=>s.lot+' (rok '+fmtExp(s.expiry)+')').join(', ');inUse.innerHTML='🔗 Lot v uporabi (iz zaloge): <strong>'+lots+'</strong>';inUse.style.display='';$i('qcLotField').style.display='none';}else{$i('qcLotField').style.display='';}}else{$i('qcLotField').style.display='';$i('qcName').value='';$i('qcType').value='biochem';$i('qcLot').value='';$i('qcLevels').value=2;}$i('qcAssayList').innerHTML=S.assays.map(a=>'<label class="assay-check"><input type="checkbox" value="'+a.name+'" '+(sel.includes(a.name)?'checked':'')+'> '+a.name+' <span style="font-size:10px;color:var(--text3)">('+(a.type==='biochem'?'c':'i')+')</span></label>').join('');renderQcGtinPicker(gsel);showMo('qcModal');}
 function deleteQcMat(i){if(!confirm('Izbriši?'))return;S.qcMaterials.splice(i,1);save();renderQcMats();notify('Material izbrisan');}
 function saveQcMaterial(){const name=$i('qcName').value.trim(),type=$i('qcType').value,lot=$i('qcLot').value.trim(),levels=parseInt($i('qcLevels').value);const assays=[...$i('qcAssayList').querySelectorAll('input:checked')].map(el=>el.value);const gtins=[...$i('qcGtinList').querySelectorAll('.qc-gtin-cb:checked')].map(el=>el.value);if(!name){notify('Vnesite naziv','warning');return;}const obj={name,type,lot,levels,gtins,assays};if(S.editingQcIdx!=null){const old=S.qcMaterials[S.editingQcIdx];if(old&&old.lotHistory)obj.lotHistory=old.lotHistory;S.qcMaterials[S.editingQcIdx]=obj;}else S.qcMaterials.push(obj);save();closeMo('qcModal');renderQcMats();notify('Material shranjen','success');}
 
@@ -2527,7 +2527,9 @@ function buildQcNonconfHtml(instrId,year,month){
 /* ---- ORKESTRACIJA: vrsta, samodejni sprožilec, čakalna vrsta ---- */
 const REP_TYPES={vzdrzevanje:'Vzdrževanje',kontrole:'Neskladja QC'};
 function _reportFilename(instrId,year,month,type){return year+'-'+_rp2(month)+'_'+_instrTag(instrId)+'_'+type+'.pdf';}
-function _reportSubfolder(year){return 'Porocila/'+year;}
+function _reportFolderForType(type){return type==='kontrole'?'Pregled QC':'Vzdrževanje';}
+function _reportMonthDir(year,month){return year+'/'+_rp2(month)+' - '+REP_MONTHS[month-1];}
+function _reportSubfolder(type,year,month){return 'Poročila/'+_reportFolderForType(type)+'/'+_reportMonthDir(year,month);}
 function _monthKey(y,m){return y+'-'+_rp2(m);}
 function _hasMsSignedIn(){try{return !!(_hasBridge()&&AndroidBridge.msIsSignedIn&&AndroidBridge.msIsSignedIn());}catch(e){return false;}}
 function _hasMonthData(year,month){
@@ -2542,7 +2544,7 @@ function generateMonthlyReports(year,month,opts){
   var instrs=opts.instrIds||INSTRUMENTS.map(function(i){return i.id;});
   var types=opts.types||['vzdrzevanje','kontrole'];
   var jobs=[];
-  instrs.forEach(function(id){types.forEach(function(t){jobs.push({instrId:id,year:year,month:month,type:t,filename:_reportFilename(id,year,month,t),subfolder:_reportSubfolder(year)});});});
+  instrs.forEach(function(id){types.forEach(function(t){jobs.push({instrId:id,year:year,month:month,type:t,filename:_reportFilename(id,year,month,t),subfolder:_reportSubfolder(t,year,month)});});});
   if(!jobs.length){notify('Ni izbranih poročil','warn');return;}
   _repQueue=_repQueue.concat(jobs);
   notify((opts.auto?'Samodejno generiram ':'Generiram ')+jobs.length+' poročil…','ok');
@@ -2635,7 +2637,7 @@ function retryPendingReports(){
   if(!S.pendingReports||!S.pendingReports.length)return;
   if(!_hasMsSignedIn())return;
   var pend=S.pendingReports;S.pendingReports=[];save();
-  pend.forEach(function(j){_repQueue.push({instrId:j.instrId,year:j.year,month:j.month,type:j.type,filename:_reportFilename(j.instrId,j.year,j.month,j.type),subfolder:_reportSubfolder(j.year)});});
+  pend.forEach(function(j){_repQueue.push({instrId:j.instrId,year:j.year,month:j.month,type:j.type,filename:_reportFilename(j.instrId,j.year,j.month,j.type),subfolder:_reportSubfolder(j.type,j.year,j.month)});});
   notify('Nalagam '+pend.length+' čakajočih poročil…','ok');
   _repPump();
 }
