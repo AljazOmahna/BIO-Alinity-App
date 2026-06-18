@@ -1531,6 +1531,10 @@ function qcStockLots(q){
 }
 /* FEFO lot (v uporabi) za material — najprej v zalogi po GTIN, sicer ročni q.lot */
 function qcCurrentLot(q){const s=qcStockLots(q);return s.length?s[0].lot:(q&&q.lot)||'';}
+/* bazni lot: 10-mesten (z nivojsko končnico) -> 9-mesten base (isto kot qcFindValues) */
+function qcBaseLot(lot){lot=String(lot==null?'':lot).trim();return lot.length>=10?lot.slice(0,-1):lot;}
+/* različni loti v zalogi (deduplicirani po baznem lotu, FEFO; en vnos na pravi lot, ne na nivo) */
+function qcStockLotsDistinct(q){const seen={},out=[];qcStockLots(q).forEach(s=>{const b=qcBaseLot(s.lot);if(b&&!seen[b]){seen[b]=1;out.push({lot:b,expiry:s.expiry,daysLeft:s.daysLeft});}});return out;}
 /* Integration: prikaži prave lote iz zaloge (po GTIN) z rokom in barvo */
 function pregledLotHint(q){
   try{
@@ -1726,7 +1730,7 @@ function deleteAssay(i){if(!confirm('Izbriši?'))return;S.assays.splice(i,1);sav
 function saveAssay(){const n=$i('assayName').value.trim(),t=$i('assayType').value;if(!n){notify('Vnesite naziv','warning');return;}if(S.editingAssayIdx!=null)S.assays[S.editingAssayIdx]={name:n,type:t};else S.assays.push({name:n,type:t});save();closeMo('assayModal');renderAssays();notify('Preiskava shranjena','success');}
 
 /* ===== QC MATERIALS ===== */
-function renderQcMats(){$i('qcMatBody').innerHTML=S.qcMaterials.map((q,i)=>{const stock=qcStockLots(q);let lotCell;if(stock.length){lotCell=stock.map(it=>{const cls=expiryClass(it.daysLeft);const col=cls==='r-exp'?'var(--red)':cls==='r-14'?'var(--orange)':cls==='r-28'?'var(--yellow)':'var(--accent2)';return '<span style="color:'+col+'">'+it.lot+'</span>';}).join('<br>')+' <span style="font-size:10px;color:var(--accent2)">🔗</span>';}else{lotCell=(q.lot||'–');}return '<tr><td><strong>'+q.name+'</strong></td><td><span class="badge badge-gray">'+q.type+'</span></td><td>'+q.levels+'</td><td>'+lotCell+'</td><td style="font-size:12px">'+((q.assays||[]).slice(0,3).join(', ')+(q.assays?.length>3?' +'+(q.assays.length-3):''))+'</td><td><button class="btn btn-outline btn-sm" onclick="openQcModal('+i+')">✏️</button> <button class="btn btn-teal btn-sm" onclick="openQcValuesModal('+i+')">📊</button> <button class="btn btn-g btn-sm" onclick="openLotHistory('+i+')">📋</button> <button class="btn btn-d btn-sm" onclick="deleteQcMat('+i+')">🗑️</button></td></tr>';}).join('')||'<tr><td colspan="6" class="empty">Ni materialov.</td></tr>';}
+function renderQcMats(){$i('qcMatBody').innerHTML=S.qcMaterials.map((q,i)=>{const stock=qcStockLotsDistinct(q);let lotCell;if(stock.length){lotCell=stock.map(it=>{const cls=expiryClass(it.daysLeft);const col=cls==='r-exp'?'var(--red)':cls==='r-14'?'var(--orange)':cls==='r-28'?'var(--yellow)':'var(--accent2)';return '<span style="color:'+col+'">'+it.lot+'</span>';}).join('<br>')+' <span style="font-size:10px;color:var(--accent2)">🔗</span>';}else{lotCell=(q.lot||'–');}return '<tr><td><strong>'+q.name+'</strong></td><td><span class="badge badge-gray">'+q.type+'</span></td><td>'+q.levels+'</td><td>'+lotCell+'</td><td style="font-size:12px">'+((q.assays||[]).slice(0,3).join(', ')+(q.assays?.length>3?' +'+(q.assays.length-3):''))+'</td><td><button class="btn btn-outline btn-sm" onclick="openQcModal('+i+')">✏️</button> <button class="btn btn-teal btn-sm" onclick="openQcValuesModal('+i+')">📊</button> <button class="btn btn-g btn-sm" onclick="openLotHistory('+i+')">📋</button> <button class="btn btn-d btn-sm" onclick="deleteQcMat('+i+')">🗑️</button></td></tr>';}).join('')||'<tr><td colspan="6" class="empty">Ni materialov.</td></tr>';}
 /* GTIN-povezovalnik: seznam različnih kontrol+kalibratorjev iz zaloge s kljukicami */
 function renderQcGtinPicker(sel){
   sel=sel||[];const seen={};const opts=[];
@@ -1736,7 +1740,7 @@ function renderQcGtinPicker(sel){
   opts.sort((a,b)=>a.name.localeCompare(b.name));
   $i('qcGtinList').innerHTML=opts.length?opts.map(o=>'<label class="assay-check" style="display:flex;align-items:center;gap:8px"><input type="checkbox" class="qc-gtin-cb" value="'+o.gtin+'" '+(sel.includes(o.gtin)?'checked':'')+'> <span style="flex:1">'+o.name+(o.type?' <span style="font-size:10px;color:var(--text3)">'+(o.type==='control'?'kontrola':'kalibrator')+'</span>':'')+'</span><span style="font-size:10px;color:var(--text3)">'+o.gtin+'</span></label>').join(''):'<div class="muted" style="font-size:12px">Ni kontrol v zalogi (sinhronizirajte z Zebro).</div>';
 }
-function openQcModal(idx){S.editingQcIdx=idx??null;$i('qcModalTitle').textContent=idx!=null?'Uredi QC material':'Nov QC material';let sel=[],gsel=[];const inUse=$i('qcLotInUse');inUse.style.display='none';inUse.innerHTML='';if(idx!=null){const q=S.qcMaterials[idx];$i('qcName').value=q.name;$i('qcType').value=q.type;$i('qcLot').value=q.lot||'';$i('qcLevels').value=q.levels||2;sel=q.assays||[];gsel=q.gtins||[];const stock=qcStockLots(q);if(stock.length){const lots=stock.map(s=>s.lot+' (rok '+fmtExp(s.expiry)+')').join(', ');inUse.innerHTML='🔗 Lot v uporabi (iz zaloge): <strong>'+lots+'</strong>';inUse.style.display='';}}else{$i('qcName').value='';$i('qcType').value='biochem';$i('qcLot').value='';$i('qcLevels').value=2;}$i('qcAssayList').innerHTML=S.assays.map(a=>'<label class="assay-check"><input type="checkbox" value="'+a.name+'" '+(sel.includes(a.name)?'checked':'')+'> '+a.name+' <span style="font-size:10px;color:var(--text3)">('+(a.type==='biochem'?'c':'i')+')</span></label>').join('');renderQcGtinPicker(gsel);showMo('qcModal');}
+function openQcModal(idx){S.editingQcIdx=idx??null;$i('qcModalTitle').textContent=idx!=null?'Uredi QC material':'Nov QC material';let sel=[],gsel=[];const inUse=$i('qcLotInUse');inUse.style.display='none';inUse.innerHTML='';if(idx!=null){const q=S.qcMaterials[idx];$i('qcName').value=q.name;$i('qcType').value=q.type;$i('qcLot').value=q.lot||'';$i('qcLevels').value=q.levels||2;sel=q.assays||[];gsel=q.gtins||[];const stock=qcStockLotsDistinct(q);if(stock.length){const lots=stock.map(s=>s.lot+' (rok '+fmtExp(s.expiry)+')').join(', ');inUse.innerHTML='🔗 Lot v uporabi (iz zaloge): <strong>'+lots+'</strong>';inUse.style.display='';}}else{$i('qcName').value='';$i('qcType').value='biochem';$i('qcLot').value='';$i('qcLevels').value=2;}$i('qcAssayList').innerHTML=S.assays.map(a=>'<label class="assay-check"><input type="checkbox" value="'+a.name+'" '+(sel.includes(a.name)?'checked':'')+'> '+a.name+' <span style="font-size:10px;color:var(--text3)">('+(a.type==='biochem'?'c':'i')+')</span></label>').join('');renderQcGtinPicker(gsel);showMo('qcModal');}
 function deleteQcMat(i){if(!confirm('Izbriši?'))return;S.qcMaterials.splice(i,1);save();renderQcMats();notify('Material izbrisan');}
 function saveQcMaterial(){const name=$i('qcName').value.trim(),type=$i('qcType').value,lot=$i('qcLot').value.trim(),levels=parseInt($i('qcLevels').value);const assays=[...$i('qcAssayList').querySelectorAll('input:checked')].map(el=>el.value);const gtins=[...$i('qcGtinList').querySelectorAll('.qc-gtin-cb:checked')].map(el=>el.value);if(!name){notify('Vnesite naziv','warning');return;}const obj={name,type,lot,levels,gtins,assays};if(S.editingQcIdx!=null){const old=S.qcMaterials[S.editingQcIdx];if(old&&old.lotHistory)obj.lotHistory=old.lotHistory;S.qcMaterials[S.editingQcIdx]=obj;}else S.qcMaterials.push(obj);save();closeMo('qcModal');renderQcMats();notify('Material shranjen','success');}
 
@@ -1889,9 +1893,9 @@ function qcSuggestAbbott(appAssay,vals){
 function qcUnitsForAssay(vals,num){const set={};const a=vals.assays[num];if(!a)return [];for(const lv in a.levels)for(const u in a.levels[lv].units)set[u]=1;return Object.keys(set);}
 function openQcValuesModal(idx){
   qcValIdx=idx;const q=S.qcMaterials[idx];$i('qcValTitle').textContent='QC vrednosti – '+q.name;
-  /* zberi vse lote iz zaloge (FEFO); fallback na ročni lot */
-  const lots=qcStockLots(q).map(s=>qcLotKey(s.lot)).filter(Boolean);
-  if(!lots.length&&q.lot)lots.push(qcLotKey(q.lot));
+  /* zberi različne lote iz zaloge (bazni, FEFO); fallback na ročni lot */
+  const lots=qcStockLotsDistinct(q).map(s=>s.lot).filter(Boolean);
+  if(!lots.length&&q.lot)lots.push(qcBaseLot(q.lot));
   const sel=$i('qcValLotSel'),wrap=$i('qcValLotWrap');
   if(lots.length){sel.innerHTML=lots.map(l=>'<option value="'+l+'">'+l+'</option>').join('');wrap.style.display=lots.length>1?'':'none';}
   else{sel.innerHTML='';wrap.style.display='none';}
