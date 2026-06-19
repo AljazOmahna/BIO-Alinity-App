@@ -656,7 +656,14 @@ public class MainActivity extends AppCompatActivity {
             final int PDF_W = 842, PDF_H = 595;
             final int VW = PDF_W * 2, VH_PAGE = PDF_H * 2;
 
-            int cH = view.getContentHeight();
+            // Izmeri pravo višino vsebine pri širini VW (UNSPECIFIED višina, da
+            // se ne omeji na velikost okna/vsebnika — drugače se visoka poročila
+            // odrežejo na ~1 stran). getContentHeight() je nezanesljiv.
+            int specW = View.MeasureSpec.makeMeasureSpec(VW, View.MeasureSpec.EXACTLY);
+            int specH = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED);
+            view.measure(specW, specH);
+            int cH = view.getMeasuredHeight();
+            if (cH <= 0) { cH = view.getContentHeight(); }
             if (cH <= 0) cH = VH_PAGE;
             view.layout(0, 0, VW, cH);
 
