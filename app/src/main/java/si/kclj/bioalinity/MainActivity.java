@@ -91,6 +91,10 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // Mora biti klicano pred ustvarjanjem kateregakoli WebView-a: omogoči, da
+        // view.draw() izriše CELOTEN dokument (ne le vidnega pasu) — nujno za
+        // pravilen večstranski izris poročil v PDF.
+        WebView.enableSlowWholeDocumentDraw();
         setContentView(R.layout.activity_main);
 
         webView = findViewById(R.id.webView);
@@ -643,8 +647,7 @@ public class MainActivity extends AppCompatActivity {
             wv.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
             reportWebView = wv;
 
-            // WebView pritrjen na window hierarchy pri velikosti ene strani; vsebino
-            // (višjo od strani) zajamemo z drsenjem po straneh (writeWebViewPdf).
+            // WebView pritrjen na window hierarchy, da se vsebina naloži in izriše.
             final FrameLayout container = new FrameLayout(this);
             container.setAlpha(0f);
             reportContainer = container;
@@ -665,67 +668,52 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // Večstranski PDF z drsenjem: WebView je velik eno stran; za vsako stran
-    // oddrsamo na i*RVH in izrišemo viden pas (drsenje sproži izris pasu v WebView).
+    // Večstranski PDF: WebView postavimo na celotno višino vsebine in ga izrišemo
+    // po pasovih (A4 landscape). enableSlowWholeDocumentDraw() (v onCreate) poskrbi,
+    // da view.draw() izriše CELOTEN dokument, ne le vidnega pasu.
     private void writeWebViewPdf(WebView view, final String subfolder, final String filename) {
         try {
-            float scale = view.getScale();
-            if (scale <= 0) scale = 1f;
-            int contentPx = (int) Math.ceil(view.getContentHeight() * scale);
-            if (contentPx <= 0) contentPx = RVH;
-            int pages = Math.max(1, (int) Math.ceil((double) contentPx / RVH));
+            // Izmeri pravo višino vsebine pri širini RVW (UNSPECIFIED višina).
+            int specW = View.MeasureSpec.makeMeasureSpec(RVW, View.MeasureSpec.EXACTLY);
+            int specH = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED);
+            view.measure(specW, specH);
+            int cH = view.getMeasuredHeight();
+            if (cH <= 0) {
+                float scale = view.getScale() > 0 ? view.getScale() : 1f;
+                cH = (int) Math.ceil(view.getContentHeight() * scale);
+            }
+            if (cH <= 0) cH = RVH;
+            view.layout(0, 0, RVW, cH);
+
+            int pages = Math.max(1, (int) Math.ceil((double) cH / RVH));
             pages = Math.min(pages, 60); // varovalka
 
-            File dir = getExternalFilesDir(subfolder);
-            if (dir == null) dir = new File(getFilesDir(), subfolder);
-            if (!dir.exists()) dir.mkdirs();
-            final File outFile = new File(dir, filename);
-
-            final PdfDocument doc = new PdfDocument();
-            captureReportPage(view, doc, 0, pages, subfolder, filename, outFile);
-        } catch (Exception e) {
-            cleanupReportView();
-            reportDone(filename, false, "Napaka PDF: " + e.getMessage(), null);
-        }
-    }
-
-    private void captureReportPage(final WebView view, final PdfDocument doc, final int i,
-                                   final int pages, final String subfolder, final String filename,
-                                   final File outFile) {
-        view.scrollTo(0, i * RVH);
-        // počakaj, da WebView izriše pas po drsenju, nato zajemi
-        mainHandler.postDelayed(() -> {
-            try {
-                int sy = view.getScrollY();           // dejanski scroll (zadnja stran se lahko omeji)
-                int want = i * RVH;                    // želeni začetek pasu
+            PdfDocument doc = new PdfDocument();
+            for (int i = 0; i < pages; i++) {
                 PdfDocument.PageInfo info = new PdfDocument.PageInfo.Builder(PDF_W, PDF_H, i + 1).create();
                 PdfDocument.Page pg = doc.startPage(info);
                 Canvas canvas = pg.getCanvas();
                 canvas.scale(0.5f, 0.5f);              // RVW×RVH px → PDF_W×PDF_H pt
-                canvas.translate(0, -(want - sy));     // poravnaj pas (popravi morebitno omejitev scrolla)
-                view.draw(canvas);                     // izriše pas vsebine v vrh platna
+                canvas.translate(0, -(float) (i * RVH));
+                view.draw(canvas);                     // izriše celoten dokument (slow whole doc)
                 doc.finishPage(pg);
-            } catch (Exception e) {
-                doc.close();
-                cleanupReportView();
-                reportDone(filename, false, "Napaka strani " + (i + 1) + ": " + e.getMessage(), null);
-                return;
             }
-            if (i + 1 < pages) {
-                captureReportPage(view, doc, i + 1, pages, subfolder, filename, outFile);
-            } else {
-                try {
-                    try (FileOutputStream fos = new FileOutputStream(outFile)) { doc.writeTo(fos); }
-                    doc.close();
-                    cleanupReportView();
-                    uploadReportPdf(subfolder, filename, outFile);
-                } catch (Exception e) {
-                    doc.close();
-                    cleanupReportView();
-                    reportDone(filename, false, "Napaka zapisa PDF: " + e.getMessage(), null);
-                }
+
+            File dir = getExternalFilesDir(subfolder);
+            if (dir == null) dir = new File(getFilesDir(), subfolder);
+            if (!dir.exists()) dir.mkdirs();
+            File outFile = new File(dir, filename);
+            try (FileOutputStream fos = new FileOutputStream(outFile)) {
+                doc.writeTo(fos);
             }
-        }, 150);
+            doc.close();
+
+            cleanupReportView();
+            uploadReportPdf(subfolder, filename, outFile);
+        } catch (Exception e) {
+            cleanupReportView();
+            reportDone(filename, false, "Napaka PDF: " + e.getMessage(), null);
+        }
     }
 
     private void uploadReportPdf(final String subfolder, final String filename, final File file) {
