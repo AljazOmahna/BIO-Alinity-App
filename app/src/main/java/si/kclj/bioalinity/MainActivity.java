@@ -13,6 +13,12 @@ import android.provider.OpenableColumns;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
+import android.os.CancellationSignal;
+import android.os.ParcelFileDescriptor;
+import android.print.PageRange;
+import android.print.PrintAttributes;
+import android.print.PrintDocumentAdapter;
+import android.print.PrintDocumentInfo;
 import android.database.Cursor;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
@@ -618,83 +624,98 @@ public class MainActivity extends AppCompatActivity {
                 + jsStr(filename) + "," + (ok ? "true" : "false") + "," + jsStr(msg) + "," + jsStr(localPath) + ")");
     }
 
+    private FrameLayout reportContainer; // vsebnik, da WebView ostane pritrjen med async tiskanjem
+
+    private void cleanupReportView() {
+        try {
+            if (reportContainer != null && reportContainer.getParent() != null)
+                ((ViewGroup) reportContainer.getParent()).removeView(reportContainer);
+        } catch (Exception ignored) {}
+        reportContainer = null;
+        reportWebView = null;
+    }
+
     @SuppressLint("SetJavaScriptEnabled")
     private void renderReportToPdf(final String subfolder, final String filename, String html) {
         try {
-            final int VW = 842 * 2; // A4 landscape 2×
+            // A4 landscape širina v px pri ~2× za izris; višino določi tiskalni okvir sam.
+            final int VW = 842 * 2;
             final WebView wv = new WebView(this);
             wv.getSettings().setJavaScriptEnabled(false);
-            wv.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
             reportWebView = wv;
 
-            // WebView mora biti pritrjen na window hierarchy — brez tega draw() vrne prazne strani
+            // WebView mora biti pritrjen na window hierarchy, da se vsebina v celoti izriše.
             final FrameLayout container = new FrameLayout(this);
             container.setAlpha(0f);
+            reportContainer = container;
             FrameLayout decor = (FrameLayout) getWindow().getDecorView();
             decor.addView(container, new FrameLayout.LayoutParams(VW, FrameLayout.LayoutParams.WRAP_CONTENT));
             container.addView(wv, new FrameLayout.LayoutParams(VW, FrameLayout.LayoutParams.WRAP_CONTENT));
 
             wv.setWebViewClient(new WebViewClient() {
                 @Override public void onPageFinished(WebView view, String url) {
-                    mainHandler.postDelayed(() -> {
-                        writeWebViewPdf(view, subfolder, filename);
-                        if (container.getParent() != null)
-                            ((ViewGroup) container.getParent()).removeView(container);
-                    }, 600);
+                    // počakaj kratek hip, da se postavitev ustali, nato natisni v PDF
+                    mainHandler.postDelayed(() -> writeWebViewPdf(view, subfolder, filename), 400);
                 }
             });
             wv.loadDataWithBaseURL("file:///android_asset/", html, "text/html", "UTF-8", null);
         } catch (Exception e) {
-            reportWebView = null;
+            cleanupReportView();
             reportDone(filename, false, "Napaka izrisa: " + e.getMessage(), null);
         }
     }
 
+    // Uporabi tiskalni okvir (PrintDocumentAdapter): pravilna večstranska paginacija
+    // (A4 landscape), brez ročnega rezanja platna — visoka poročila se ne odrežejo.
     private void writeWebViewPdf(WebView view, final String subfolder, final String filename) {
         try {
-            // A4 landscape: 842×595 PostScript points. Render at 2x for quality.
-            final int PDF_W = 842, PDF_H = 595;
-            final int VW = PDF_W * 2, VH_PAGE = PDF_H * 2;
-
-            // Izmeri pravo višino vsebine pri širini VW (UNSPECIFIED višina, da
-            // se ne omeji na velikost okna/vsebnika — drugače se visoka poročila
-            // odrežejo na ~1 stran). getContentHeight() je nezanesljiv.
-            int specW = View.MeasureSpec.makeMeasureSpec(VW, View.MeasureSpec.EXACTLY);
-            int specH = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED);
-            view.measure(specW, specH);
-            int cH = view.getMeasuredHeight();
-            if (cH <= 0) { cH = view.getContentHeight(); }
-            if (cH <= 0) cH = VH_PAGE;
-            view.layout(0, 0, VW, cH);
-
-            int pages = Math.max(1, (int) Math.ceil((double) cH / VH_PAGE));
-
-            PdfDocument doc = new PdfDocument();
-            for (int i = 0; i < pages; i++) {
-                PdfDocument.PageInfo info = new PdfDocument.PageInfo.Builder(PDF_W, PDF_H, i + 1).create();
-                PdfDocument.Page pg = doc.startPage(info);
-                Canvas canvas = pg.getCanvas();
-                canvas.save();
-                canvas.scale(0.5f, 0.5f);
-                canvas.translate(0, -(float)(i * VH_PAGE));
-                view.draw(canvas);
-                canvas.restore();
-                doc.finishPage(pg);
-            }
-
             File dir = getExternalFilesDir(subfolder);
             if (dir == null) dir = new File(getFilesDir(), subfolder);
             if (!dir.exists()) dir.mkdirs();
-            File outFile = new File(dir, filename);
-            try (FileOutputStream fos = new FileOutputStream(outFile)) {
-                doc.writeTo(fos);
-            }
-            doc.close();
+            final File outFile = new File(dir, filename);
 
-            reportWebView = null;
-            uploadReportPdf(subfolder, filename, outFile);
+            final PrintDocumentAdapter adapter = view.createPrintDocumentAdapter("report");
+            PrintAttributes attrs = new PrintAttributes.Builder()
+                    .setMediaSize(PrintAttributes.MediaSize.ISO_A4.asLandscape())
+                    .setResolution(new PrintAttributes.Resolution("pdf", "pdf", 300, 300))
+                    .setMinMargins(PrintAttributes.Margins.NO_MARGINS)
+                    .build();
+
+            adapter.onLayout(null, attrs, null, new PrintDocumentAdapter.LayoutResultCallback() {
+                @Override public void onLayoutFinished(PrintDocumentInfo info, boolean changed) {
+                    ParcelFileDescriptor pfd = null;
+                    try {
+                        pfd = ParcelFileDescriptor.open(outFile,
+                                ParcelFileDescriptor.MODE_CREATE
+                              | ParcelFileDescriptor.MODE_TRUNCATE
+                              | ParcelFileDescriptor.MODE_WRITE_ONLY);
+                        final ParcelFileDescriptor fpfd = pfd;
+                        adapter.onWrite(new PageRange[]{PageRange.ALL_PAGES}, pfd,
+                                new CancellationSignal(), new PrintDocumentAdapter.WriteResultCallback() {
+                            @Override public void onWriteFinished(PageRange[] pages) {
+                                try { fpfd.close(); } catch (Exception ignored) {}
+                                cleanupReportView();
+                                uploadReportPdf(subfolder, filename, outFile);
+                            }
+                            @Override public void onWriteFailed(CharSequence error) {
+                                try { fpfd.close(); } catch (Exception ignored) {}
+                                cleanupReportView();
+                                reportDone(filename, false, "PDF zapis: " + error, null);
+                            }
+                        });
+                    } catch (Exception e) {
+                        try { if (pfd != null) pfd.close(); } catch (Exception ignored) {}
+                        cleanupReportView();
+                        reportDone(filename, false, "PDF odpiranje: " + e.getMessage(), null);
+                    }
+                }
+                @Override public void onLayoutFailed(CharSequence error) {
+                    cleanupReportView();
+                    reportDone(filename, false, "PDF postavitev: " + error, null);
+                }
+            }, null);
         } catch (Exception e) {
-            reportWebView = null;
+            cleanupReportView();
             reportDone(filename, false, "Napaka PDF: " + e.getMessage(), null);
         }
     }
