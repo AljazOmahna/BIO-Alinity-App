@@ -365,7 +365,8 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
 <!-- ============ LOTI ============ -->
 <div class="page-main" id="main-loti">
   <div class="sec-hdr"><div class="sec-title">&#129514; Loti</div>
-    <span class="muted" style="font-size:12px">Samo za branje</span></div>
+    <button class="btn btn-g btn-sm" onclick="msDownload('pregledBK_db')">&#8635; Sync</button></div>
+  <div id="lotsStats" style="display:flex;gap:8px;padding:6px 0;flex-wrap:wrap"></div>
   <div class="fr">
     <input id="lotiSearch" placeholder="&#128269; Iskanje izdelka/lota..." oninput="renderLoti()">
     <select id="lotiType" onchange="renderLoti()">
@@ -376,8 +377,39 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
       <option value="reagent-imuno">Reagent imunologija</option>
       <option value="consumable">Potrošni material</option>
     </select>
+    <select id="lotiStatus" onchange="renderLoti()">
+      <option value="">Vsi statusi</option>
+      <option value="pending">&#128997; Čakajo</option>
+      <option value="ok">&#9989; Ovrednoteni</option>
+    </select>
   </div>
   <div id="lotiBody"></div>
+</div>
+
+<!-- LOT EVAL MODAL -->
+<div class="mo" id="moLotEval">
+  <div class="modal" style="max-width:440px">
+    <div class="mh"><h3>&#128203; Ovrednotenje lota</h3><button class="mc" onclick="closeMo('moLotEval')">&#10005;</button></div>
+    <div class="mb">
+      <div style="text-align:center;margin-bottom:10px">
+        <div id="lotEvalName" style="font-size:13px;font-weight:700;color:var(--text)"></div>
+        <div id="lotEvalLot" style="font-family:var(--mono);font-size:11px;color:var(--text3);margin-top:2px"></div>
+      </div>
+      <div class="fg"><label>Datum ovrednotenja</label><input type="date" id="lotEvalDate"></div>
+      <div class="fg"><label>Vpisano na analizatorje</label>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;padding:4px 0">
+          <label style="display:flex;align-items:center;gap:6px;font-size:14px"><input type="checkbox" id="evalAL01" style="width:18px;height:18px"> AL01</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:14px"><input type="checkbox" id="evalAL02" style="width:18px;height:18px"> AL02</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:14px"><input type="checkbox" id="evalAL03" style="width:18px;height:18px"> AL03</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:14px"><input type="checkbox" id="evalAL04" style="width:18px;height:18px"> AL04</label>
+        </div>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn btn-g" onclick="closeMo('moLotEval')">Prekliči</button>
+      <button class="btn btn-a" onclick="confirmLotEval()">&#10003; Potrdi ovrednotenje</button>
+    </div>
+  </div>
 </div>
 
 <!-- ============ QC ============ -->
@@ -1375,6 +1407,10 @@ function renderRoki(){
   $i('rokiBody').innerHTML=html||'<div class="empty">Ni artiklov z roki uporabe.</div>';
 }
 
+var LOT_TYPE_ORDER=['calibrator','reagent-bio','reagent-imuno','control','consumable'];
+var EVAL_TYPES=['calibrator','control','reagent-bio','reagent-imuno'];
+var _lotEvalKey=null;
+
 function _qcMatLotiType(m){
   if((m.lotHistory||[]).some(h=>h.type==='cal'))return 'calibrator';
   return 'control';
@@ -1383,47 +1419,149 @@ function renderLoti(){
   loadPregledDB();
   const q=($i('lotiSearch').value||'').toLowerCase();
   const tf=$i('lotiType').value;
-  const byProd={};
-  // DEL 1: QC materiali iz S.qcMaterials (vedno dostopni brez sync)
-  (S.qcMaterials||[]).forEach(m=>{
-    const lot=qcCurrentLot(m); if(!lot) return;
+  const sf=($i('lotiStatus')||{value:''}).value;
+  let h='';
+
+  // DEL 1: QC materiali iz S.qcMaterials (brez sync)
+  const qcItems=(S.qcMaterials||[]).filter(m=>{
+    const lot=qcCurrentLot(m); if(!lot) return false;
     const mtype=_qcMatLotiType(m);
-    if(tf&&tf!==mtype) return;
-    if(q){const hay=(m.name+' '+lot).toLowerCase();if(!hay.includes(q))return;}
-    let expiry='';
-    const stock=qcStockLotsDistinct(m);
-    if(stock.length) expiry=stock[0].expiry||'';
-    else{try{const vals=qcFindValues(lot);if(vals&&vals.expiry)expiry=vals.expiry;}catch(e){}}
-    const key='__qc__'+m.name;
-    byProd[key]={name:m.name,type:mtype,source:'qc',lots:[{lot,expiry,qty:null}]};
+    if(tf&&tf!==mtype) return false;
+    if(sf) return false; // QC materiali nimajo checked statusa
+    if(q){const hay=(m.name+' '+lot).toLowerCase();return hay.includes(q);}
+    return true;
   });
-  // DEL 2: Zaloga iz DB_PREGLED (potrebuje sync s Pregled BK)
-  DB_PREGLED.inventory.forEach(it=>{
-    if(tf&&it.type!==tf) return;
-    if(q){const hay=((it.name||'')+' '+(it.lot||'')).toLowerCase();if(!hay.includes(q))return;}
-    const key=it.name||'&ndash;';
-    if(!byProd[key]) byProd[key]={name:key,type:it.type,source:'inv',lots:[]};
-    byProd[key].lots.push(it);
+  if(qcItems.length){
+    h+='<div style="font-size:11px;font-weight:700;text-transform:uppercase;padding:6px 0 4px;color:var(--text3)">QC materiali (tablični)</div>';
+    qcItems.forEach((m,pi)=>{
+      const lot=qcCurrentLot(m);
+      const mtype=_qcMatLotiType(m);
+      let expiry='';
+      const stock=qcStockLotsDistinct(m);
+      if(stock.length) expiry=stock[0].expiry||'';
+      else{try{const vals=qcFindValues(lot);if(vals&&vals.expiry)expiry=vals.expiry;}catch(e){}}
+      const dl=expiry?daysLeft(expiry):null;
+      h+='<div style="padding:8px;border-radius:6px;margin-bottom:6px;border:1px solid var(--border);background:var(--bg2)">';
+      h+='<div style="display:flex;align-items:center;gap:6px"><div style="flex:1">';
+      h+='<span style="font-size:12px;font-weight:700">'+m.name+'</span>';
+      h+='<span style="font-size:10px;background:var(--accent2);color:#fff;border-radius:3px;padding:1px 5px;margin-left:5px">QC</span>';
+      h+='<span class="badge '+(TYPE_BADGE[mtype]||'b-gray')+'" style="margin-left:5px">'+(TYPE_LABELS[mtype]||mtype)+'</span>';
+      h+='<br><span style="font-family:var(--mono);font-size:11px;font-weight:700;color:var(--text)">'+lot+'</span>';
+      h+=(expiry?' <span style="font-size:10px;color:var(--text3)">Rok: '+fmtExp(expiry)+'</span>':'');
+      h+='</div>'+(dl!==null?expiryBadge(dl):'')+'</div></div>';
+    });
+  }
+
+  // DEL 2: Loti iz DB_PREGLED.lots[] z ovrednotenjem
+  const lots=(DB_PREGLED.lots||[]).filter(l=>{
+    if(tf&&l.type!==tf) return false;
+    if(sf==='pending'&&l.checked) return false;
+    if(sf==='ok'&&!l.checked) return false;
+    if(q&&l.name.toLowerCase().indexOf(q)<0&&(l.lot||'').toLowerCase().indexOf(q)<0) return false;
+    return true;
   });
-  const prods=Object.values(byProd).sort((a,b)=>a.name.localeCompare(b.name));
-  if(!prods.length){$i('lotiBody').innerHTML='<div class="empty">Ni lotov.</div>';return;}
-  $i('lotiBody').innerHTML=prods.map((p,pi)=>{
-    const isQc=p.source==='qc';
-    const lotRows=p.lots.sort((a,b)=>{const da=daysLeft(a.expiry),db=daysLeft(b.expiry);if(da===null)return 1;if(db===null)return -1;return da-db;}).map(it=>{
-      const dl=daysLeft(it.expiry);
-      const snCount=(it.units||it.serials||[]).length;
-      const epcCount=(it.units?it.units.filter(u=>u.epc).length:(it.rfidEpcs||[]).length);
-      const qtyStr=it.qty!==null&&it.qty!==undefined?(it.qty||0)+' kos':'';
-      return '<div class="lot-row"><div style="flex:1"><span class="lot-n">'+(it.lot||'&ndash;')+'</span>'+
-        (isQc?'<span style="font-size:10px;background:var(--accent2);color:#fff;border-radius:3px;padding:1px 4px;margin-left:4px">QC</span>':'')+
-        '<div style="font-size:11px;color:var(--text3);margin-top:2px">'+fmtExp(it.expiry)+(qtyStr?' &middot; '+qtyStr:'')+(snCount?' &middot; '+snCount+' SN':'')+(epcCount?' &middot; '+epcCount+' EPC':'')+'</div></div>'+
-        (dl!==null?expiryBadge(dl):'')+'</div>';
-    }).join('');
-    return '<div class="prod-card" id="prod'+pi+'"><div class="prod-card-hdr" onclick="$i(\'prod'+pi+'\').classList.toggle(\'open\')">'+
-      '<span class="badge '+(TYPE_BADGE[p.type]||'b-gray')+'">'+(TYPE_LABELS[p.type]||p.type||'&ndash;')+'</span>'+
-      '<span class="prod-card-name">'+p.name+'</span><span class="muted" style="font-size:12px">'+p.lots.length+' lot(ov) &#9662;</span></div>'+
-      '<div class="prod-card-body">'+lotRows+'</div></div>';
-  }).join('');
+  // Stats
+  const totalLots=(DB_PREGLED.lots||[]).length;
+  const pendingLots=(DB_PREGLED.lots||[]).filter(l=>!l.checked).length;
+  const nowM=new Date();const m0=new Date(nowM.getFullYear(),nowM.getMonth(),1);
+  const thisMonth=(DB_PREGLED.lots||[]).filter(l=>l.firstReceivedAt&&new Date(l.firstReceivedAt)>=m0).length;
+  $i('lotsStats').innerHTML=totalLots?
+    '<div class="stat-card" style="flex:1;padding:8px;min-width:70px"><div class="stat-num" style="font-size:18px">'+totalLots+'</div><div class="stat-lbl">Skupaj</div></div>'+
+    '<div class="stat-card" style="flex:1;padding:8px;min-width:70px'+(pendingLots>0?';border-color:#3b82f6':'')+'"><div class="stat-num" style="font-size:18px'+(pendingLots>0?';color:#3b82f6':'')+'">'+pendingLots+'</div><div class="stat-lbl">Čakajo</div></div>'+
+    '<div class="stat-card" style="flex:1;padding:8px;min-width:70px"><div class="stat-num" style="font-size:18px">'+thisMonth+'</div><div class="stat-lbl">Ta mesec</div></div>':'';
+  if(lots.length){
+    LOT_TYPE_ORDER.forEach(type=>{
+      const typeLots=lots.filter(l=>l.type===type);
+      if(!typeLots.length) return;
+      const hasPending=typeLots.some(l=>!l.checked);
+      const pendingCount=typeLots.filter(l=>!l.checked).length;
+      h+='<div style="margin-bottom:4px"><div style="font-size:11px;font-weight:700;text-transform:uppercase;padding:6px 0 4px;color:'+(hasPending?'#3b82f6':'var(--text3)')+'">'+
+        (hasPending?'&#128997; ':'&#9989; ')+(TYPE_LABELS[type]||type)+(pendingCount>0?' (čaka '+pendingCount+')':'')+'</div>';
+      // Grupiraj po artiklu
+      const articles={};
+      typeLots.forEach(l=>{if(!articles[l.gtin])articles[l.gtin]={name:l.name,lots:[]};articles[l.gtin].lots.push(l);});
+      Object.keys(articles).forEach(gtin=>{
+        const art=articles[gtin];
+        h+='<div style="margin-bottom:8px"><div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:4px">'+art.name+'</div>';
+        art.lots.sort((a,b)=>(b.firstReceivedAt||'').localeCompare(a.firstReceivedAt||'')).forEach(l=>{
+          const bg=l.checked?'':'background:#e8f0ff;border-left:3px solid #3b82f6;';
+          const dateStr=l.firstReceivedAt?l.firstReceivedAt.slice(0,10):'-';
+          const expStr=l.expiry?fmtExp(l.expiry):'-';
+          const needsEval=EVAL_TYPES.indexOf(l.type)>=0;
+          const lotSafe=l.lot.replace(/'/g,"\\'");
+          h+='<div style="'+bg+'padding:8px;border-radius:6px;margin-bottom:6px;border:1px solid var(--border)">';
+          h+='<div style="display:flex;align-items:center;gap:6px"><div style="flex:1">';
+          h+='<span style="font-family:var(--mono);font-size:11px;font-weight:700;color:var(--text)">'+l.lot+'</span>';
+          if(!l.checked)h+=' <span style="font-size:9px;font-weight:700;background:#3b82f6;color:#fff;padding:1px 5px;border-radius:5px">&#127381; NOV</span>';
+          h+=' <span style="font-size:10px;color:var(--text3)">Rok: '+expStr+'</span>';
+          h+='<br><span style="font-size:10px;color:var(--text3)">Sprejet: '+dateStr+'</span>';
+          h+='</div>';
+          if(needsEval){
+            if(!l.checked)h+='<button class="btn btn-a btn-sm" onclick="openLotEval(\''+gtin+'\',\''+lotSafe+'\')" style="white-space:nowrap">&#128203; Ovrednoti</button>';
+          } else {
+            h+='<input type="checkbox"'+(l.checked?' checked':'')+'onchange="toggleLotChecked(\''+gtin+'\',\''+lotSafe+'\')" style="width:20px;height:20px;accent-color:#3b82f6">';
+          }
+          h+='</div>';
+          if(needsEval&&l.checked){
+            h+='<div style="font-size:10px;color:var(--green);margin-top:4px;padding-top:4px;border-top:1px solid var(--border)">';
+            h+='&#10003; Ovrednoten '+(l.evalDate||l.checkedAt||'').slice(0,10)+(l.evalAnalyzers&&l.evalAnalyzers.length?' &middot; '+l.evalAnalyzers.join(', '):'');
+            h+=' <a href="#" onclick="openLotEval(\''+gtin+'\',\''+lotSafe+'\');return false" style="color:var(--text3);font-size:9px;margin-left:6px">uredi</a>';
+            h+=' <a href="#" onclick="clearLotEval(\''+gtin+'\',\''+lotSafe+'\');return false" style="color:var(--red);font-size:9px;margin-left:4px">prekliči</a>';
+            h+='</div>';
+          }
+          h+='</div>';
+        });
+        h+='</div>';
+      });
+      h+='</div>';
+    });
+  } else if(!qcItems.length){
+    h='<div class="empty" style="padding:32px 16px">Ni lotov.<br><small>Sinhronizirajte z Zebro (&#8635; Sync) ali prejemite dobavnico.</small></div>';
+  }
+  $i('lotiBody').innerHTML=h;
+}
+function openLotEval(gtin,lot){
+  var l=(DB_PREGLED.lots||[]).filter(function(x){return x.gtin===gtin&&x.lot===lot;})[0];
+  if(!l)return;
+  _lotEvalKey={gtin:gtin,lot:lot};
+  $i('lotEvalName').textContent=l.name;
+  $i('lotEvalLot').textContent='Lot: '+l.lot;
+  $i('lotEvalDate').value=l.evalDate||new Date().toISOString().slice(0,10);
+  var ea=l.evalAnalyzers||[];
+  ['AL01','AL02','AL03','AL04'].forEach(function(a){var el=$i('eval'+a);if(el)el.checked=ea.indexOf(a)>=0;});
+  showMo('moLotEval');
+}
+function confirmLotEval(){
+  if(!_lotEvalKey)return;
+  var l=(DB_PREGLED.lots||[]).filter(function(x){return x.gtin===_lotEvalKey.gtin&&x.lot===_lotEvalKey.lot;})[0];
+  if(!l)return;
+  var analyzers=['AL01','AL02','AL03','AL04'].filter(function(a){var el=$i('eval'+a);return el&&el.checked;});
+  if(analyzers.length<4){notify('Označite vse analizatorje (AL01–AL04)','warning');return;}
+  l.evalDate=$i('lotEvalDate').value||new Date().toISOString().slice(0,10);
+  l.evalAnalyzers=analyzers;
+  l.checked=true;
+  l.checkedAt=new Date().toISOString();
+  _lotEvalKey=null;
+  savePregledDB();
+  closeMo('moLotEval');
+  renderLoti();
+  notify('Lot '+l.lot+' ovrednoten','ok');
+  try{if(typeof AndroidBridge!=='undefined'&&AndroidBridge.msIsSignedIn&&AndroidBridge.msIsSignedIn())msUpload('pregledBK_db',JSON.stringify(DB_PREGLED));}catch(e){}
+}
+function toggleLotChecked(gtin,lot){
+  var l=(DB_PREGLED.lots||[]).filter(function(x){return x.gtin===gtin&&x.lot===lot;})[0];
+  if(!l)return;
+  if(EVAL_TYPES.indexOf(l.type)>=0&&!l.checked){openLotEval(gtin,lot);return;}
+  l.checked=!l.checked;
+  l.checkedAt=l.checked?new Date().toISOString():null;
+  savePregledDB();renderLoti();
+  notify(l.checked?'Lot označen':'Lot odznačen','ok');
+}
+function clearLotEval(gtin,lot){
+  var l=(DB_PREGLED.lots||[]).filter(function(x){return x.gtin===gtin&&x.lot===lot;})[0];
+  if(!l||!confirm('Preklicati ovrednotenje lota '+lot+'?'))return;
+  l.checked=false;l.checkedAt=null;l.evalDate='';l.evalAnalyzers=[];
+  savePregledDB();renderLoti();notify('Ovrednotenje preklicano');
 }
 
 /* ============================================================
