@@ -390,6 +390,7 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
     <div class="tab" data-qc="ljmulti" onclick="navQc('ljmulti')">&#128201; Multi L-J</div>
     <div class="tab" data-qc="assays" onclick="navQc('assays')">&#129514; Preiskave</div>
     <div class="tab" data-qc="qcmaterials" onclick="navQc('qcmaterials')">&#129516; Materiali</div>
+    <div class="tab" data-qc="kalibratorji" onclick="navQc('kalibratorji')">&#9881;&#65039; Kalibratorji</div>
     <div class="tab" data-qc="operators" onclick="navQc('operators')">&#128100; Operaterji</div>
     <div class="tab" data-qc="maintenance" onclick="navQc('maintenance')">&#128295; Vzdržev.</div>
     <div class="tab" data-qc="maint-review" onclick="navQc('maint-review')">&#128197; Pregled vzd.</div>
@@ -534,6 +535,45 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
   <div class="page qc-page" id="page-qcmaterials">
     <div class="sec-hdr"><div class="sec-title" style="font-size:16px">QC Materiali</div><button class="btn btn-a" onclick="openQcModal()">+ Nov</button></div>
     <div class="card" style="padding:0"><div class="tbl-wrap"><table><thead><tr><th>Naziv</th><th>Tip</th><th>Nivoji</th><th>Lot</th><th>Preiskave</th><th></th></tr></thead><tbody id="qcMatBody"></tbody></table></div></div>
+  </div>
+
+  <!-- QC KALIBRATORJI -->
+  <div class="page qc-page" id="page-kalibratorji">
+    <div class="sec-hdr">
+      <div class="sec-title" style="font-size:16px">&#9881;&#65039; Kalibratorji</div>
+      <button class="btn btn-a btn-sm" onclick="openNewBuildModal(null)">+ Nov build</button>
+    </div>
+    <div id="kalibratorjiBody" style="padding:4px 0"></div>
+  </div>
+
+  <!-- KAL NEW BUILD MODAL -->
+  <div class="mo" id="kalBuildModal">
+    <div class="modal" style="max-width:480px">
+      <div class="mh"><h3 id="kalBuildModalTitle">Nov kalibratorski build</h3><button class="mc" onclick="closeMo('kalBuildModal')">&#10005;</button></div>
+      <div class="mb">
+        <div class="fr" style="margin-bottom:8px">
+          <label style="font-size:12px;color:var(--text3)">Material</label>
+          <select id="kalMatSel" style="width:100%"></select>
+        </div>
+        <div class="fr" style="margin-bottom:8px">
+          <label style="font-size:12px;color:var(--text3)">Build / Lot številka</label>
+          <input id="kalLotNum" placeholder="npr. 129 ali LOT12345" style="width:100%">
+        </div>
+        <div class="fr" style="margin-bottom:8px">
+          <label style="font-size:12px;color:var(--text3)">Datum odprtja</label>
+          <input type="date" id="kalLotDate" style="width:100%">
+        </div>
+        <div class="fr" style="margin-bottom:4px">
+          <label style="font-size:12px;color:var(--text3)">Analizatorji (katerim je bil vnešen):</label>
+        </div>
+        <div id="kalAnalyzerList" style="display:flex;flex-wrap:wrap;gap:8px;padding:6px 0 10px"></div>
+        <div class="fr">
+          <label style="font-size:12px;color:var(--text3)">Opomba</label>
+          <input id="kalNote" placeholder="neobvezno" style="width:100%">
+        </div>
+      </div>
+      <div class="mf"><button class="btn btn-g" onclick="closeMo('kalBuildModal')">Prekliči</button><button class="btn btn-a" onclick="saveNewBuild()">Shrani</button></div>
+    </div>
   </div>
 
   <!-- QC OPERATORS -->
@@ -857,6 +897,15 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
   </div>
 </div>
 
+<!-- ============ DOBAVNICE ============ -->
+<div class="page-main" id="main-deliveries">
+  <div class="sec-hdr">
+    <div class="sec-title">&#128666; Dobavnice</div>
+    <button class="btn btn-a btn-sm" onclick="salusCheckNew()">&#8635; Preveri</button>
+  </div>
+  <div id="deliveriesBody" style="padding:8px 4px"></div>
+</div>
+
 </main>
 </div>
 
@@ -866,6 +915,7 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
   <div class="bn-item" data-main="roki" onclick="navMain('roki')"><div class="bn-icon">&#128197;</div>Roki</div>
   <div class="bn-item" data-main="loti" onclick="navMain('loti')"><div class="bn-icon">&#129514;</div>Loti</div>
   <div class="bn-item" data-main="narocila" onclick="navMain('narocila')"><div class="bn-icon">&#128722;</div>Naročila</div>
+  <div class="bn-item" data-main="deliveries" onclick="navMain('deliveries')"><div class="bn-icon">&#128666;</div>Dobavnice</div>
   <div class="bn-item" data-main="servis" onclick="navMain('servis')"><div class="bn-icon">&#128295;</div>Servis</div>
   <div class="bn-item" data-main="qc" onclick="navMain('qc')"><div class="bn-icon">&#128202;</div>QC</div>
   <div class="bn-item" data-main="vec" onclick="navMain('vec')"><div class="bn-icon">&#9776;</div>Več</div>
@@ -1150,6 +1200,7 @@ function navMain(tab){
   if(tab==='vec') renderVec();
   if(tab==='narocila') navOrd(currentOrd||'prepare');
   if(tab==='servis') navSrv(currentSrv||'entry');
+  if(tab==='deliveries') renderDeliveries();
 }
 
 /* ============ QC SUB-NAVIGATION ============ */
@@ -1167,6 +1218,7 @@ function navQc(page){
   if(page==='ljmulti') populateLjmSelects();
   if(page==='assays') renderAssays();
   if(page==='qcmaterials') renderQcMats();
+  if(page==='kalibratorji') renderKalibratorji();
   if(page==='operators') renderOperators();
   if(page==='maintenance') setMaintType(maintState.type||'daily');
   if(page==='maint-review') renderMaintReview();
@@ -1323,28 +1375,49 @@ function renderRoki(){
   $i('rokiBody').innerHTML=html||'<div class="empty">Ni artiklov z roki uporabe.</div>';
 }
 
+function _qcMatLotiType(m){
+  if((m.lotHistory||[]).some(h=>h.type==='cal'))return 'calibrator';
+  return 'control';
+}
 function renderLoti(){
   loadPregledDB();
   const q=($i('lotiSearch').value||'').toLowerCase();
   const tf=$i('lotiType').value;
   const byProd={};
+  // DEL 1: QC materiali iz S.qcMaterials (vedno dostopni brez sync)
+  (S.qcMaterials||[]).forEach(m=>{
+    const lot=qcCurrentLot(m); if(!lot) return;
+    const mtype=_qcMatLotiType(m);
+    if(tf&&tf!==mtype) return;
+    if(q){const hay=(m.name+' '+lot).toLowerCase();if(!hay.includes(q))return;}
+    let expiry='';
+    const stock=qcStockLotsDistinct(m);
+    if(stock.length) expiry=stock[0].expiry||'';
+    else{try{const vals=qcFindValues(lot);if(vals&&vals.expiry)expiry=vals.expiry;}catch(e){}}
+    const key='__qc__'+m.name;
+    byProd[key]={name:m.name,type:mtype,source:'qc',lots:[{lot,expiry,qty:null}]};
+  });
+  // DEL 2: Zaloga iz DB_PREGLED (potrebuje sync s Pregled BK)
   DB_PREGLED.inventory.forEach(it=>{
     if(tf&&it.type!==tf) return;
     if(q){const hay=((it.name||'')+' '+(it.lot||'')).toLowerCase();if(!hay.includes(q))return;}
     const key=it.name||'&ndash;';
-    if(!byProd[key]) byProd[key]={name:key,type:it.type,lots:[]};
+    if(!byProd[key]) byProd[key]={name:key,type:it.type,source:'inv',lots:[]};
     byProd[key].lots.push(it);
   });
   const prods=Object.values(byProd).sort((a,b)=>a.name.localeCompare(b.name));
   if(!prods.length){$i('lotiBody').innerHTML='<div class="empty">Ni lotov.</div>';return;}
   $i('lotiBody').innerHTML=prods.map((p,pi)=>{
+    const isQc=p.source==='qc';
     const lotRows=p.lots.sort((a,b)=>{const da=daysLeft(a.expiry),db=daysLeft(b.expiry);if(da===null)return 1;if(db===null)return -1;return da-db;}).map(it=>{
       const dl=daysLeft(it.expiry);
       const snCount=(it.units||it.serials||[]).length;
       const epcCount=(it.units?it.units.filter(u=>u.epc).length:(it.rfidEpcs||[]).length);
+      const qtyStr=it.qty!==null&&it.qty!==undefined?(it.qty||0)+' kos':'';
       return '<div class="lot-row"><div style="flex:1"><span class="lot-n">'+(it.lot||'&ndash;')+'</span>'+
-        '<div style="font-size:11px;color:var(--text3);margin-top:2px">'+fmtExp(it.expiry)+' &middot; '+(it.qty||0)+' kos'+(snCount?' &middot; '+snCount+' SN':'')+(epcCount?' &middot; '+epcCount+' EPC':'')+'</div></div>'+
-        expiryBadge(dl)+'</div>';
+        (isQc?'<span style="font-size:10px;background:var(--accent2);color:#fff;border-radius:3px;padding:1px 4px;margin-left:4px">QC</span>':'')+
+        '<div style="font-size:11px;color:var(--text3);margin-top:2px">'+fmtExp(it.expiry)+(qtyStr?' &middot; '+qtyStr:'')+(snCount?' &middot; '+snCount+' SN':'')+(epcCount?' &middot; '+epcCount+' EPC':'')+'</div></div>'+
+        (dl!==null?expiryBadge(dl):'')+'</div>';
     }).join('');
     return '<div class="prod-card" id="prod'+pi+'"><div class="prod-card-hdr" onclick="$i(\'prod'+pi+'\').classList.toggle(\'open\')">'+
       '<span class="badge '+(TYPE_BADGE[p.type]||'b-gray')+'">'+(TYPE_LABELS[p.type]||p.type||'&ndash;')+'</span>'+
@@ -1440,12 +1513,13 @@ function defaultQcMaterials(){return [
 let S = { assays:[], qcMaterials:[], operators:[], entries:[], currentAssayTab:'biochem',
   editingAssayIdx:null, editingQcIdx:null, editingOpIdx:null, wiz:{}, pinValue:'',
   ljRules:{'1_2s':true,'1_3s':true,'2_2s':true,'R_4s':true,'4_1s':true,'10_x':true},
-  assayRules:{}, maintenanceLog:[], maintSteps:null, serviceLog:[] };
+  assayRules:{}, maintenanceLog:[], maintSteps:null, serviceLog:[], deliveries:[] };
 
 function initState(){
   const sv=localStorage.getItem('qclab_v2');
   if(sv){try{const p=JSON.parse(sv);Object.assign(S,p);if(!S.assayRules)S.assayRules={};if(!S.maintenanceLog)S.maintenanceLog=[];if(!S.ljRules['10_x'])S.ljRules['10_x']=true;}catch(e){}}
   if(!S.serviceLog)S.serviceLog=[];
+  if(!S.deliveries)S.deliveries=[];
   if(!S.reports)S.reports=[];
   if(!S.pendingReports)S.pendingReports=[];
   if(typeof S.lastReportMonth!=='string')S.lastReportMonth='';
@@ -3618,6 +3692,272 @@ function drawBars(canvasId,data,title){
 }
 
 /* ============ BOOT ============ */
+// ===== DOBAVNICE SALUS =====
+var _salusQueue=[];
+function parseSalusText(pages){
+  var text=(Array.isArray(pages)?pages:[pages]).join('\n');
+  var lines=text.split('\n');
+  var items={};
+  var ph=null;
+  for(var i=0;i<lines.length;i++){
+    var line=lines[i].trim();
+    var hm=line.match(/^(\d+)\.\s+([A-Z][A-Z0-9]+)(?:\s+\d{5,7})?\s+(.+?)\s+ABBO\s+(\d+)\s+KOS/);
+    if(hm){ph={name:hm[3].trim(),qty:parseInt(hm[4],10),salusCode:hm[2]};continue;}
+    var dm=line.match(/^01\*\s+\d+\s+(\d{14})\s+(\S+)\s+(\d{2})\.(\d{2})\.(\d{4})/);
+    if(dm&&ph){
+      var gtin=dm[1],lot=dm[2];
+      var expiry=dm[3]+dm[4]+dm[5].slice(2);
+      var key=gtin+'|'+lot;
+      if(items[key]){items[key].qty+=ph.qty;}
+      else{items[key]={gtin:gtin,lot:lot,expiry:expiry,name:ph.name,qty:ph.qty,
+        salusCode:ph.salusCode,catalog:'',matched:false,
+        matchedType:_salusGuessType(ph.name)};}
+      ph=null;
+    }
+  }
+  var out=[];Object.keys(items).forEach(function(k){out.push(items[k]);});
+  return out;
+}
+function _salusGuessType(name){
+  var n=(name||'').toUpperCase();
+  if(n.indexOf('KALIB')>=0)return 'calibrator';
+  if(n.indexOf('CTRL')>=0||n.indexOf('QC')>=0)return 'control';
+  return 'reagent-bio';
+}
+function enrichDeliveryItems(items){
+  loadPregledDB();
+  items.forEach(function(it){
+    var gr=(DB_PREGLED.gtins||[]).filter(function(g){return g.gtin===it.gtin;})[0];
+    if(gr){it.matchedType=gr.type||it.matchedType;it.catalog=gr.catalog||it.catalog||'';
+      if(gr.name&&gr.name.length>3)it.name=gr.name;it.matched=true;}
+    else{it.matched=false;}
+  });
+}
+function salusCheckNew(){
+  if(typeof AndroidBridge==='undefined'||!AndroidBridge.msIsSignedIn||!AndroidBridge.msIsSignedIn()){notify('Ni prijave v OneDrive','warning');return;}
+  if(!AndroidBridge.msListFolder){notify('msListFolder ni na voljo','warning');return;}
+  try{AndroidBridge.msListFolder('Salus_Dobavnice');}catch(e){notify('Napaka: '+e,'error');}
+}
+function onMsFolderListed(json,msg){
+  if(!json){notify('Napaka OneDrive: '+(msg||''),'error');return;}
+  var data;try{data=JSON.parse(json);}catch(e){return;}
+  var files=data.value||[];
+  var known={};(S.deliveries||[]).forEach(function(d){known[d.file]=true;});
+  _salusQueue=[];
+  files.forEach(function(f){
+    var n=f.name||'';
+    if(n.indexOf('.salus.json')<0)return;
+    var pdf=n.replace('.salus.json','.pdf');
+    if(known[pdf])return;
+    _salusQueue.push(n);
+  });
+  if(_salusQueue.length===0){notify('Ni novih dobavnic Salus','ok');return;}
+  notify('Nalagam '+_salusQueue.length+' dobavnic…','ok');
+  _salusDownloadNext();
+}
+function _salusDownloadNext(){
+  if(_salusQueue.length===0){
+    save();
+    var pg=$i('main-deliveries');if(pg&&pg.classList.contains('active'))renderDeliveries();
+    notify('Dobavnice Salus posodobljene','ok');return;
+  }
+  var name=_salusQueue.shift();
+  try{AndroidBridge.msDownloadText('Salus_Dobavnice/'+name);}catch(e){_salusDownloadNext();}
+}
+function onMsTextFile(json,msg){
+  if(!json){_salusDownloadNext();return;}
+  var data;try{data=JSON.parse(json);}catch(e){_salusDownloadNext();return;}
+  if(data.supplier==='Salus'&&Array.isArray(data.pages)){
+    var items=parseSalusText(data.pages);
+    enrichDeliveryItems(items);
+    if(!S.deliveries)S.deliveries=[];
+    S.deliveries.push({id:Date.now().toString(),file:data.file,supplier:data.supplier,
+      fetchedAt:data.fetchedAt||new Date().toISOString(),status:'pending',items:items});
+  }
+  _salusDownloadNext();
+}
+function renderDeliveries(){
+  if(!S.deliveries)S.deliveries=[];
+  var pending=S.deliveries.filter(function(d){return d.status==='pending';});
+  var done=S.deliveries.filter(function(d){return d.status!=='pending';});
+  var h='';
+  if(!pending.length&&!done.length){
+    h='<div style="text-align:center;color:var(--text3);padding:40px 20px">Ni dobavnic.<br><small>Kliknite &#8635; Preveri za osveževanje.</small></div>';
+  }
+  pending.forEach(function(d){h+=_renderDelivCard(d,true);});
+  if(done.length){
+    h+='<div style="margin-top:16px;font-size:11px;color:var(--text3);font-weight:700;text-transform:uppercase;padding:4px 0">Zaključene ('+done.length+')</div>';
+    done.slice().reverse().forEach(function(d){h+=_renderDelivCard(d,false);});
+  }
+  $i('deliveriesBody').innerHTML=h;
+}
+function _renderDelivCard(d,canConfirm){
+  var date=(d.fetchedAt||'').slice(0,10);
+  var fname=(d.file||'').replace('.pdf','');
+  var totalQty=(d.items||[]).reduce(function(s,it){return s+(it.qty||0);},0);
+  var hasUnknown=(d.items||[]).some(function(it){return !it.matched;});
+  var badge=d.status==='pending'?'<span style="color:#3b82f6;font-weight:700">&#9679; Čaka</span>':
+    d.status==='done'?'<span style="color:var(--green);font-weight:700">&#10003; Sprejeto</span>':
+    '<span style="color:var(--text3)">Preskočeno</span>';
+  var h='<div style="border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:10px;background:var(--bg2)">';
+  h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">';
+  h+='<div><div style="font-size:12px;font-weight:700;color:var(--text)">'+fname+'</div>';
+  h+='<div style="font-size:10px;color:var(--text3)">'+date+' &middot; '+(d.items||[]).length+' art. &middot; '+totalQty+' kos</div></div>';
+  h+=badge+'</div>';
+  if(hasUnknown&&canConfirm)h+='<div style="font-size:10px;color:var(--orange);margin-bottom:6px">&#9888; Nekateri GTIN niso v šifrantu</div>';
+  h+='<div style="font-size:11px;max-height:160px;overflow-y:auto;margin-bottom:8px">';
+  (d.items||[]).forEach(function(it){
+    var expStr=it.expiry?(it.expiry.slice(0,2)+'.'+it.expiry.slice(2,4)+'.20'+it.expiry.slice(4)):'';
+    var tc={calibrator:'#8b5cf6','reagent-bio':'#3b82f6','reagent-imuno':'#06b6d4',control:'#f59e0b',consumable:'#6b7280'};
+    var col=tc[it.matchedType]||'#999';
+    h+='<div style="display:flex;gap:6px;padding:3px 0;border-bottom:1px solid var(--border);align-items:center">';
+    h+='<span style="font-size:10px;font-weight:700;color:'+col+';min-width:22px">'+(it.qty||1)+'×</span>';
+    h+='<div style="flex:1;min-width:0">';
+    h+='<div style="font-size:11px;color:'+(it.matched?'var(--text)':'var(--orange)')+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(it.matched?'':'&#9888; ')+it.name+'</div>';
+    h+='<div style="font-size:9px;color:var(--text3)">'+it.lot+(expStr?' &middot; '+expStr:'')+'</div>';
+    h+='</div></div>';
+  });
+  h+='</div>';
+  if(canConfirm){
+    h+='<div style="display:flex;gap:6px">';
+    h+='<button class="btn btn-g" style="flex:1;font-size:11px;justify-content:center" onclick="skipDelivery(\''+d.id+'\')">Preskoči</button>';
+    h+='<button class="btn btn-a" style="flex:2;font-size:11px;justify-content:center" onclick="confirmDelivery(\''+d.id+'\')">&#10003; Potrdi sprejem</button>';
+    h+='</div>';
+  }
+  h+='</div>';
+  return h;
+}
+function confirmDelivery(id){
+  var d=(S.deliveries||[]).filter(function(x){return x.id===id;})[0];
+  if(!d)return;
+  loadPregledDB();
+  var added=0;
+  (d.items||[]).forEach(function(it){
+    if(!it.gtin)return;
+    var type=it.matchedType||'reagent-bio';
+    for(var i=0;i<(it.qty||1);i++){
+      if(!DB_PREGLED.received)DB_PREGLED.received=[];
+      DB_PREGLED.received.push({id:(Date.now()+added).toString(),gtin:it.gtin,name:it.name||'',
+        type:type,lot:it.lot||'',expiry:it.expiry||'',serial:'',
+        catalog:it.catalog||'',ident:'',rfidEpc:'',
+        receivedAt:new Date().toISOString(),status:'active',source:'salus'});
+      added++;
+    }
+  });
+  d.status='done';
+  savePregledDB();
+  save();
+  renderDeliveries();
+  notify('Sprejem '+added+' kosov potrjen','ok');
+}
+function skipDelivery(id){
+  var d=(S.deliveries||[]).filter(function(x){return x.id===id;})[0];
+  if(!d)return;
+  if(!confirm('Preskočiti dobavnico '+d.file+'?'))return;
+  d.status='skipped';save();renderDeliveries();
+}
+
+// ===== KALIBRATORJI BUILD TRACKING =====
+const KAL_ANALYZERS=['AL01 C1','AL01 I2','AL02 C1','AL02 C3','AL03 C1','AL03 C3','AL03 I2','AL04 C1','ABTL L1'];
+var _kalBuildMatIdx=null;
+function renderKalibratorji(){
+  var mats=(S.qcMaterials||[]).map(function(m,i){return {m:m,i:i};}).filter(function(x){
+    return (x.m.lotHistory||[]).some(function(h){return h.type==='cal';});
+  });
+  if(!mats.length){
+    $i('kalibratorjiBody').innerHTML='<div class="empty" style="padding:32px 16px">Ni kalibrator materialov z evidentiranimi buildi.<br><small>Kliknite <strong>+ Nov build</strong> za začetek.</small></div>';
+    return;
+  }
+  $i('kalibratorjiBody').innerHTML=mats.map(function(x){
+    var m=x.m,mi=x.i;
+    var calEntries=(m.lotHistory||[]).filter(function(h){return h.type==='cal';});
+    var latest=calEntries[calEntries.length-1];
+    var pendingAnals=latest?KAL_ANALYZERS.filter(function(a){
+      var ana=latest.analyzers&&typeof latest.analyzers==='object'&&!Array.isArray(latest.analyzers)?latest.analyzers:{};
+      return !(ana[a]&&ana[a].done);
+    }):[];
+    var statusBadge=pendingAnals.length===0?
+      '<span style="color:var(--green);font-weight:700;font-size:11px">&#10003; Vsi vnešeni</span>':
+      '<span style="color:var(--orange);font-weight:700;font-size:11px">'+pendingAnals.length+' čakata</span>';
+    var h='<div class="card" style="margin-bottom:10px">';
+    h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
+    h+='<div><div style="font-weight:700;font-size:14px">'+m.name+'</div>';
+    h+=(latest?'<div style="font-size:11px;color:var(--text3)">Aktiven build: <strong>'+latest.lot+'</strong> ('+latest.date+')</div>':'<div style="font-size:11px;color:var(--text3)">Ni vnosa</div>');
+    h+='</div>';
+    h+='<div style="display:flex;gap:6px;align-items:center">'+statusBadge+'<button class="btn btn-a btn-sm" onclick="openNewBuildModal('+mi+')">+ Build</button></div></div>';
+    if(latest){
+      var ana=latest.analyzers&&typeof latest.analyzers==='object'&&!Array.isArray(latest.analyzers)?latest.analyzers:{};
+      h+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px">';
+      KAL_ANALYZERS.forEach(function(a){
+        var done=ana[a]&&ana[a].done;
+        var doneAt=ana[a]&&ana[a].doneAt?ana[a].doneAt.slice(0,10):'';
+        h+='<div style="border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:11px;text-align:center;min-width:64px;background:'+(done?'var(--green-bg, #d1fae5)':'var(--bg2)')+'">';
+        h+='<div style="font-weight:700;color:'+(done?'var(--green)':'var(--text3)')+'">'+a+'</div>';
+        h+=(done?'<div style="font-size:9px;color:var(--green)">'+doneAt+'</div>':'<button class="btn btn-g" style="font-size:9px;padding:2px 6px;margin-top:2px" onclick="confirmBuildAnalyzer('+mi+','+(calEntries.length-1)+',\''+a+'\')">Potrdi</button>');
+        h+='</div>';
+      });
+      h+='</div>';
+    }
+    if(calEntries.length>1){
+      h+='<details><summary style="font-size:11px;color:var(--text3);cursor:pointer">Zgodovina ('+calEntries.length+' buildov)</summary>';
+      h+='<div style="font-size:11px;margin-top:6px">';
+      calEntries.slice(0,-1).reverse().forEach(function(e){
+        h+='<div style="padding:4px 0;border-bottom:1px solid var(--border);color:var(--text3)"><strong>'+e.lot+'</strong> &middot; '+e.date+(e.note?' &middot; '+e.note:'')+'</div>';
+      });
+      h+='</div></details>';
+    }
+    h+='</div>';
+    return h;
+  }).join('');
+}
+function openNewBuildModal(matIdx){
+  _kalBuildMatIdx=matIdx;
+  var sel=$i('kalMatSel');
+  sel.innerHTML=(S.qcMaterials||[]).map(function(m,i){
+    return '<option value="'+i+'"'+(i===matIdx?' selected':'')+'>'+m.name+'</option>';
+  }).join('');
+  $i('kalLotNum').value='';
+  $i('kalLotDate').value=new Date().toISOString().slice(0,10);
+  $i('kalNote').value='';
+  var list=$i('kalAnalyzerList');
+  list.innerHTML=KAL_ANALYZERS.map(function(a){
+    return '<label style="display:flex;align-items:center;gap:4px;font-size:12px"><input type="checkbox" class="kal-anal-cb" value="'+a+'" checked> '+a+'</label>';
+  }).join('');
+  $i('kalBuildModalTitle').textContent='Nov kalibratorski build'+(matIdx!=null?' — '+(S.qcMaterials[matIdx]||{}).name:'');
+  showMo('kalBuildModal');
+}
+function saveNewBuild(){
+  var mi=parseInt($i('kalMatSel').value);
+  var lot=$i('kalLotNum').value.trim();
+  var date=$i('kalLotDate').value;
+  var note=$i('kalNote').value.trim();
+  if(!lot){notify('Vpišite lot/build številko','warning');return;}
+  if(!date){notify('Izberite datum','warning');return;}
+  var m=S.qcMaterials[mi];if(!m){notify('Material ni izbran','warning');return;}
+  var checkedAnals=[...$i('kalAnalyzerList').querySelectorAll('.kal-anal-cb:checked')].map(function(el){return el.value;});
+  var analyzers={};
+  KAL_ANALYZERS.forEach(function(a){
+    var done=checkedAnals.indexOf(a)>=0;
+    analyzers[a]={done:done,doneAt:done?new Date().toISOString().slice(0,10):null};
+  });
+  if(!m.lotHistory)m.lotHistory=[{lot:m.lot||'–',date:'',type:'qc',note:'Začetni lot'}];
+  m.lotHistory.push({lot:lot,date:date,type:'cal',note:note,analyzers:analyzers});
+  save();
+  closeMo('kalBuildModal');
+  renderKalibratorji();
+  notify('Build '+lot+' shranjen','ok');
+}
+function confirmBuildAnalyzer(matIdx,calIdx,analyzer){
+  var m=S.qcMaterials[matIdx];if(!m||!m.lotHistory)return;
+  var calEntries=m.lotHistory.filter(function(h){return h.type==='cal';});
+  var entry=calEntries[calIdx];if(!entry)return;
+  if(!entry.analyzers||typeof entry.analyzers!=='object'||Array.isArray(entry.analyzers))entry.analyzers={};
+  entry.analyzers[analyzer]={done:true,doneAt:new Date().toISOString().slice(0,10)};
+  save();
+  renderKalibratorji();
+  notify(analyzer+' potrjen','ok');
+}
+
 loadPregledDB();
 loadOrd();
 initState();

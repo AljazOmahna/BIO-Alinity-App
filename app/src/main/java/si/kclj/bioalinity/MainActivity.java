@@ -495,6 +495,24 @@ public class MainActivity extends AppCompatActivity {
             }));
         }
 
+        @JavascriptInterface
+        public void msListFolder(String folder) {
+            final String f = folder;
+            mainHandler.post(() -> msAcquireToken("folder_" + f, (token, err) -> {
+                if (token == null) { callJs("onMsFolderListed(null," + jsStr(err) + ")"); return; }
+                graphListFolder(f, token);
+            }));
+        }
+
+        @JavascriptInterface
+        public void msDownloadText(String path) {
+            final String p = path;
+            mainHandler.post(() -> msAcquireToken("text_" + p, (token, err) -> {
+                if (token == null) { callJs("onMsTextFile(null," + jsStr(err) + ")"); return; }
+                graphGetText(p, token);
+            }));
+        }
+
         // Sestavi PDF iz HTML-ja, shrani lokalno (Porocila/<leto>) in naloži v OneDrive DigiLab/<subfolder>/<filename>.
         @JavascriptInterface
         public void generateAndUploadReport(String subfolder, String filename, String html) {
@@ -607,6 +625,59 @@ public class MainActivity extends AppCompatActivity {
                     callJs("onMsDownloadDone(" + jsStr(key) + "," + jsStr(bodyStr) + ",'ok')");
                 } else {
                     callJs("onMsDownloadDone(" + jsStr(key) + ",null," + jsStr("Graph napaka " + code) + ")");
+                }
+            }
+        });
+    }
+
+    private void graphListFolder(final String folder, String token) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(Uri.encode(MS_FOLDER));
+        for (String seg : folder.split("/")) {
+            if (!seg.isEmpty()) sb.append("/").append(Uri.encode(seg));
+        }
+        String url = "https://graph.microsoft.com/v1.0/me/drive/root:/"
+                + sb + ":/children?$select=name,id,lastModifiedDateTime&$top=200";
+        Request req = new Request.Builder()
+                .url(url)
+                .header("Authorization", "Bearer " + token)
+                .get()
+                .build();
+        http.newCall(req).enqueue(new Callback() {
+            @Override public void onFailure(@NonNull Call call, @NonNull IOException e) {
+                callJs("onMsFolderListed(null," + jsStr("Napaka mreže: " + e.getMessage()) + ")");
+            }
+            @Override public void onResponse(@NonNull Call call, @NonNull Response resp) {
+                int code = resp.code();
+                String body = null;
+                try { ResponseBody rb = resp.body(); if (rb != null) body = rb.string(); } catch (IOException ignored) {} finally { resp.close(); }
+                if (code >= 200 && code < 300 && body != null) {
+                    callJs("onMsFolderListed(" + jsStr(body) + ",'ok')");
+                } else {
+                    callJs("onMsFolderListed(null," + jsStr("Graph napaka " + code) + ")");
+                }
+            }
+        });
+    }
+
+    private void graphGetText(final String relPath, String token) {
+        Request req = new Request.Builder()
+                .url(graphPathUrl(relPath))
+                .header("Authorization", "Bearer " + token)
+                .get()
+                .build();
+        http.newCall(req).enqueue(new Callback() {
+            @Override public void onFailure(@NonNull Call call, @NonNull IOException e) {
+                callJs("onMsTextFile(null," + jsStr("Napaka mreže: " + e.getMessage()) + ")");
+            }
+            @Override public void onResponse(@NonNull Call call, @NonNull Response resp) {
+                int code = resp.code();
+                String body = null;
+                try { ResponseBody rb = resp.body(); if (rb != null) body = rb.string(); } catch (IOException ignored) {} finally { resp.close(); }
+                if (code >= 200 && code < 300 && body != null) {
+                    callJs("onMsTextFile(" + jsStr(body) + ",'ok')");
+                } else {
+                    callJs("onMsTextFile(null," + jsStr("Graph napaka " + code) + ")");
                 }
             }
         });
