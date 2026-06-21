@@ -1698,6 +1698,8 @@ function initState(){
   /* vzdrževalna opravila: privzeta iz OB-KIKKB obrazcev, urejljiva */
   if(!S.maintSteps)S.maintSteps=JSON.parse(JSON.stringify(MAINT_DEFAULTS));
   ['daily','weekly','monthly','quarterly'].forEach(t=>{if(!S.maintSteps[t])S.maintSteps[t]={c:[],i:[],l:[]};if(!S.maintSteps[t].c)S.maintSteps[t].c=[];if(!S.maintSteps[t].i)S.maintSteps[t].i=[];if(!S.maintSteps[t].l)S.maintSteps[t].l=[];});
+  /* migracija: seed privzetih linijskih (l) opravil, če jih star S.maintSteps še nima */
+  if(S.maintStepsSchema!==2){['daily','weekly','monthly','quarterly'].forEach(t=>{if((!S.maintSteps[t].l||!S.maintSteps[t].l.length)&&(MAINT_DEFAULTS[t].l||[]).length)S.maintSteps[t].l=JSON.parse(JSON.stringify(MAINT_DEFAULTS[t].l));});S.maintStepsSchema=2;}
   /* migracija starih zapisov: triannual → quarterly (3-mesečno) */
   (S.maintenanceLog||[]).forEach(m=>{if(m.type==='triannual')m.type='quarterly';});
   if(!S.assays.length) S.assays=[...DEFAULT_BIOCHEM.map(n=>({name:n,type:'biochem'})),...DEFAULT_IMMUNO.map(n=>({name:n,type:'immuno'}))];
