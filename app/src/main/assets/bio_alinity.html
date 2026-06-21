@@ -425,7 +425,7 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
     <div class="tab" data-qc="operators" onclick="navQc('operators')">&#128100; Operaterji</div>
     <div class="tab" data-qc="maintenance" onclick="navQc('maintenance')">&#128295; Vzdržev.</div>
     <div class="tab" data-qc="maint-review" onclick="navQc('maint-review')">&#128197; Pregled vzd.</div>
-    <div class="tab" data-qc="notifications" onclick="navQc('notifications')">&#128276; Obvestila</div>
+    <div class="tab" data-qc="notifications" onclick="navQc('notifications')">&#128276; Obvestila <span id="notifBadge" style="display:none;background:var(--red);color:#fff;border-radius:10px;font-size:10px;padding:1px 6px;margin-left:2px;font-weight:700;vertical-align:middle"></span></div>
   </div>
 
   <!-- QC DASHBOARD -->
@@ -1740,6 +1740,7 @@ function buildInstrMap(){
   }).join('');
 }
 function renderDashboard(){
+  _updateNotifBadge();
   const today=new Date().toDateString();
   const weekAgo=new Date();weekAgo.setDate(weekAgo.getDate()-7);
   $i('stat-today').textContent=S.entries.filter(e=>new Date(e.datetime).toDateString()===today).length;
@@ -1903,9 +1904,21 @@ function renderQcSignoff(){
   const revs=[...(S.qcReviews||[])].sort((a,b)=>(b.datetime||'').localeCompare(a.datetime||''));
   const tb=$i('qcReviewHistBody');
   if(!revs.length){tb.innerHTML='<tr><td colspan="6" class="empty">Ni pregledov.</td></tr>';return;}
-  tb.innerHTML=revs.map(r=>'<tr><td style="font-size:12px">'+(r.datetime||'').slice(0,16).replace('T',' ')+'</td><td><span class="badge badge-blue">'+r.instrId+'</span></td><td style="font-size:12px">'+(r.fromDate||'')+' &ndash; '+(r.toDate||'')+'</td><td>'+getOpName(r.reviewerId)+'</td><td style="font-size:12px;max-width:220px">'+(r.actions?_repEsc(r.actions):'<span class="muted">&ndash;</span>')+'</td><td><button class="btn btn-d btn-sm" onclick="deleteQcReview(\''+r.id+'\')">🗑️</button></td></tr>').join('');
+  tb.innerHTML=revs.map(r=>'<tr><td style="font-size:12px">'+(r.datetime||'').slice(0,16).replace('T',' ')+'</td><td><span class="badge badge-blue">'+r.instrId+'</span></td><td style="font-size:12px">'+(r.fromDate||'')+' &ndash; '+(r.toDate||'')+'</td><td>'+getOpName(r.reviewerId)+'</td><td style="font-size:12px;max-width:220px">'+(r.actions?_repEsc(r.actions):'<span class="muted">&ndash;</span>')+'</td><td style="white-space:nowrap"><button class="btn btn-g btn-sm" onclick="openQcReviewEdit(\''+r.id+'\')" style="margin-right:4px">&#9998;</button><button class="btn btn-d btn-sm" onclick="deleteQcReview(\''+r.id+'\')">&#128465;</button></td></tr>').join('');
 }
 function deleteQcReview(id){if(!confirm('Izbrisati ta pregled?'))return;S.qcReviews=(S.qcReviews||[]).filter(r=>r.id!==id);save();renderQcSignoff();notify('Pregled izbrisan');}
+function openQcReviewEdit(id){
+  const rev=(S.qcReviews||[]).find(r=>r.id===id);if(!rev)return;
+  qcReviewState={instrId:rev.instrId,editId:id};qcRevPin='';
+  $i('qcRevTitle').textContent='Uredi pregled – '+rev.instrId;
+  $i('qcRevSummary').innerHTML='<div style="background:rgba(176,120,0,.1);border:1px solid rgba(176,120,0,.3);border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:4px">'
+    +'<div style="font-weight:600;color:var(--yellow);margin-bottom:4px">&#9998; Urejanje obstoječega pregleda</div>'
+    +'Obdobje: <b>'+(rev.fromDate||'')+'</b> &ndash; <b>'+(rev.toDate||'')+'</b><br>'
+    +'Prvotni pregledovalec: '+getOpName(rev.reviewerId)+'</div>';
+  $i('qcRevActions').value=rev.actions||'';
+  buildQcRevPinGrid();updateQcRevPinDisplay();
+  showMo('qcReviewModal');
+}
 function openQcReviewSign(instrId){
   qcReviewState={instrId};qcRevPin='';
   const today=new Date().toISOString().slice(0,10);const from=_qcReviewFrom(instrId);const fl=_qcFailsInPeriod(instrId,from,today);
@@ -1924,11 +1937,20 @@ function updateQcRevPinDisplay(){for(let i=0;i<5;i++)$i('qrpd'+i)?.classList.tog
 function saveQcReview(){
   if(qcRevPin.length<5){notify('Vpišite matično številko','warning');return;}
   const op=S.operators.find(o=>o.id===qcRevPin);if(!op){notify('Operater ni registriran','error');return;}
-  const instrId=qcReviewState.instrId;const today=new Date().toISOString().slice(0,10);const from=_qcReviewFrom(instrId);
-  if(!S.qcReviews)S.qcReviews=[];
   const actions=$i('qcRevActions').value.trim();
+  if(!S.qcReviews)S.qcReviews=[];
+  // UREDI obstoječi pregled
+  if(qcReviewState.editId){
+    const idx=S.qcReviews.findIndex(r=>r.id===qcReviewState.editId);
+    if(idx>=0)Object.assign(S.qcReviews[idx],{actions,reviewerId:qcRevPin,editedAt:new Date().toISOString()});
+    save();closeMo('qcReviewModal');renderQcSignoff();notify('Pregled posodobljen ✓','success');
+    try{if(typeof AndroidBridge!=='undefined'&&AndroidBridge.msIsSignedIn&&AndroidBridge.msIsSignedIn())msUpload('qclab_v2',JSON.stringify(S));}catch(e){}
+    return;
+  }
+  // NOV pregled
+  const instrId=qcReviewState.instrId;const today=new Date().toISOString().slice(0,10);const from=_qcReviewFrom(instrId);
   S.qcReviews.push({id:Date.now().toString(),datetime:new Date().toISOString(),instrId,fromDate:from,toDate:today,reviewerId:qcRevPin,actions,note:''});
-  if(actions){if(!S.notifications)S.notifications=[];S.notifications.push({id:(Date.now()+1).toString(),datetime:new Date().toISOString(),type:'qcreview',message:actions,authorId:qcRevPin,instrId,resolved:false});}
+  if(actions){if(!S.notifications)S.notifications=[];S.notifications.push({id:(Date.now()+1).toString(),datetime:new Date().toISOString(),type:'qcreview',message:actions,authorId:qcRevPin,instrId,resolved:false});_updateNotifBadge();}
   save();closeMo('qcReviewModal');renderQcSignoff();notify('Pregled QC zabeležen ✓','success');
   _syncNotifLog();
   try{if(typeof AndroidBridge!=='undefined'&&AndroidBridge.msIsSignedIn&&AndroidBridge.msIsSignedIn())msUpload('qclab_v2',JSON.stringify(S));}catch(e){}
@@ -1944,6 +1966,11 @@ function _qcReviewsForMonth(instrId,year,month){
 }
 
 /* ===== OBVESTILA ===== */
+function _updateNotifBadge(){
+  const n=(S.notifications||[]).filter(x=>!x.resolved).length;
+  const b=$i('notifBadge');if(!b)return;
+  if(n>0){b.textContent=n;b.style.display='';}else{b.style.display='none';}
+}
 var notifPin='';
 function openNotifModal(){
   notifPin='';_buildNotifPinGrid();updateNotifPinDisplay();
@@ -1966,17 +1993,17 @@ function saveNotif(){
   const type=document.querySelector('input[name="notifType"]:checked')?.value||'manual';
   if(!S.notifications)S.notifications=[];
   S.notifications.push({id:Date.now().toString(),datetime:new Date().toISOString(),type,message:msg,authorId:notifPin,instrId:'',resolved:false});
-  save();closeMo('notifModal');renderNotifications();notify('Obvestilo objavljeno ✓','success');
+  save();closeMo('notifModal');renderNotifications();_updateNotifBadge();notify('Obvestilo objavljeno ✓','success');
   _syncNotifLog();
   try{if(typeof AndroidBridge!=='undefined'&&AndroidBridge.msIsSignedIn&&AndroidBridge.msIsSignedIn())msUpload('qclab_v2',JSON.stringify(S));}catch(e){}
 }
 function resolveNotif(id){
   const n=(S.notifications||[]).find(x=>x.id===id);if(!n)return;
   n.resolved=true;n.resolvedAt=new Date().toISOString();
-  save();renderNotifications();_syncNotifLog();
+  save();renderNotifications();_updateNotifBadge();_syncNotifLog();
   try{if(typeof AndroidBridge!=='undefined'&&AndroidBridge.msIsSignedIn&&AndroidBridge.msIsSignedIn())msUpload('qclab_v2',JSON.stringify(S));}catch(e){}
 }
-function deleteNotif(id){if(!confirm('Izbrisati obvestilo?'))return;S.notifications=(S.notifications||[]).filter(x=>x.id!==id);save();renderNotifications();}
+function deleteNotif(id){if(!confirm('Izbrisati obvestilo?'))return;S.notifications=(S.notifications||[]).filter(x=>x.id!==id);save();renderNotifications();_updateNotifBadge();}
 function renderNotifications(){
   const wrap=$i('notifListWrap');if(!wrap)return;
   const all=[...(S.notifications||[])].sort((a,b)=>(b.datetime||'').localeCompare(a.datetime||''));
@@ -2003,6 +2030,7 @@ function renderNotifications(){
   if(unresolved.length){html+='<div style="font-weight:700;font-size:12px;color:var(--orange);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">&#9888; Nerazrešena ('+unresolved.length+')</div>';html+=unresolved.map(renderCard).join('');}
   if(resolved.length){html+='<div style="font-weight:700;font-size:12px;color:var(--text3);margin:14px 0 6px;text-transform:uppercase;letter-spacing:.5px">Razrešena ('+resolved.length+')</div>';html+=resolved.map(renderCard).join('');}
   wrap.innerHTML=html;
+  _updateNotifBadge();
 }
 /* CSV log v DigiLab/Obvestila/YYYY-MM.csv */
 function _notifToCsv(month){
