@@ -422,7 +422,6 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
     <div class="tab" data-qc="ljmulti" onclick="navQc('ljmulti')">&#128201; Multi L-J</div>
     <div class="tab" data-qc="assays" onclick="navQc('assays')">&#129514; Preiskave</div>
     <div class="tab" data-qc="qcmaterials" onclick="navQc('qcmaterials')">&#129516; Materiali</div>
-    <div class="tab" data-qc="kalibratorji" onclick="navQc('kalibratorji')">&#9881;&#65039; Kalibratorji</div>
     <div class="tab" data-qc="operators" onclick="navQc('operators')">&#128100; Operaterji</div>
     <div class="tab" data-qc="maintenance" onclick="navQc('maintenance')">&#128295; Vzdržev.</div>
     <div class="tab" data-qc="maint-review" onclick="navQc('maint-review')">&#128197; Pregled vzd.</div>
@@ -600,45 +599,6 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
   <div class="page qc-page" id="page-qcmaterials">
     <div class="sec-hdr"><div class="sec-title" style="font-size:16px">QC Materiali</div><button class="btn btn-a" onclick="openQcModal()">+ Nov</button></div>
     <div class="card" style="padding:0"><div class="tbl-wrap"><table><thead><tr><th>Naziv</th><th>Tip</th><th>Nivoji</th><th>Lot</th><th>Preiskave</th><th></th></tr></thead><tbody id="qcMatBody"></tbody></table></div></div>
-  </div>
-
-  <!-- QC KALIBRATORJI -->
-  <div class="page qc-page" id="page-kalibratorji">
-    <div class="sec-hdr">
-      <div class="sec-title" style="font-size:16px">&#9881;&#65039; Kalibratorji</div>
-      <button class="btn btn-a btn-sm" onclick="openNewBuildModal(null)">+ Nov build</button>
-    </div>
-    <div id="kalibratorjiBody" style="padding:4px 0"></div>
-  </div>
-
-  <!-- KAL NEW BUILD MODAL -->
-  <div class="mo" id="kalBuildModal">
-    <div class="modal" style="max-width:480px">
-      <div class="mh"><h3 id="kalBuildModalTitle">Nov kalibratorski build</h3><button class="mc" onclick="closeMo('kalBuildModal')">&#10005;</button></div>
-      <div class="mb">
-        <div class="fr" style="margin-bottom:8px">
-          <label style="font-size:12px;color:var(--text3)">Material</label>
-          <select id="kalMatSel" style="width:100%"></select>
-        </div>
-        <div class="fr" style="margin-bottom:8px">
-          <label style="font-size:12px;color:var(--text3)">Build / Lot številka</label>
-          <input id="kalLotNum" placeholder="npr. 129 ali LOT12345" style="width:100%">
-        </div>
-        <div class="fr" style="margin-bottom:8px">
-          <label style="font-size:12px;color:var(--text3)">Datum odprtja</label>
-          <input type="date" id="kalLotDate" style="width:100%">
-        </div>
-        <div class="fr" style="margin-bottom:4px">
-          <label style="font-size:12px;color:var(--text3)">Analizatorji (katerim je bil vnešen):</label>
-        </div>
-        <div id="kalAnalyzerList" style="display:flex;flex-wrap:wrap;gap:8px;padding:6px 0 10px"></div>
-        <div class="fr">
-          <label style="font-size:12px;color:var(--text3)">Opomba</label>
-          <input id="kalNote" placeholder="neobvezno" style="width:100%">
-        </div>
-      </div>
-      <div class="mf"><button class="btn btn-g" onclick="closeMo('kalBuildModal')">Prekliči</button><button class="btn btn-a" onclick="saveNewBuild()">Shrani</button></div>
-    </div>
   </div>
 
   <!-- QC OPERATORS -->
@@ -1283,7 +1243,6 @@ function navQc(page){
   if(page==='ljmulti') populateLjmSelects();
   if(page==='assays') renderAssays();
   if(page==='qcmaterials') renderQcMats();
-  if(page==='kalibratorji') renderKalibratorji();
   if(page==='operators') renderOperators();
   if(page==='maintenance') setMaintType(maintState.type||'daily');
   if(page==='maint-review') renderMaintReview();
@@ -4221,107 +4180,6 @@ function skipDelivery(id){
   if(!d)return;
   if(!confirm('Preskočiti dobavnico '+d.file+'?'))return;
   d.status='skipped';save();renderDeliveries();
-}
-
-// ===== KALIBRATORJI BUILD TRACKING =====
-const KAL_ANALYZERS=['AL01 C1','AL01 I2','AL02 C1','AL02 C3','AL03 C1','AL03 C3','AL03 I2','AL04 C1','ABTL L1'];
-var _kalBuildMatIdx=null;
-function renderKalibratorji(){
-  var mats=(S.qcMaterials||[]).map(function(m,i){return {m:m,i:i};}).filter(function(x){
-    return (x.m.lotHistory||[]).some(function(h){return h.type==='cal';});
-  });
-  if(!mats.length){
-    $i('kalibratorjiBody').innerHTML='<div class="empty" style="padding:32px 16px">Ni kalibrator materialov z evidentiranimi buildi.<br><small>Kliknite <strong>+ Nov build</strong> za začetek.</small></div>';
-    return;
-  }
-  $i('kalibratorjiBody').innerHTML=mats.map(function(x){
-    var m=x.m,mi=x.i;
-    var calEntries=(m.lotHistory||[]).filter(function(h){return h.type==='cal';});
-    var latest=calEntries[calEntries.length-1];
-    var pendingAnals=latest?KAL_ANALYZERS.filter(function(a){
-      var ana=latest.analyzers&&typeof latest.analyzers==='object'&&!Array.isArray(latest.analyzers)?latest.analyzers:{};
-      return !(ana[a]&&ana[a].done);
-    }):[];
-    var statusBadge=pendingAnals.length===0?
-      '<span style="color:var(--green);font-weight:700;font-size:11px">&#10003; Vsi vnešeni</span>':
-      '<span style="color:var(--orange);font-weight:700;font-size:11px">'+pendingAnals.length+' čakata</span>';
-    var h='<div class="card" style="margin-bottom:10px">';
-    h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
-    h+='<div><div style="font-weight:700;font-size:14px">'+m.name+'</div>';
-    h+=(latest?'<div style="font-size:11px;color:var(--text3)">Aktiven build: <strong>'+latest.lot+'</strong> ('+latest.date+')</div>':'<div style="font-size:11px;color:var(--text3)">Ni vnosa</div>');
-    h+='</div>';
-    h+='<div style="display:flex;gap:6px;align-items:center">'+statusBadge+'<button class="btn btn-a btn-sm" onclick="openNewBuildModal('+mi+')">+ Build</button></div></div>';
-    if(latest){
-      var ana=latest.analyzers&&typeof latest.analyzers==='object'&&!Array.isArray(latest.analyzers)?latest.analyzers:{};
-      h+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px">';
-      KAL_ANALYZERS.forEach(function(a){
-        var done=ana[a]&&ana[a].done;
-        var doneAt=ana[a]&&ana[a].doneAt?ana[a].doneAt.slice(0,10):'';
-        h+='<div style="border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:11px;text-align:center;min-width:64px;background:'+(done?'var(--green-bg, #d1fae5)':'var(--bg2)')+'">';
-        h+='<div style="font-weight:700;color:'+(done?'var(--green)':'var(--text3)')+'">'+a+'</div>';
-        h+=(done?'<div style="font-size:9px;color:var(--green)">'+doneAt+'</div>':'<button class="btn btn-g" style="font-size:9px;padding:2px 6px;margin-top:2px" onclick="confirmBuildAnalyzer('+mi+','+(calEntries.length-1)+',\''+a+'\')">Potrdi</button>');
-        h+='</div>';
-      });
-      h+='</div>';
-    }
-    if(calEntries.length>1){
-      h+='<details><summary style="font-size:11px;color:var(--text3);cursor:pointer">Zgodovina ('+calEntries.length+' buildov)</summary>';
-      h+='<div style="font-size:11px;margin-top:6px">';
-      calEntries.slice(0,-1).reverse().forEach(function(e){
-        h+='<div style="padding:4px 0;border-bottom:1px solid var(--border);color:var(--text3)"><strong>'+e.lot+'</strong> &middot; '+e.date+(e.note?' &middot; '+e.note:'')+'</div>';
-      });
-      h+='</div></details>';
-    }
-    h+='</div>';
-    return h;
-  }).join('');
-}
-function openNewBuildModal(matIdx){
-  _kalBuildMatIdx=matIdx;
-  var sel=$i('kalMatSel');
-  sel.innerHTML=(S.qcMaterials||[]).map(function(m,i){
-    return '<option value="'+i+'"'+(i===matIdx?' selected':'')+'>'+m.name+'</option>';
-  }).join('');
-  $i('kalLotNum').value='';
-  $i('kalLotDate').value=new Date().toISOString().slice(0,10);
-  $i('kalNote').value='';
-  var list=$i('kalAnalyzerList');
-  list.innerHTML=KAL_ANALYZERS.map(function(a){
-    return '<label style="display:flex;align-items:center;gap:4px;font-size:12px"><input type="checkbox" class="kal-anal-cb" value="'+a+'" checked> '+a+'</label>';
-  }).join('');
-  $i('kalBuildModalTitle').textContent='Nov kalibratorski build'+(matIdx!=null?' — '+(S.qcMaterials[matIdx]||{}).name:'');
-  showMo('kalBuildModal');
-}
-function saveNewBuild(){
-  var mi=parseInt($i('kalMatSel').value);
-  var lot=$i('kalLotNum').value.trim();
-  var date=$i('kalLotDate').value;
-  var note=$i('kalNote').value.trim();
-  if(!lot){notify('Vpišite lot/build številko','warning');return;}
-  if(!date){notify('Izberite datum','warning');return;}
-  var m=S.qcMaterials[mi];if(!m){notify('Material ni izbran','warning');return;}
-  var checkedAnals=[...$i('kalAnalyzerList').querySelectorAll('.kal-anal-cb:checked')].map(function(el){return el.value;});
-  var analyzers={};
-  KAL_ANALYZERS.forEach(function(a){
-    var done=checkedAnals.indexOf(a)>=0;
-    analyzers[a]={done:done,doneAt:done?new Date().toISOString().slice(0,10):null};
-  });
-  if(!m.lotHistory)m.lotHistory=[{lot:m.lot||'–',date:'',type:'qc',note:'Začetni lot'}];
-  m.lotHistory.push({lot:lot,date:date,type:'cal',note:note,analyzers:analyzers});
-  save();
-  closeMo('kalBuildModal');
-  renderKalibratorji();
-  notify('Build '+lot+' shranjen','ok');
-}
-function confirmBuildAnalyzer(matIdx,calIdx,analyzer){
-  var m=S.qcMaterials[matIdx];if(!m||!m.lotHistory)return;
-  var calEntries=m.lotHistory.filter(function(h){return h.type==='cal';});
-  var entry=calEntries[calIdx];if(!entry)return;
-  if(!entry.analyzers||typeof entry.analyzers!=='object'||Array.isArray(entry.analyzers))entry.analyzers={};
-  entry.analyzers[analyzer]={done:true,doneAt:new Date().toISOString().slice(0,10)};
-  save();
-  renderKalibratorji();
-  notify(analyzer+' potrjen','ok');
 }
 
 loadPregledDB();
