@@ -2587,7 +2587,11 @@ const MAINT_DEFAULTS={
   ]
  },
  weekly:{
-  l:[],
+  l:[
+   {id:'lw1',text:'Čiščenje ovinkov, križišč ter vidnih madežev (serum, urin) po celotni liniji, čiščenje »decapper-ja« (ponedeljek)'},
+   {id:'lw2',text:'Čiščenje, podmazovanje in sesanje (v/na/okolica) centrifug na liniji (CM-1 in CM-2) ter samostoječih centrifug (sreda)'},
+   {id:'lw3',text:'Sesanje in čiščenje celotne linije (četrtek)'}
+  ],
   c:[
    {id:'cw1',text:'Analizator postavi v IDLE (Pause), ključ v analizatorju obrni v desno (bela oznaka)'},
    {id:'cw2',text:'Preveri delovne raztopine v krožniku (porabi se celoten Detergent A)'},
@@ -2612,7 +2616,9 @@ const MAINT_DEFAULTS={
   ]
  },
  monthly:{
-  l:[],
+  l:[
+   {id:'lm1',text:'Čiščenje »avtomobilčkov«'}
+  ],
   c:[
    {id:'cm1',text:'Čiščenje spiralne postaje kivet in menjava »dry tipa«'},
    {id:'cm2',text:'Čiščenje kivet (postopek 5910 v zavihku vzdrževanj »as needed«)'},
@@ -2641,12 +2647,16 @@ const MAINT_DEFAULTS={
 function getMaintSteps(type,instrType){return ((S.maintSteps||MAINT_DEFAULTS)[type]||{})[instrType]||[];}
 let maintState={type:'daily',checked:{},pendingSign:null};
 function setMaintType(type){maintState.type=type;document.querySelectorAll('#maintTypeTabs .tab').forEach((t,i)=>t.classList.toggle('active',i===['daily','weekly','monthly','quarterly'].indexOf(type)));renderMaintContent();}
+/* obdobje potrjevanja: dnevno→dan, tedensko→teden v mesecu, mesečno/3-mes.→mesec (npr. tedensko 3/3 v celem tednu) */
+function _maintWeekOf(d){return Math.min(4,Math.ceil(d/7));}
+function _maintPeriodKey(type,dateStr){if(!dateStr)return '';const d=new Date(dateStr+'T00:00:00');if(type==='daily')return dateStr;if(type==='weekly')return dateStr.slice(0,7)+'-W'+_maintWeekOf(d.getDate());return dateStr.slice(0,7);}
+function _maintCurRec(instrId,type){const key=_maintPeriodKey(type,new Date().toISOString().slice(0,10));return (S.maintenanceLog||[]).find(m=>m.instrId===instrId&&m.type===type&&_maintPeriodKey(type,(m.datetime||'').slice(0,10))===key);}
+function _maintPeriodWord(type){return type==='daily'?'danes':type==='weekly'?'ta teden':'ta mesec';}
 function renderMaintContent(){
   const type=maintState.type;const wrap=$i('maintContent');
   wrap.innerHTML=INSTRUMENTS.map(instr=>{
     const steps=getMaintSteps(type,instr.type);const key=instr.id+'_'+type;const checked=maintState.checked[key]||{};const ti=MAINT_TYPES[type];
-    const todayStr=new Date().toISOString().slice(0,10);
-    const todayRec=(S.maintenanceLog||[]).find(m=>m.instrId===instr.id&&m.type===type&&m.datetime.slice(0,10)===todayStr);
+    const todayRec=_maintCurRec(instr.id,type);
     const confirmed={};if(todayRec)todayRec.steps.forEach(s=>{if(s.done)confirmed[s.id]=true;});
     const doneCount=steps.filter(s=>confirmed[s.id]||(!confirmed[s.id]&&!!checked[s.id])).length;
     const allDone=steps.length>0&&doneCount===steps.length;
@@ -2655,12 +2665,12 @@ function renderMaintContent(){
     const instrLabel=instr.type==='l'?'Abbott linija':'Alinity '+instr.type.toUpperCase();
     let bottomHtml='<div style="margin-top:12px;text-align:right">';
     if(hasNewChecks)bottomHtml+='<button class="btn '+(allDone?'btn-teal':'btn-outline')+' btn-sm" onclick="openMaintSign(\''+instr.id+'\',\''+type+'\')">'+(allDone?'✅ Potrdi in podpiši':'⚠️ Potrdi ('+newCount+' novih)')+'</button>';
-    else if(allDone)bottomHtml+='<span class="badge badge-ok" style="font-size:12px;padding:6px 12px">✅ Vse potrjeno danes</span>';
+    else if(allDone)bottomHtml+='<span class="badge badge-ok" style="font-size:12px;padding:6px 12px">✅ Vse potrjeno '+_maintPeriodWord(type)+'</span>';
     else bottomHtml+='<button class="btn btn-g btn-sm" disabled>⚠️ Potrdi</button>';
     bottomHtml+='</div>';
     return '<div class="card" style="border-left:4px solid '+(allDone?'var(--success)':ti.color)+'">'
       +'<div class="card-title"><span>'+ti.icon+' '+instr.id+' &ndash; '+instr.name+'</span><span style="font-size:12px;font-weight:400;color:'+(allDone?'var(--success)':'var(--text3)')+'">'+(allDone?'✅ Vse opravljeno':doneCount+' / '+steps.length+' korakov')+'</span></div>'
-      +(todayRec?'<div style="background:var(--gbg);border:1px solid var(--green);border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:12px;color:var(--accent2)">✅ '+doneCount+'/'+steps.length+' potrjeno danes &ndash; zadnjič ob '+new Date(todayRec.datetime).toLocaleTimeString('sl-SI',{hour:'2-digit',minute:'2-digit'})+' ('+getOpName(todayRec.operatorId)+')</div>':'')
+      +(todayRec?'<div style="background:var(--gbg);border:1px solid var(--green);border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:12px;color:var(--accent2)">✅ '+doneCount+'/'+steps.length+' potrjeno '+_maintPeriodWord(type)+' &ndash; zadnjič '+new Date(todayRec.datetime).toLocaleDateString('sl-SI',{day:'2-digit',month:'2-digit'})+' ob '+new Date(todayRec.datetime).toLocaleTimeString('sl-SI',{hour:'2-digit',minute:'2-digit'})+' ('+getOpName(todayRec.operatorId)+')</div>':'')
       +(steps.length===0?'<div class="muted" style="font-size:13px;padding:8px">Koraki bodo dodani za '+ti.label.toLowerCase()+' – '+instrLabel+'.</div>'
         :'<div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:10px"><button class="btn btn-g btn-sm" onclick="checkAllMaint(\''+instr.id+'\',\''+type+'\',true)">✔ Vse</button><button class="btn btn-g btn-sm" onclick="checkAllMaint(\''+instr.id+'\',\''+type+'\',false)">☐ Počisti</button></div>'
         +steps.map(step=>{
@@ -2672,14 +2682,14 @@ function renderMaintContent(){
   }).join('');
 }
 function toggleMaintStep(instrId,type,stepId,val){const key=instrId+'_'+type;if(!maintState.checked[key])maintState.checked[key]={};maintState.checked[key][stepId]=val;renderMaintContent();}
-function checkAllMaint(instrId,type,val){const instr=INSTRUMENTS.find(i=>i.id===instrId);const steps=getMaintSteps(type,instr?.type);const key=instrId+'_'+type;if(!maintState.checked[key])maintState.checked[key]={};const todayStr=new Date().toISOString().slice(0,10);const todayRec=(S.maintenanceLog||[]).find(m=>m.instrId===instrId&&m.type===type&&m.datetime.slice(0,10)===todayStr);const confirmed={};if(todayRec)todayRec.steps.forEach(s=>{if(s.done)confirmed[s.id]=true;});steps.forEach(s=>{if(!confirmed[s.id])maintState.checked[key][s.id]=val;});renderMaintContent();}
+function checkAllMaint(instrId,type,val){const instr=INSTRUMENTS.find(i=>i.id===instrId);const steps=getMaintSteps(type,instr?.type);const key=instrId+'_'+type;if(!maintState.checked[key])maintState.checked[key]={};const todayRec=_maintCurRec(instrId,type);const confirmed={};if(todayRec)todayRec.steps.forEach(s=>{if(s.done)confirmed[s.id]=true;});steps.forEach(s=>{if(!confirmed[s.id])maintState.checked[key][s.id]=val;});renderMaintContent();}
 let maintPinVal='';
-function openMaintSign(instrId,type){const instr=INSTRUMENTS.find(i=>i.id===instrId);const steps=getMaintSteps(type,instr.type);const key=instrId+'_'+type;const checked=maintState.checked[key]||{};const ti=MAINT_TYPES[type];const todayStr=new Date().toISOString().slice(0,10);const todayRec=(S.maintenanceLog||[]).find(m=>m.instrId===instrId&&m.type===type&&m.datetime.slice(0,10)===todayStr);const confirmed={};if(todayRec)todayRec.steps.forEach(s=>{if(s.done)confirmed[s.id]=true;});const newCount=steps.filter(s=>!confirmed[s.id]&&!!checked[s.id]).length;const totalDone=steps.filter(s=>confirmed[s.id]||(!confirmed[s.id]&&!!checked[s.id])).length;maintState.pendingSign={instrId,type};maintPinVal='';$i('maintSignTitle').textContent='Potrditev – '+instrId;const prevInfo=todayRec?'<div style="font-size:11px;color:var(--text3);margin-top:4px">Že potrjeno danes: '+Object.keys(confirmed).length+' korakov</div>':'';$i('maintSignSummary').innerHTML='<div style="background:rgba(0,48,135,.05);border-radius:8px;padding:10px 14px"><div style="font-weight:600;font-size:14px;color:var(--abbott-blue);margin-bottom:6px">'+ti.icon+' '+ti.label+' – '+instrId+'</div><div style="font-size:13px">Novih: <strong>'+newCount+'</strong> &nbsp;|&nbsp; Skupno danes: <strong>'+totalDone+' / '+steps.length+'</strong> '+(totalDone===steps.length?'<span class="badge badge-ok">Vse</span>':'<span class="badge badge-2sd">Ni popolno</span>')+'</div>'+prevInfo+'</div>';$i('maintSignNote').value='';updateMaintPinDisplay();buildMaintPinGrid();showMo('maintSignModal');}
+function openMaintSign(instrId,type){const instr=INSTRUMENTS.find(i=>i.id===instrId);const steps=getMaintSteps(type,instr.type);const key=instrId+'_'+type;const checked=maintState.checked[key]||{};const ti=MAINT_TYPES[type];const pw=_maintPeriodWord(type);const todayRec=_maintCurRec(instrId,type);const confirmed={};if(todayRec)todayRec.steps.forEach(s=>{if(s.done)confirmed[s.id]=true;});const newCount=steps.filter(s=>!confirmed[s.id]&&!!checked[s.id]).length;const totalDone=steps.filter(s=>confirmed[s.id]||(!confirmed[s.id]&&!!checked[s.id])).length;maintState.pendingSign={instrId,type};maintPinVal='';$i('maintSignTitle').textContent='Potrditev – '+instrId;const prevInfo=todayRec?'<div style="font-size:11px;color:var(--text3);margin-top:4px">Že potrjeno '+pw+': '+Object.keys(confirmed).length+' korakov</div>':'';$i('maintSignSummary').innerHTML='<div style="background:rgba(0,48,135,.05);border-radius:8px;padding:10px 14px"><div style="font-weight:600;font-size:14px;color:var(--abbott-blue);margin-bottom:6px">'+ti.icon+' '+ti.label+' – '+instrId+'</div><div style="font-size:13px">Novih: <strong>'+newCount+'</strong> &nbsp;|&nbsp; Skupno '+pw+': <strong>'+totalDone+' / '+steps.length+'</strong> '+(totalDone===steps.length?'<span class="badge badge-ok">Vse</span>':'<span class="badge badge-2sd">Ni popolno</span>')+'</div>'+prevInfo+'</div>';$i('maintSignNote').value='';updateMaintPinDisplay();buildMaintPinGrid();showMo('maintSignModal');}
 function buildMaintPinGrid(){const keys=[1,2,3,4,5,6,7,8,9,'',0,'⌫'];$i('maintPinGrid').innerHTML=keys.map(k=>'<div class="pin-key" onclick="maintPinPress(\''+k+'\')">'+k+'</div>').join('');}
 function maintPinPress(k){if(k===''||k==='undefined')return;if(k==='⌫')maintPinVal=maintPinVal.slice(0,-1);else if(maintPinVal.length<5)maintPinVal+=k;updateMaintPinDisplay();}
 function clearMaintPin(){maintPinVal='';updateMaintPinDisplay();}
 function updateMaintPinDisplay(){for(let i=0;i<5;i++)$i('mpd'+i)?.classList.toggle('filled',i<maintPinVal.length);const op=S.operators.find(o=>o.id===maintPinVal);$i('maintPinName').textContent=op?'✓ '+op.first+' '+op.last:(maintPinVal.length===5?'⚠ Operater ni najden':'');}
-function saveMaintenance(){if(maintPinVal.length<5){notify('Vpišite matično številko','warning');return;}const op=S.operators.find(o=>o.id===maintPinVal);if(!op){notify('Operater ni registriran','error');return;}const {instrId,type}=maintState.pendingSign;const instr=INSTRUMENTS.find(i=>i.id===instrId);const steps=getMaintSteps(type,instr.type);const key=instrId+'_'+type;const checked=maintState.checked[key]||{};const note=$i('maintSignNote').value.trim();if(!S.maintenanceLog)S.maintenanceLog=[];const todayStr=new Date().toISOString().slice(0,10);const existIdx=S.maintenanceLog.findIndex(m=>m.instrId===instrId&&m.type===type&&m.datetime.slice(0,10)===todayStr);if(existIdx>=0){const ex=S.maintenanceLog[existIdx];ex.steps.forEach(s=>{if(checked[s.id])s.done=true;});ex.doneCount=ex.steps.filter(s=>s.done).length;ex.datetime=new Date().toISOString();if(note)ex.note=ex.note?ex.note+' / '+note:note;ex.operatorId=maintPinVal;}else{S.maintenanceLog.push({id:Date.now().toString(),datetime:new Date().toISOString(),instrId,integration:instr.integration,type,steps:steps.map(s=>({id:s.id,text:s.text,done:!!checked[s.id]})),doneCount:steps.filter(s=>checked[s.id]).length,totalSteps:steps.length,note,operatorId:maintPinVal});}save();closeMo('maintSignModal');maintState.checked[key]={};renderMaintContent();notify('Vzdrževanje potrjeno! ✓','success');}
+function saveMaintenance(){if(maintPinVal.length<5){notify('Vpišite matično številko','warning');return;}const op=S.operators.find(o=>o.id===maintPinVal);if(!op){notify('Operater ni registriran','error');return;}const {instrId,type}=maintState.pendingSign;const instr=INSTRUMENTS.find(i=>i.id===instrId);const steps=getMaintSteps(type,instr.type);const key=instrId+'_'+type;const checked=maintState.checked[key]||{};const note=$i('maintSignNote').value.trim();if(!S.maintenanceLog)S.maintenanceLog=[];const _pk=_maintPeriodKey(type,new Date().toISOString().slice(0,10));const existIdx=S.maintenanceLog.findIndex(m=>m.instrId===instrId&&m.type===type&&_maintPeriodKey(type,(m.datetime||'').slice(0,10))===_pk);if(existIdx>=0){const ex=S.maintenanceLog[existIdx];ex.steps.forEach(s=>{if(checked[s.id])s.done=true;});ex.doneCount=ex.steps.filter(s=>s.done).length;ex.datetime=new Date().toISOString();if(note)ex.note=ex.note?ex.note+' / '+note:note;ex.operatorId=maintPinVal;}else{S.maintenanceLog.push({id:Date.now().toString(),datetime:new Date().toISOString(),instrId,integration:instr.integration,type,steps:steps.map(s=>({id:s.id,text:s.text,done:!!checked[s.id]})),doneCount:steps.filter(s=>checked[s.id]).length,totalSteps:steps.length,note,operatorId:maintPinVal});}save();closeMo('maintSignModal');maintState.checked[key]={};renderMaintContent();notify('Vzdrževanje potrjeno! ✓','success');}
 function getOpName(id){const op=S.operators.find(o=>o.id===id);return op?op.first+' '+op.last:id;}
 /* ---- urejevalnik opravil vzdrževanja ---- */
 function openMaintEdit(){$i('meType').value=maintState.type==='triannual'?'quarterly':maintState.type;renderMaintEdit();showMo('maintEditModal');}
@@ -2830,7 +2840,8 @@ function _maintDatumTable(instrId,instrType,year,month,type,heading){
 function buildMaintReportHtml(instrId,year,month){
   var instr=INSTRUMENTS.find(function(i){return i.id===instrId;})||{id:instrId,name:'',type:'c'};
   var moName=REP_MONTHS[month-1].toUpperCase()+' '+year;
-  var head='<div class="rhdr"><table class="meta"><tr><td class="k">ANALIZATOR/APARAT:</td><td>Alinity '+_repEsc(instr.id)+'</td><td class="k">MESEC/LETO:</td><td>'+moName+'</td><td class="k">Zap. št./oddelek:</td><td>&nbsp;</td></tr></table></div>';
+  var aparat=instr.type==='l'?'Linija Abbott':'Alinity '+_repEsc(instr.id);
+  var head='<div class="rhdr"><table class="meta"><tr><td class="k">ANALIZATOR/APARAT:</td><td>'+aparat+'</td><td class="k">MESEC/LETO:</td><td>'+moName+'</td><td class="k">Zap. št./oddelek:</td><td>&nbsp;</td></tr></table></div>';
   var secs=[
     _maintDailyTable(instr.id,instr.type,year,month),
     _maintWeeklyTable(instr.id,instr.type,year,month),
