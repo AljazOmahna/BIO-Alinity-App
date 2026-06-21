@@ -707,6 +707,11 @@ public class MainActivity extends AppCompatActivity {
     // A4 landscape: 842×595 PostScript pt. Izris pri 2× za kakovost.
     private static final int PDF_W = 842, PDF_H = 595;
     private static final int RVW = PDF_W * 2, RVH = PDF_H * 2; // velikost ene strani v px
+    // Odmik vsebine od robov strani (na vsaki strani PDF-ja). V px je 2× (izris pri 2×).
+    private static final int PAGE_MARGIN_PT = 28;             // ~10 mm
+    private static final int MARGIN_PX = PAGE_MARGIN_PT * 2;
+    private static final int CONTENT_W = RVW - 2 * MARGIN_PX; // širina vsebinskega območja
+    private static final int CONTENT_H = RVH - 2 * MARGIN_PX; // višina vsebinskega območja
 
     @SuppressLint("SetJavaScriptEnabled")
     private void renderReportToPdf(final String subfolder, final String filename, String html) {
@@ -744,8 +749,8 @@ public class MainActivity extends AppCompatActivity {
     // da view.draw() izriše CELOTEN dokument, ne le vidnega pasu.
     private void writeWebViewPdf(WebView view, final String subfolder, final String filename) {
         try {
-            // Izmeri pravo višino vsebine pri širini RVW (UNSPECIFIED višina).
-            int specW = View.MeasureSpec.makeMeasureSpec(RVW, View.MeasureSpec.EXACTLY);
+            // Izmeri pravo višino vsebine pri širini vsebinskega območja (znotraj robov).
+            int specW = View.MeasureSpec.makeMeasureSpec(CONTENT_W, View.MeasureSpec.EXACTLY);
             int specH = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED);
             view.measure(specW, specH);
             int cH = view.getMeasuredHeight();
@@ -753,10 +758,10 @@ public class MainActivity extends AppCompatActivity {
                 float scale = view.getScale() > 0 ? view.getScale() : 1f;
                 cH = (int) Math.ceil(view.getContentHeight() * scale);
             }
-            if (cH <= 0) cH = RVH;
-            view.layout(0, 0, RVW, cH);
+            if (cH <= 0) cH = CONTENT_H;
+            view.layout(0, 0, CONTENT_W, cH);
 
-            int pages = Math.max(1, (int) Math.ceil((double) cH / RVH));
+            int pages = Math.max(1, (int) Math.ceil((double) cH / CONTENT_H));
             pages = Math.min(pages, 60); // varovalka
 
             PdfDocument doc = new PdfDocument();
@@ -764,8 +769,10 @@ public class MainActivity extends AppCompatActivity {
                 PdfDocument.PageInfo info = new PdfDocument.PageInfo.Builder(PDF_W, PDF_H, i + 1).create();
                 PdfDocument.Page pg = doc.startPage(info);
                 Canvas canvas = pg.getCanvas();
-                canvas.scale(0.5f, 0.5f);              // RVW×RVH px → PDF_W×PDF_H pt
-                canvas.translate(0, -(float) (i * RVH));
+                canvas.scale(0.5f, 0.5f);                       // RVW×RVH px → PDF_W×PDF_H pt
+                canvas.translate(MARGIN_PX, MARGIN_PX);         // odmik od robov (vsaka stran)
+                canvas.clipRect(0, 0, CONTENT_W, CONTENT_H);    // rob ostane prazen
+                canvas.translate(0, -(float) (i * CONTENT_H));  // pas strani i
                 view.draw(canvas);                     // izriše celoten dokument (slow whole doc)
                 doc.finishPage(pg);
             }
