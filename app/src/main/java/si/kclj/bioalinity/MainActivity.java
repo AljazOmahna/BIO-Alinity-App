@@ -513,6 +513,17 @@ public class MainActivity extends AppCompatActivity {
             }));
         }
 
+        // Naloži besedilno vsebino (npr. CSV) v DigiLab/<relPath> v OneDriveju.
+        @JavascriptInterface
+        public void msUploadRaw(String relPath, String content, String mimeType) {
+            final String rp = relPath, ct = mimeType != null && !mimeType.isEmpty() ? mimeType : "text/plain; charset=utf-8";
+            final byte[] bytes = content == null ? new byte[0] : content.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            mainHandler.post(() -> msAcquireToken("raw_" + rp, (token, err) -> {
+                if (token == null) { callJs("onMsUploadRawDone(false," + jsStr(err) + ")"); return; }
+                graphUploadRawBytes(rp, bytes, ct, token);
+            }));
+        }
+
         // Sestavi PDF iz HTML-ja, shrani lokalno (Porocila/<leto>) in naloži v OneDrive DigiLab/<subfolder>/<filename>.
         @JavascriptInterface
         public void generateAndUploadReport(String subfolder, String filename, String html) {
@@ -630,6 +641,24 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    private void graphUploadRawBytes(final String relPath, byte[] bytes, String contentType, String token) {
+        RequestBody body = RequestBody.create(bytes, MediaType.parse(contentType));
+        Request req = new Request.Builder()
+                .url(graphPathUrl(relPath))
+                .header("Authorization", "Bearer " + token)
+                .put(body)
+                .build();
+        http.newCall(req).enqueue(new Callback() {
+            @Override public void onFailure(@NonNull Call call, @NonNull IOException e) {
+                callJs("onMsUploadRawDone(false," + jsStr("Napaka: " + e.getMessage()) + ")");
+            }
+            @Override public void onResponse(@NonNull Call call, @NonNull Response resp) {
+                int code = resp.code(); resp.close();
+                callJs("onMsUploadRawDone(" + (code >= 200 && code < 300 ? "true" : "false") + ",'ok')");
+            }
+        });
+    }
+
     private void graphListFolder(final String folder, String token) {
         StringBuilder sb = new StringBuilder();
         sb.append(Uri.encode(MS_FOLDER));
@@ -707,7 +736,9 @@ public class MainActivity extends AppCompatActivity {
     // A4 landscape: 842×595 PostScript pt. Izris pri 2× za kakovost.
     private static final int PDF_W = 842, PDF_H = 595;
     private static final int RVW = PDF_W * 2, RVH = PDF_H * 2; // velikost ene strani v px
-    // Odmik vsebine od robov je v CSS (body padding v REPORT_CSS), da se tabela pravilno prelije.
+    // Vsebinska višina na stran = 561pt (CSS @page size), tj. 1122px pri 2×. Spodnji odmik 34pt izhaja
+    // iz razlike RVH-SLICE_H=68px (=34pt×2). CSS page-break-inside:avoid deluje znotraj tega modela.
+    private static final int SLICE_H = 561 * 2; // = 1122 px — mora se ujemati z @page{size:842pt 561pt}
 
     @SuppressLint("SetJavaScriptEnabled")
     private void renderReportToPdf(final String subfolder, final String filename, String html) {
@@ -757,7 +788,7 @@ public class MainActivity extends AppCompatActivity {
             if (cH <= 0) cH = RVH;
             view.layout(0, 0, RVW, cH);
 
-            int pages = Math.max(1, (int) Math.ceil((double) cH / RVH));
+            int pages = Math.max(1, (int) Math.ceil((double) cH / SLICE_H));
             pages = Math.min(pages, 60); // varovalka
 
             PdfDocument doc = new PdfDocument();
@@ -766,7 +797,7 @@ public class MainActivity extends AppCompatActivity {
                 PdfDocument.Page pg = doc.startPage(info);
                 Canvas canvas = pg.getCanvas();
                 canvas.scale(0.5f, 0.5f);              // RVW×RVH px → PDF_W×PDF_H pt
-                canvas.translate(0, -(float) (i * RVH));
+                canvas.translate(0, -(float) (i * SLICE_H));
                 view.draw(canvas);                     // izriše celoten dokument (slow whole doc)
                 doc.finishPage(pg);
             }
