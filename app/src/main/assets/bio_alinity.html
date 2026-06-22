@@ -386,6 +386,91 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
   <div id="lotiBody"></div>
 </div>
 
+<!-- ============ GTIN ============ -->
+<div class="page-main" id="main-gtins">
+  <div class="sec-hdr">
+    <div class="sec-title">&#127991; GTIN baza</div>
+    <button class="btn btn-g btn-sm" onclick="loadGtinDemo()">&#128229; Naloži privzete</button>
+    <button class="btn btn-g btn-sm" onclick="openImportGtin()">&#128218; Uvozi CSV</button>
+    <button class="btn btn-a btn-sm" onclick="openGtinMo()">+ GTIN</button>
+  </div>
+  <div style="font-size:11px;color:var(--text3);margin-bottom:8px">&#128161; GTIN baza je skupna z Zebro (pregledBK_db). Spremembe so vidne na obeh napravah po sinhronizaciji.</div>
+  <div class="fr">
+    <input type="text" id="gtinSrch" placeholder="&#128269; Išči naziv, GTIN..." oninput="renderGtins()">
+    <select id="gtinTypeFilter" onchange="renderGtins()">
+      <option value="">Vsi tipi</option>
+      <option value="calibrator">Kalibrator</option>
+      <option value="control">Kontrola</option>
+      <option value="reagent-bio">Reagent bio</option>
+      <option value="reagent-imuno">Reagent imuno</option>
+      <option value="consumable">Potrošni material</option>
+    </select>
+    <button class="btn btn-g btn-sm" onclick="exportGtinCSV()">&#128190; CSV</button>
+  </div>
+  <table style="width:100%;border-collapse:collapse;margin-top:8px">
+    <thead><tr style="border-bottom:2px solid var(--border)">
+      <th style="text-align:left;padding:6px 4px;font-size:11px">GTIN</th>
+      <th style="text-align:left;padding:6px 4px;font-size:11px">Naziv</th>
+      <th style="text-align:left;padding:6px 4px;font-size:11px">Tip</th>
+      <th style="text-align:left;padding:6px 4px;font-size:11px">Analizator</th>
+      <th style="padding:6px 4px;font-size:11px"></th>
+    </tr></thead>
+    <tbody id="gtinBody"></tbody>
+  </table>
+</div>
+
+<!-- GTIN MODAL -->
+<div class="mo" id="moGtin">
+  <div class="modal" style="max-width:460px">
+    <div class="mh"><h3 id="gtinMoT">Dodaj GTIN</h3><button class="mc" onclick="closeMo('moGtin')">&#10005;</button></div>
+    <div class="mb">
+      <div class="fg"><label>GTIN (14 mest)</label><input type="text" id="gtinCode" maxlength="14" style="font-family:var(--mono)" inputmode="numeric"></div>
+      <div class="fg"><label>Naziv</label><input type="text" id="gtinName"></div>
+      <div class="fr" style="gap:8px">
+        <div class="fg" style="flex:1"><label>Tip</label>
+          <select id="gtinTypeVal" onchange="updateLotNotifyDefault()">
+            <option value="control">Kontrola</option>
+            <option value="calibrator">Kalibrator</option>
+            <option value="reagent-bio">Reagent bio</option>
+            <option value="reagent-imuno">Reagent imuno</option>
+            <option value="consumable">Potrošni material</option>
+          </select></div>
+        <div class="fg" style="flex:1"><label>Analizator</label><input type="text" id="gtinAnal"></div>
+      </div>
+      <div class="fr" style="gap:8px">
+        <div class="fg" style="flex:1"><label>Proizvajalec</label><input type="text" id="gtinMfr"></div>
+        <div class="fg" style="flex:1"><label>Kataloška št.</label><input type="text" id="gtinCatalog" maxlength="30"></div>
+      </div>
+      <div class="fg"><label>Opomba</label><input type="text" id="gtinNote"></div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin:4px 0">
+        <input type="checkbox" id="gtinLotNotify" style="width:18px;height:18px;flex-shrink:0">
+        Opozorilo ob novem lotu
+      </label>
+    </div>
+    <div class="mf">
+      <button class="btn btn-g" onclick="closeMo('moGtin')">Prekliči</button>
+      <button class="btn btn-a" onclick="saveGtin()">Shrani</button>
+    </div>
+  </div>
+</div>
+
+<!-- GTIN CSV IMPORT MODAL -->
+<div class="mo" id="moImportGtin">
+  <div class="modal" style="max-width:480px">
+    <div class="mh"><h3>Uvoz GTIN CSV</h3><button class="mc" onclick="closeMo('moImportGtin')">&#10005;</button></div>
+    <div class="mb">
+      <div style="font-size:11px;color:var(--text3);margin-bottom:10px">Format: <span style="font-family:var(--mono);color:var(--accent)">gtin,naziv,tip,proizvajalec,analizator,opomba</span></div>
+      <input type="file" accept=".csv,.txt" onchange="readGtinFile(this)" style="margin-bottom:8px;width:100%">
+      <textarea id="gtinImportTxt" rows="6" placeholder="... ali prilepi CSV vsebino sem" style="width:100%;box-sizing:border-box;font-family:var(--mono);font-size:11px;resize:vertical"></textarea>
+      <div id="gtinImportPrev" style="font-size:11px;color:var(--text3);margin-top:4px"></div>
+    </div>
+    <div class="mf">
+      <button class="btn btn-g" onclick="closeMo('moImportGtin')">Prekliči</button>
+      <button class="btn btn-a" onclick="importGtinCsv()">Uvozi</button>
+    </div>
+  </div>
+</div>
+
 <!-- LOT EVAL MODAL -->
 <div class="mo" id="moLotEval">
   <div class="modal" style="max-width:440px">
@@ -972,6 +1057,7 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
   <div class="bn-item active" data-main="zaloga" onclick="navMain('zaloga')"><div class="bn-icon">&#128230;</div>Zaloga</div>
   <div class="bn-item" data-main="roki" onclick="navMain('roki')"><div class="bn-icon">&#128197;</div>Roki</div>
   <div class="bn-item" data-main="loti" onclick="navMain('loti')"><div class="bn-icon">&#129514;</div>Loti</div>
+  <div class="bn-item" data-main="gtins" onclick="navMain('gtins')"><div class="bn-icon">&#127991;&#65039;</div>GTIN</div>
   <div class="bn-item" data-main="narocila" onclick="navMain('narocila')"><div class="bn-icon">&#128722;</div>Naročila</div>
   <div class="bn-item" data-main="deliveries" onclick="navMain('deliveries')"><div class="bn-icon">&#128666;</div>Dobavnice</div>
   <div class="bn-item" data-main="servis" onclick="navMain('servis')"><div class="bn-icon">&#128295;</div>Servis</div>
@@ -1254,6 +1340,7 @@ function navMain(tab){
   if(tab==='zaloga') renderZaloga();
   if(tab==='roki') renderRoki();
   if(tab==='loti') renderLoti();
+  if(tab==='gtins') renderGtins();
   if(tab==='qc') navQc(currentQc||'dashboard');
   if(tab==='vec') renderVec();
   if(tab==='narocila') navOrd(currentOrd||'prepare');
@@ -1588,6 +1675,180 @@ function clearLotEval(gtin,lot){
   if(!l||!confirm('Preklicati ovrednotenje lota '+lot+'?'))return;
   l.checked=false;l.checkedAt=null;l.evalDate='';l.evalAnalyzers=[];
   savePregledDB();renderLoti();notify('Ovrednotenje preklicano');
+}
+
+// ===== GTIN BAZA =====
+const BUILTIN_GTINS = [
+  {gtin:'00380740121693',name:'ICT Serum Cals',type:'calibrator',manufacturer:'Abbott Diagnostics',analyser:'Alinity c',note:''},
+  {gtin:'00380740121709',name:'ICT Urine Cals',type:'calibrator',manufacturer:'Abbott Diagnostics',analyser:'Alinity c',note:''},
+  {gtin:'00380740154325',name:'Lipid MC Cal',type:'calibrator',manufacturer:'Abbott Diagnostics',analyser:'Alinity c',note:''},
+  {gtin:'00380740136260',name:'UIBC Cal',type:'calibrator',manufacturer:'Abbott Diagnostics',analyser:'Alinity c',note:''},
+  {gtin:'00380740180935',name:'TDM MC Cal',type:'calibrator',manufacturer:'Abbott Diagnostics',analyser:'Alinity c',note:'Terapevtski monitoring'},
+  {gtin:'00380740164980',name:'ConCC',type:'calibrator',manufacturer:'Abbott Diagnostics',analyser:'Alinity c',note:'Connectivity Cal'},
+  {gtin:'00380740121969',name:'MC Cals',type:'calibrator',manufacturer:'Abbott Diagnostics',analyser:'Alinity c',note:'Multi-calibrator'},
+  {gtin:'00380740130077',name:'CRP WR Cals',type:'calibrator',manufacturer:'Abbott Diagnostics',analyser:'Alinity c',note:''},
+  {gtin:'00380740135355',name:'Ethanol Cals',type:'calibrator',manufacturer:'Abbott Diagnostics',analyser:'Alinity c',note:''},
+  {gtin:'00380740121617',name:'CO2 Cals',type:'calibrator',manufacturer:'Abbott Diagnostics',analyser:'Alinity c',note:''},
+  {gtin:'00380740154295',name:'Clin Chem Cal',type:'calibrator',manufacturer:'Abbott Diagnostics',analyser:'Alinity c',note:''},
+  {gtin:'00380740135157',name:'U/CSF Prot Cals',type:'calibrator',manufacturer:'Abbott Diagnostics',analyser:'Alinity c',note:''},
+  {gtin:'00380740190774',name:'Microalb Cals',type:'calibrator',manufacturer:'Abbott Diagnostics',analyser:'Alinity c',note:'Mikroalbuminski kalibrator'},
+  {gtin:'00380740204037',name:'Lip2 Cal',type:'calibrator',manufacturer:'Abbott Diagnostics',analyser:'Alinity c',note:'Lipaza 2 kalibrator'},
+  {gtin:'00380740194857',name:'GFAP Cals',type:'calibrator',manufacturer:'Abbott Diagnostics',analyser:'Alinity i',note:'GFAP kalibrator'},
+  {gtin:'00380740194871',name:'UCH-L1 Cals',type:'calibrator',manufacturer:'Abbott Diagnostics',analyser:'Alinity i',note:'UCH-L1 kalibrator'},
+  {gtin:'00380740131456',name:'Ferritin Cals',type:'calibrator',manufacturer:'Abbott Diagnostics',analyser:'Alinity i',note:''},
+  {gtin:'00380740121488',name:'Beta-HCG Cals',type:'calibrator',manufacturer:'Abbott Diagnostics',analyser:'Alinity i',note:''},
+  {gtin:'00380740172275',name:'Myo STAT Cals',type:'calibrator',manufacturer:'Abbott Diagnostics',analyser:'Alinity i',note:'Mioglobin'},
+  {gtin:'00380740153939',name:'PCT Cals',type:'calibrator',manufacturer:'Abbott Diagnostics',analyser:'Alinity i',note:''},
+  {gtin:'00380740165482',name:'CK-MB STAT Cals',type:'calibrator',manufacturer:'Abbott Diagnostics',analyser:'Alinity i',note:''},
+  {gtin:'00380740130718',name:'hsTnI STAT Cals',type:'calibrator',manufacturer:'Abbott Diagnostics',analyser:'Alinity i',note:'Troponin I'},
+  {gtin:'05055845400534',name:'Alere NT-proBNP Cals',type:'calibrator',manufacturer:'Abbott Diagnostics',analyser:'Alinity i',note:'NT-proBNP'},
+  {gtin:'00380740194864',name:'GFAP Ctrls',type:'control',manufacturer:'Abbott Diagnostics',analyser:'Alinity i',note:'GFAP kontrola'},
+  {gtin:'00380740194888',name:'UCH-L1 Ctrls',type:'control',manufacturer:'Abbott Diagnostics',analyser:'Alinity i',note:'UCH-L1 kontrola'},
+  {gtin:'00380740153946',name:'PCT Ctrls',type:'control',manufacturer:'Abbott Diagnostics',analyser:'Alinity i',note:''},
+  {gtin:'05391523440776',name:'Multichem S Plus L1',type:'control',manufacturer:'Technopath',analyser:'Alinity c',note:'Biokemija nivo 1'},
+  {gtin:'05391523440783',name:'Multichem S Plus L2',type:'control',manufacturer:'Technopath',analyser:'Alinity c',note:'Biokemija nivo 2'},
+  {gtin:'05391523440790',name:'Multichem S Plus L3',type:'control',manufacturer:'Technopath',analyser:'Alinity c',note:'Biokemija nivo 3'},
+  {gtin:'05391523440745',name:'Multichem IA Plus',type:'control',manufacturer:'Technopath',analyser:'Alinity i',note:'Imunologija'},
+  {gtin:'05391523440752',name:'Multichem U',type:'control',manufacturer:'Technopath',analyser:'Alinity c',note:'Urin'},
+  {gtin:'05055273217025',name:'HIL (Randox)',type:'control',manufacturer:'Randox',analyser:'Alinity c',note:'Hemoliza/Ikterija/Lipemija'},
+  {gtin:'05055273203783',name:'HUM ASY L2 (Randox)',type:'control',manufacturer:'Randox',analyser:'Alinity i',note:''},
+  {gtin:'05055273203608',name:'HUM ASY L3 (Randox)',type:'control',manufacturer:'Randox',analyser:'Alinity i',note:''}
+];
+var _editGtinIdx=null;
+function calcGtinCheck(base13){
+  var sum=0;for(var i=0;i<13;i++)sum+=parseInt(base13[i])*(i%2===0?3:1);
+  return ((10-(sum%10))%10).toString();
+}
+function validGtin(g){
+  if(!g||g.length!==14||!/^\d{14}$/.test(g))return false;
+  var d=g.split('').map(Number);
+  var sum=0;for(var i=0;i<13;i++)sum+=d[i]*(i%2===0?3:1);
+  return (10-(sum%10))%10===d[13];
+}
+function renderGtins(){
+  var q=($i('gtinSrch')?$i('gtinSrch').value:'').toLowerCase();
+  var tf=$i('gtinTypeFilter')?$i('gtinTypeFilter').value:'';
+  var items=(DB_PREGLED.gtins||[]).filter(function(g){
+    return(!q||g.gtin.indexOf(q)>=0||(g.name||'').toLowerCase().indexOf(q)>=0)&&(!tf||g.type===tf);
+  });
+  var tbody=$i('gtinBody');if(!tbody)return;
+  if(!items.length){tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:20px">Ni GTIN kod. Dodajte ali uvozite CSV.</td></tr>';return;}
+  tbody.innerHTML=items.map(function(g){
+    var ri=(DB_PREGLED.gtins||[]).indexOf(g);
+    var badge=TYPE_BADGE[g.type]||'b-gray';
+    var lbl=TYPE_LABELS[g.type]||g.type;
+    return '<tr style="border-bottom:1px solid var(--border)">'+
+      '<td class="gtin" style="padding:6px 4px;white-space:nowrap">'+g.gtin+'</td>'+
+      '<td style="padding:6px 4px"><div style="font-size:12px;font-weight:600">'+_ge(g.name)+'</div>'+(g.note?'<div style="font-size:10px;color:var(--text3)">'+_ge(g.note)+'</div>':'')+'</td>'+
+      '<td style="padding:6px 4px"><span class="badge '+badge+'">'+lbl+'</span></td>'+
+      '<td style="padding:6px 4px;font-size:11px;color:var(--text2)">'+(g.analyser||'&ndash;')+'</td>'+
+      '<td style="padding:6px 4px;white-space:nowrap;text-align:right">'+
+      '<button class="btn btn-g btn-sm" onclick="openGtinMo('+ri+')" style="padding:4px 8px;min-height:30px">&#9998;</button> '+
+      '<button class="btn btn-d btn-sm" onclick="delGtin('+ri+')" style="padding:4px 8px;min-height:30px">&#128465;</button>'+
+      '</td></tr>';
+  }).join('');
+}
+function _ge(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function openGtinMo(idx){
+  _editGtinIdx=idx!=null?idx:null;
+  $i('gtinMoT').textContent=idx!=null?'Uredi GTIN':'Dodaj GTIN';
+  if(idx!=null){
+    var g=(DB_PREGLED.gtins||[])[idx];
+    $i('gtinCode').value=g.gtin;$i('gtinName').value=g.name;$i('gtinTypeVal').value=g.type;
+    $i('gtinMfr').value=g.manufacturer||'';$i('gtinAnal').value=g.analyser||'';
+    $i('gtinNote').value=g.note||'';$i('gtinCatalog').value=g.catalog||'';
+    $i('gtinLotNotify').checked=(g.lotNotify!==false);
+  }else{
+    ['gtinCode','gtinName','gtinMfr','gtinAnal','gtinNote','gtinCatalog'].forEach(function(id){$i(id).value='';});
+    $i('gtinTypeVal').value='control';$i('gtinLotNotify').checked=true;
+  }
+  showMo('moGtin');
+}
+function updateLotNotifyDefault(){
+  if(_editGtinIdx===null){$i('gtinLotNotify').checked=($i('gtinTypeVal').value!=='consumable');}
+}
+function saveGtin(){
+  var gtin=$i('gtinCode').value.trim().replace(/\D/g,'');
+  var name=$i('gtinName').value.trim();
+  if(!gtin){notify('Vpišite GTIN','warn');return;}
+  if(gtin.length!==14){notify('GTIN mora biti 14 mest','warn');return;}
+  if(!validGtin(gtin)){notify('Neveljavna GTIN kontrolna številka','warn');return;}
+  if(!name){notify('Vpišite naziv','warn');return;}
+  var obj={gtin:gtin,name:name,type:$i('gtinTypeVal').value,manufacturer:$i('gtinMfr').value.trim(),
+           analyser:$i('gtinAnal').value.trim(),note:$i('gtinNote').value.trim(),
+           catalog:$i('gtinCatalog').value.trim(),lotNotify:$i('gtinLotNotify').checked};
+  if(_editGtinIdx!=null){
+    var prev=(DB_PREGLED.gtins||[])[_editGtinIdx];
+    if(prev&&prev.type!==obj.type)(DB_PREGLED.inventory||[]).forEach(function(inv){if(inv.gtin===obj.gtin)inv.type=obj.type;});
+    DB_PREGLED.gtins[_editGtinIdx]=obj;
+  }else{
+    if((DB_PREGLED.gtins||[]).some(function(g){return g.gtin===gtin;})){notify('GTIN že obstaja','warn');return;}
+    DB_PREGLED.gtins.push(obj);
+  }
+  savePregledDB();closeMo('moGtin');renderGtins();notify('GTIN shranjen','ok');
+  try{if(_hasBridge()&&AndroidBridge.msIsSignedIn&&AndroidBridge.msIsSignedIn())msUpload('pregledBK_db');}catch(e){}
+}
+function delGtin(i){
+  if(!confirm('Izbrisati GTIN?'))return;
+  DB_PREGLED.gtins.splice(i,1);
+  savePregledDB();renderGtins();notify('GTIN izbrisan');
+  try{if(_hasBridge()&&AndroidBridge.msIsSignedIn&&AndroidBridge.msIsSignedIn())msUpload('pregledBK_db');}catch(e){}
+}
+function loadGtinDemo(){
+  var added=0;
+  BUILTIN_GTINS.forEach(function(g){
+    if(!(DB_PREGLED.gtins||[]).some(function(x){return x.gtin===g.gtin;})){
+      DB_PREGLED.gtins.push(g);added++;
+    }
+  });
+  if(added>0){savePregledDB();renderGtins();notify('Naloženih '+added+' novih GTIN kod','ok');
+    try{if(_hasBridge()&&AndroidBridge.msIsSignedIn&&AndroidBridge.msIsSignedIn())msUpload('pregledBK_db');}catch(e){}
+  }else{notify('Vse privzete GTIN kode so že v bazi ('+((DB_PREGLED.gtins||[]).length)+' skupaj)','ok');}
+}
+function openImportGtin(){$i('moImportGtin').classList.add('open');$i('gtinImportTxt').value='';$i('gtinImportPrev').textContent='';}
+function readGtinFile(input){
+  var file=input.files[0];if(!file)return;
+  var r=new FileReader();
+  r.onload=function(e){
+    $i('gtinImportTxt').value=e.target.result;
+    var lines=e.target.result.replace(/\r/g,'').split('\n').filter(function(l){return l.trim()&&!/^\s*gtin\s*,/i.test(l);});
+    $i('gtinImportPrev').textContent='Najdenih '+lines.length+' vrstic.';
+  };
+  r.readAsText(file);
+}
+function _parseCsvLine(line){
+  var out=[],cur='',q=false;
+  for(var i=0;i<line.length;i++){
+    var c=line[i];
+    if(q){if(c==='"'){if(line[i+1]==='"'){cur+='"';i++;}else q=false;}else cur+=c;}
+    else{if(c==='"')q=true;else if(c===','){out.push(cur);cur='';}else cur+=c;}
+  }
+  out.push(cur);return out.map(function(x){return x.trim();});
+}
+function importGtinCsv(){
+  var txt=$i('gtinImportTxt').value.trim();
+  if(!txt){notify('Ni vsebine za uvoz','warn');return;}
+  var lines=txt.replace(/\r/g,'').split('\n').filter(function(l){return l.trim()&&!/^\s*gtin\s*,/i.test(l);});
+  var added=0,skipped=0;
+  lines.forEach(function(line){
+    var p=_parseCsvLine(line);
+    var gtin=(p[0]||'').replace(/\D/g,'');
+    var name=p[1]||'',type=p[2]||'',mfr=p[3]||'',anal=p[4]||'',note=p[5]||'';
+    if(!gtin||gtin.length!==14||!validGtin(gtin)){skipped++;return;}
+    if((DB_PREGLED.gtins||[]).some(function(g){return g.gtin===gtin;})){skipped++;return;}
+    DB_PREGLED.gtins.push({gtin:gtin,name:name||gtin,type:type||'consumable',manufacturer:mfr,analyser:anal,note:note,lotNotify:true});
+    added++;
+  });
+  savePregledDB();closeMo('moImportGtin');renderGtins();notify('Uvoženo '+added+', preskočenih '+skipped,'ok');
+  try{if(_hasBridge()&&AndroidBridge.msIsSignedIn&&AndroidBridge.msIsSignedIn())msUpload('pregledBK_db');}catch(e){}
+}
+function exportGtinCSV(){
+  var rows=[['GTIN','Naziv','Tip','Proizvajalec','Analizator','Opomba','Katalog']];
+  (DB_PREGLED.gtins||[]).forEach(function(g){rows.push([g.gtin,g.name,g.type,g.manufacturer||'',g.analyser||'',g.note||'',g.catalog||'']);});
+  var csv=rows.map(function(r){return r.map(function(v){return'"'+String(v||'').replace(/"/g,'""')+'"';}).join(',');}).join('\r\n');
+  var blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
+  var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='GTIN_'+new Date().toISOString().slice(0,10)+'.csv';a.click();
+  notify('CSV izvožen','ok');
 }
 
 /* ============================================================
