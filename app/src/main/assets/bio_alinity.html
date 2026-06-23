@@ -1181,6 +1181,7 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
           <label style="cursor:pointer;display:flex;align-items:center;gap:4px;margin:0"><input type="radio" name="qcxmlf" id="qcXmlF23" onchange="_qcXmlSetFactor(2/3)" checked><span>&#x2154; standard</span></label>
           <label style="cursor:pointer;display:flex;align-items:center;gap:4px;margin:0;color:var(--orange)"><input type="radio" name="qcxmlf" id="qcXmlF13" onchange="_qcXmlSetFactor(1/3)"><span>&#x2153; tesnejše</span></label>
         </div>
+        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;font-size:12px;padding:4px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;white-space:nowrap"><input type="checkbox" id="qcXmlOnlyUsed" onchange="_qcXmlToggleOnlyUsed(this.checked)" checked><span>Samo naše preiskave</span></label>
       </div>
       <div style="margin-bottom:8px"><span id="qcXmlFactorHint" style="font-size:11px;color:var(--text3)">SD&#x2093;&#x2090;&#x161; = &#x2154; &#xD7; SD<sub>mfr</sub> &#xB7; meje = Mean &#xB1; 2&#xB7;SD &#xB7; kliknite SD za popravek</span></div>
       <div id="qcXmlPrepBody"></div>
@@ -2631,28 +2632,44 @@ function qcSetOverride(lot,num,lv,unit,field,val){
   save();
 }
 function qcResetOverride(lot,num,lv,unit){const O=S.qcOverrides&&S.qcOverrides[lot];if(O&&O[num]&&O[num][lv])delete O[num][lv][unit];save();}
-/* zgradi analizatorski XML iz izvornega (xmlRaw): spremeni le SD/Low/High, vse ostalo nespremenjeno */
+/* Nabor 'naših' Abbott preiskav za material iz potrjene preslikave: {abbottNum: našaEnota|null}.
+   Vrne null, če material nima preslikave (klicatelj naj obdrži vse + opozori). */
+function qcUsedAssays(matName){
+  const amap=(matName&&S.qcAssayMap&&S.qcAssayMap[matName])||{};
+  if(!Object.keys(amap).length)return null;
+  const umap=(matName&&S.qcUnitMap&&S.qcUnitMap[matName])||{};
+  const out={};
+  Object.keys(amap).forEach(a=>{const num=amap[a];if(num)out[num]=umap[a]||null;});
+  return Object.keys(out).length?out:null;
+}
+/* trenutni material XML-pripravljalnika */
+function _qcXmlMatName(){return qcXmlPrepIdx!=null&&S.qcMaterials[qcXmlPrepIdx]?S.qcMaterials[qcXmlPrepIdx].name:null;}
+/* aktivni filter naših preiskav (ali null = obdrži vse) */
+function _qcXmlUsedFilter(){if(!_qcXmlOnlyUsed)return null;return qcUsedAssays(_qcXmlMatName());}
+/* zgradi analizatorski XML iz izvornega (xmlRaw): spremeni le SD/Low/High; če je filter aktiven, obdrži le naše preiskave/enote */
 function buildAdjustedQcXml(lot){
   const v=S.qcValues&&S.qcValues[lot];if(!v||!v.xmlRaw)throw new Error('Ni izvornega XML za lot '+lot+' (najprej uvozite uradni XML)');
   const doc=new DOMParser().parseFromString(v.xmlRaw,'text/xml');
   if(doc.getElementsByTagName('parsererror').length)throw new Error('Izvorni XML neveljaven');
-  const assays=doc.getElementsByTagName('Assay');
-  for(let i=0;i<assays.length;i++){const a=assays[i];const num=a.getAttribute('Number');
-    const units=a.getElementsByTagName('DataUnit');
-    for(let j=0;j<units.length;j++){const du=units[j];const unit=du.getAttribute('Unit');
-      const cls=du.getElementsByTagName('ControlLevel');
-      for(let k=0;k<cls.length;k++){const cl=cls[k];const lv=cl.getAttribute('Name');
+  const used=_qcXmlUsedFilter();
+  const assays=Array.from(doc.getElementsByTagName('Assay'));
+  assays.forEach(a=>{const num=a.getAttribute('Number');
+    if(used&&!(num in used)){if(a.parentNode)a.parentNode.removeChild(a);return;}
+    const wantUnit=used?used[num]:null;
+    Array.from(a.getElementsByTagName('DataUnit')).forEach(du=>{const unit=du.getAttribute('Unit');
+      if(used&&wantUnit&&unit!==wantUnit){if(du.parentNode)du.parentNode.removeChild(du);return;}
+      Array.from(du.getElementsByTagName('ControlLevel')).forEach(cl=>{const lv=cl.getAttribute('Name');
         const meanS=cl.getAttribute('Mean'),sdS=cl.getAttribute('StandardDeviation');
         const lowS=cl.getAttribute('LowRangeValue'),highS=cl.getAttribute('HighRangeValue');
         const mean=parseFloat(meanS),sdMfr=parseFloat(sdS);
-        if(!isFinite(mean)||!isFinite(sdMfr))continue;
+        if(!isFinite(mean)||!isFinite(sdMfr))return;
         const e=qcEffective(lot,num,lv,unit,mean,sdMfr);
         if(sdS!=null)cl.setAttribute('StandardDeviation',_fmtLike(sdS,e.sd));
         if(lowS!=null)cl.setAttribute('LowRangeValue',_fmtLike(lowS,e.low));
         if(highS!=null)cl.setAttribute('HighRangeValue',_fmtLike(highS,e.high));
-      }
-    }
-  }
+      });
+    });
+  });
   return new XMLSerializer().serializeToString(doc);
 }
 function _qcSlug(s){return String(s||'').replace(/[^A-Za-z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0,40);}
@@ -2771,7 +2788,7 @@ function onQcXmlFetched(lot,xmlText,msg){
 }
 
 /* ===== QC XML PRIPRAVLJALNIK (analizatorski XML + PDF potrditev) ===== */
-let qcXmlPrepIdx=null,_qcXmlLot=null;
+let qcXmlPrepIdx=null,_qcXmlLot=null,_qcXmlOnlyUsed=true;
 
 function openQcXmlPrepModal(idx){
   qcXmlPrepIdx=idx;
@@ -2790,6 +2807,7 @@ function openQcXmlPrepModal(idx){
     const f=isFinite(vals.sdFactor)?vals.sdFactor:2/3;
     $i('qcXmlF13').checked=Math.abs(f-1/3)<0.01;
     $i('qcXmlF23').checked=!$i('qcXmlF13').checked;
+    if($i('qcXmlOnlyUsed'))$i('qcXmlOnlyUsed').checked=_qcXmlOnlyUsed;
     _qcXmlUpdateFactorHint(f);
     _renderQcXmlTable(lot,vals);
   }
@@ -2808,18 +2826,28 @@ function _qcXmlSetFactor(f){
   _qcXmlUpdateFactorHint(f);
   _renderQcXmlTable(_qcXmlLot,S.qcValues[_qcXmlLot]);
 }
+function _qcXmlToggleOnlyUsed(on){
+  _qcXmlOnlyUsed=!!on;
+  if(_qcXmlLot&&S.qcValues&&S.qcValues[_qcXmlLot])_renderQcXmlTable(_qcXmlLot,S.qcValues[_qcXmlLot]);
+}
 function _qcCellId(num,lv,unit){return [num,lv,unit].map(s=>String(s||'').replace(/[^a-zA-Z0-9]/g,'_')).join('_');}
 
 function _renderQcXmlTable(lot,vals){
   const doc=new DOMParser().parseFromString(vals.xmlRaw,'text/xml');
   if(doc.getElementsByTagName('parsererror').length){$i('qcXmlPrepBody').innerHTML='<div style="color:var(--red)">Neveljaven XML.</div>';return;}
+  const used=_qcXmlUsedFilter();
+  const noMap=_qcXmlOnlyUsed&&qcUsedAssays(_qcXmlMatName())===null;
   const assays=doc.getElementsByTagName('Assay');
-  const allLevels=[],rows=[];
+  const allLevels=[],rows=[];let totalAssays=0;
   for(let i=0;i<assays.length;i++){
     const a=assays[i];const num=a.getAttribute('Number');const name=a.getAttribute('Name')||num;
+    totalAssays++;
+    if(used&&!(num in used))continue;
+    const wantUnit=used?used[num]:null;
     const unitEls=a.getElementsByTagName('DataUnit');
     for(let j=0;j<unitEls.length;j++){
       const du=unitEls[j];const unit=du.getAttribute('Unit');
+      if(used&&wantUnit&&unit!==wantUnit)continue;
       const lvData={};
       const cls=du.getElementsByTagName('ControlLevel');
       for(let k=0;k<cls.length;k++){
@@ -2863,7 +2891,13 @@ function _renderQcXmlTable(lot,vals){
       'onclick="_qcXmlResetRow(\''+_repEsc(r.num)+'\',\''+_repEsc(r.unit)+'\',\''+_repEsc(lot)+'\')" title="Ponastavi vrstico na ⅔">↺</button></td>';
     body+='</tr>';
   });
-  $i('qcXmlPrepBody').innerHTML='<style>.qcxml-hidden{display:none!important}</style>'+
+  let banner='';
+  if(noMap){
+    banner='<div style="background:var(--obg,rgba(217,119,6,.12));border:1px solid var(--orange);border-radius:6px;padding:7px 10px;margin-bottom:8px;font-size:12px;color:var(--orange)">⚠ Material nima potrjene preslikave — prikazane so <b>vse</b> preiskave. Povežite jih v »QC vrednosti«, da v XML/PDF ostanejo le preiskave, ki jih izvajate.</div>';
+  }else if(used){
+    banner='<div style="background:rgba(15,110,86,.10);border:1px solid var(--accent2);border-radius:6px;padding:7px 10px;margin-bottom:8px;font-size:12px;color:var(--accent2)">✓ Prikazane <b>'+rows.length+'</b> naših preiskav (od '+totalAssays+' v kontroli) — v enoti, ki jo uporabljamo.</div>';
+  }
+  $i('qcXmlPrepBody').innerHTML='<style>.qcxml-hidden{display:none!important}</style>'+banner+
     '<div class="tbl-wrap"><table style="font-size:12px;border-collapse:collapse;width:100%">'+
     '<thead style="position:sticky;top:0;z-index:2">'+hdr+'</thead><tbody>'+body+'</tbody></table></div>';
 }
@@ -2947,14 +2981,19 @@ function buildQcXmlReportHtml(lot,matNameOvr){
   const q=qcXmlPrepIdx!=null?S.qcMaterials[qcXmlPrepIdx]:null;
   const matName=matNameOvr||(q?q.name:(v.control||lot));
   const today=_qcToday();
+  const used=_qcXmlOnlyUsed?qcUsedAssays(matName):null;
   const doc=new DOMParser().parseFromString(v.xmlRaw,'text/xml');
   const assays=doc.getElementsByTagName('Assay');
-  let body='';
+  let body='',keptRows=0,totalAssays=0;
   for(let i=0;i<assays.length;i++){
     const a=assays[i];const num=a.getAttribute('Number');const name=a.getAttribute('Name')||num;
+    totalAssays++;
+    if(used&&!(num in used))continue;
+    const wantUnit=used?used[num]:null;
     const unitEls=a.getElementsByTagName('DataUnit');
     for(let j=0;j<unitEls.length;j++){
       const du=unitEls[j];const unit=du.getAttribute('Unit');
+      if(used&&wantUnit&&unit!==wantUnit)continue;
       const cls=du.getElementsByTagName('ControlLevel');
       const lvs=[];
       for(let k=0;k<cls.length;k++){
@@ -2967,6 +3006,7 @@ function buildQcXmlReportHtml(lot,matNameOvr){
         lvs.push({lv,m:_fmtLike(meanS,mean),sd:_fmtLike(sdS,e.sd),low:_fmtLike(sdS,e.low),high:_fmtLike(sdS,e.high),ov:isOv});
       }
       if(!lvs.length)continue;
+      keptRows++;
       body+='<tr><td>'+_repEsc(name)+'</td><td>'+_repEsc(unit)+'</td>';
       lvs.forEach(lc=>{body+='<td>'+_repEsc(lc.m)+'</td><td'+(lc.ov?' class="ov"':'')+'>'+_repEsc(lc.sd)+'</td><td>'+_repEsc(lc.low)+' – '+_repEsc(lc.high)+'</td>';});
       for(let p=lvs.length;p<3;p++)body+='<td colspan="3" style="color:#bbb;text-align:center">—</td>';
@@ -2977,6 +3017,7 @@ function buildQcXmlReportHtml(lot,matNameOvr){
   const fpdf=isFinite(lotFpdf)?lotFpdf:2/3;
   const fracStr=Math.abs(fpdf-1/3)<0.01?'&#x2153;':Math.abs(fpdf-2/3)<0.01?'&#x2154;':(Math.round(fpdf*100)+'%');
   const expStr=v.expiry?(' &nbsp;|&nbsp; Rok: '+_repEsc(v.expiry)):'';
+  const cntStr=used?(keptRows+' od '+totalAssays+' preiskav (naše)'):(keptRows+' preiskav');
   return'<!DOCTYPE html><html><head><meta charset="UTF-8">'+
   '<title>QC XML — '+_repEsc(matName)+' — '+_repEsc(lot)+'</title>'+
   '<style>*{box-sizing:border-box;margin:0;padding:0}'+
@@ -3000,7 +3041,7 @@ function buildQcXmlReportHtml(lot,matNameOvr){
   '.sig-note{font-size:7pt;color:#888;margin-top:8px;font-style:italic}'+
   '@page{size:A4 landscape;margin:10mm}</style></head><body>'+
   '<h1>QC XML — '+_repEsc(matName)+' — Lot '+_repEsc(lot)+'</h1>'+
-  '<div class="sub">SD<sub>naš</sub> = '+fracStr+' &times; SD<sub>mfr</sub> &nbsp;|&nbsp; meje = Mean &plusmn; 2&times;SD &nbsp;|&nbsp; datum: '+today+expStr+' &nbsp;|&nbsp; '+Object.keys(v.assays||{}).length+' preiskav &nbsp;|&nbsp; <b>krepko SD</b> = lastna vrednost laboratorija</div>'+
+  '<div class="sub">SD<sub>naš</sub> = '+fracStr+' &times; SD<sub>mfr</sub> &nbsp;|&nbsp; meje = Mean &plusmn; 2&times;SD &nbsp;|&nbsp; datum: '+today+expStr+' &nbsp;|&nbsp; '+cntStr+' &nbsp;|&nbsp; <b>krepko SD</b> = lastna vrednost laboratorija</div>'+
   '<table><thead><tr><th rowspan="2">Preiskava</th><th rowspan="2">Enota</th>'+
   '<th colspan="3" class="g">Nivo 1</th><th colspan="3" class="g">Nivo 2</th><th colspan="3" class="g">Nivo 3</th></tr>'+
   '<tr><th>Mean</th><th>SD</th><th>Low – High</th><th>Mean</th><th>SD</th><th>Low – High</th><th>Mean</th><th>SD</th><th>Low – High</th></tr>'+
