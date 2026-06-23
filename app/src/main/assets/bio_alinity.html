@@ -1029,14 +1029,38 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
   </div>
 
   <div class="card">
-    <div class="card-title">&#8505;&#65039; O aplikaciji</div>
-    <div style="font-size:13px;line-height:1.9">
-      <div><strong>BIO Alinity App</strong> <span id="aboutVersion">v1.0.0</span></div>
+    <div class="card-title">&#8505;&#65039; O aplikaciji &middot; identifikacija pripomočka (IVDR)</div>
+    <div style="font-size:13px;line-height:1.8">
+      <div><strong>BIO Alinity</strong> <span id="aboutVersion">v1.0.0</span></div>
       <div class="muted" id="aboutBuild">Build: &ndash;</div>
       <div class="muted" id="aboutDevice">Naprava: &ndash;</div>
       <div class="muted" id="aboutStorage">Pomnilnik: &ndash;</div>
-      <div class="muted">Namen: pregled zaloge + QC Abbott Alinity</div>
+      <div style="border-top:1px solid var(--border);margin:10px 0 8px"></div>
+      <div><span class="muted">Proizvajalec (in-house):</span><br><strong id="aboutMfr">&ndash;</strong></div>
+      <div style="margin-top:6px"><span class="muted">UDI-DI (interni identifikator):</span><br><code id="aboutUdi" style="font-size:12px">&ndash;</code></div>
+      <div style="margin-top:6px"><span class="muted">Namen uporabe:</span><br><span id="aboutIntended" style="font-size:12px">&ndash;</span></div>
+      <div style="margin-top:6px"><span class="muted">Kontakt:</span> <span id="aboutContact" style="font-size:12px">&ndash;</span></div>
+      <div id="aboutInhouse" style="margin-top:10px;background:rgba(0,48,135,.06);border:1px solid rgba(0,48,135,.25);border-radius:8px;padding:8px 12px;font-size:12px;line-height:1.5">&#127973; &ndash;</div>
     </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">&#128220; Revizijska sled (ALCOA+)</div>
+    <div class="muted" style="font-size:12px;margin-bottom:10px">Nespremenljiv dnevnik vseh sprememb (vnosi QC, pregledi, operaterji, loti, uradne vrednosti). Skladno z zahtevami celovitosti podatkov (IVDR / ISO 15189).</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+      <select id="auFilterEntity" onchange="renderAuditLog()" style="padding:6px 8px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);font-size:12px">
+        <option value="">Vse entitete</option>
+        <option value="entry">QC vnosi</option>
+        <option value="qcreview">Pregledi QC</option>
+        <option value="operator">Operaterji</option>
+        <option value="lot">Loti</option>
+        <option value="qcvalue">Uradne vrednosti</option>
+      </select>
+      <input type="date" id="auFilterFrom" onchange="renderAuditLog()" style="padding:6px 8px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);font-size:12px">
+      <input type="date" id="auFilterTo" onchange="renderAuditLog()" style="padding:6px 8px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);font-size:12px">
+      <button class="btn btn-g btn-sm" onclick="exportAuditCSV()">&#11015;&#65039; Izvozi CSV</button>
+    </div>
+    <div id="auditLogBody"></div>
   </div>
 </div>
 
@@ -1935,6 +1959,15 @@ function defaultQcMaterials(){return [
   {name:'Pool QC',type:'pool',levels:1,lot:'',gtins:[],assays:[]},
 ];}
 
+/* IVDR / ISO 15189 — identifikacija pripomočka (in-house, čl. 5(5) Uredbe (EU) 2017/746) */
+const IVDR_INFO={
+  deviceName:'BIO Alinity',
+  legalManufacturer:'UKC Ljubljana — 24-urni laboratorij',
+  intendedUse:'Programska podpora notranji kontroli kakovosti (QC) in vodenju zaloge reagentov/kontrol na analizatorjih Abbott Alinity. Za profesionalno uporabo s strani usposobljenega laboratorijskega osebja.',
+  inHouse:'In-house pripomoček, izdelan in uporabljen znotraj zdravstvene ustanove (čl. 5(5) Uredbe (EU) 2017/746). Ni namenjen prodaji ali dajanju na trg.',
+  udiDi:'INT-SI-KCLJ-BIOALINITY',
+  contact:'Oddelek za laboratorijsko diagnostiko, UKC Ljubljana'
+};
 let S = { assays:[], qcMaterials:[], operators:[], entries:[], currentAssayTab:'biochem',
   editingAssayIdx:null, editingQcIdx:null, editingOpIdx:null, wiz:{}, pinValue:'',
   ljRules:{'1_2s':true,'1_3s':true,'2_2s':true,'R_4s':true,'4_1s':true,'10_x':true},
@@ -1946,6 +1979,7 @@ function initState(){
   if(!S.serviceLog)S.serviceLog=[];
   if(!S.deliveries)S.deliveries=[];
   if(!S.qcReviews)S.qcReviews=[];
+  if(!S.auditLog)S.auditLog=[];
   if(!S.notifications)S.notifications=[];
   if(!S.reports)S.reports=[];
   if(!S.pendingReports)S.pendingReports=[];
@@ -1988,6 +2022,21 @@ function migrateQcMaterials(){
 }
 function save(){localStorage.setItem('qclab_v2',JSON.stringify(S));}
 
+/* ===== REVIZIJSKA SLED (IVDR / ISO 15189 — ALCOA+) =====
+   Append-only dnevnik vseh sprememb. Nikoli se ne ureja ali briše.
+   Attributable (operatorId) · Legible (summary) · Contemporaneous (ts) ·
+   Original/Accurate (before/after). Sinhronizira se kot del S (qclab_v2). */
+function _audit(action,entity,entityId,summary,before,after,operatorId){
+  if(!S.auditLog)S.auditLog=[];
+  var build=0;try{build=JSON.parse(AndroidBridge.getDeviceInfo()).appBuild||0;}catch(e){}
+  S.auditLog.push({id:Date.now().toString()+'_'+Math.random().toString(36).slice(2,6),
+    ts:new Date().toISOString(),action:action,entity:entity,entityId:entityId||'',
+    summary:summary||'',before:before||null,after:after||null,
+    operatorId:operatorId||'system',appBuild:build});
+}
+/* človeško berljivo ime izvajalca dejanja za revizijsko sled */
+function _auditWho(opId){if(!opId||opId==='system')return 'skrbnik (naprava)';var op=S.operators.find(function(o){return o.id===opId;});return op?op.first+' '+op.last+' ('+opId+')':opId;}
+
 function sdLabel(sd){if(sd==='ok'||!sd)return 'OK';return sd.replace('-3sd','−3SD').replace('-2sd','−2SD').replace('+3sd','+3SD').replace('+2sd','+2SD');}
 function sdBadge(sd){if(!sd||sd==='ok')return '<span class="badge badge-ok">OK</span>';if(sd.includes('3'))return '<span class="badge badge-3sd">'+sdLabel(sd)+'</span>';return '<span class="badge badge-2sd">'+sdLabel(sd)+'</span>';}
 
@@ -2027,7 +2076,10 @@ function populateEntryQcMaterials(){
   const list=$i('qcMatCheckList');if(!list)return;
   const qcs=instr?compatibleQcs(instr.type):S.qcMaterials;
   list.innerHTML=qcs.map(q=>{const ri=S.qcMaterials.indexOf(q);const curLot=qcCurrentLot(q);
-    return '<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;cursor:pointer;background:var(--bg2)"><input type="checkbox" value="'+ri+'" data-qcname="'+q.name+'" data-lot="'+(curLot||'')+'" data-levels="'+(q.levels||2)+'" class="qc-mat-cb" style="width:17px;height:17px;accent-color:var(--abbott-teal)"><span style="flex:1"><span style="font-weight:600;font-size:13px">'+q.name+'</span>'+(curLot?'<span style="font-size:11px;color:var(--text3);margin-left:8px">Lot: '+curLot+pregledLotHint(q)+'</span>':pregledLotHint(q))+'</span><span style="font-size:11px;color:var(--text3)">'+(q.levels||2)+' nivo(i)</span></label>';
+    const st=qcStockLots(q)[0];const exp=st?st.expiry:'';const dl=st?st.daysLeft:null;
+    const isExp=dl!=null&&dl<0;const isNear=dl!=null&&dl>=0&&dl<=14;
+    const flag=isExp?'<span class="badge b-exp" style="margin-left:8px">POTEKEL — blokirano '+fmtExp(exp)+'</span>':(isNear?'<span class="badge b-14" style="margin-left:8px">Poteče čez '+dl+' dni</span>':'');
+    return '<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid '+(isExp?'var(--red)':'var(--border)')+';border-radius:8px;cursor:'+(isExp?'not-allowed':'pointer')+';background:'+(isExp?'rgba(220,38,38,.06)':'var(--bg2)')+';opacity:'+(isExp?'.7':'1')+'"><input type="checkbox" value="'+ri+'" data-qcname="'+q.name+'" data-lot="'+(curLot||'')+'" data-levels="'+(q.levels||2)+'" data-expiry="'+(exp||'')+'" data-daysleft="'+(dl==null?'':dl)+'" '+(isExp?'disabled ':'')+'class="qc-mat-cb" style="width:17px;height:17px;accent-color:var(--abbott-teal)"><span style="flex:1"><span style="font-weight:600;font-size:13px">'+q.name+'</span>'+flag+(curLot?'<span style="font-size:11px;color:var(--text3);margin-left:8px">Lot: '+curLot+pregledLotHint(q)+'</span>':pregledLotHint(q))+'</span><span style="font-size:11px;color:var(--text3)">'+(q.levels||2)+' nivo(i)</span></label>';
   }).join('');
 }
 /* Povezava QC material → zaloga po GTIN: vrne postavke v zalogi (FEFO, najprej najkrajši rok) */
@@ -2062,7 +2114,7 @@ function wizardNext(from){
   if(from===0){
     const instrId=$i('entryInstr').value;if(!instrId){notify('Izberite inštrument','warning');return;}
     const cbs=[...document.querySelectorAll('.qc-mat-cb:checked')];if(!cbs.length){notify('Izberite vsaj en QC material','warning');return;}
-    S.wiz={instrId,datetime:$i('entryDateTime').value,instrType:INSTRUMENTS.find(i=>i.id===instrId).type,selectedQcs:cbs.map(cb=>({idx:parseInt(cb.value),name:cb.dataset.qcname,lot:cb.dataset.lot,levels:parseInt(cb.dataset.levels)||2}))};
+    S.wiz={instrId,datetime:$i('entryDateTime').value,instrType:INSTRUMENTS.find(i=>i.id===instrId).type,selectedQcs:cbs.map(cb=>({idx:parseInt(cb.value),name:cb.dataset.qcname,lot:cb.dataset.lot,levels:parseInt(cb.dataset.levels)||2,expiry:cb.dataset.expiry||'',daysLeft:(cb.dataset.daysleft===''||cb.dataset.daysleft==null?null:parseInt(cb.dataset.daysleft))}))};
     buildLevelPills();showWStep(1);
   }else if(from===1){
     const qcLevels={};S.wiz.selectedQcs.forEach(qc=>{qcLevels[qc.idx]=[...document.querySelectorAll('.lp-pill[data-qc="'+qc.idx+'"].selected-pill')].map(p=>p.dataset.level);});
@@ -2125,11 +2177,17 @@ function updatePinDisplay(){for(let i=0;i<5;i++)$i('pd'+i).classList.toggle('fil
 function saveEntry(){
   if(S.pinValue.length<5){notify('Vpišite vseh 5 mest','warning');return;}
   const op=S.operators.find(o=>o.id===S.pinValue);if(!op){notify('Operater ni registriran','error');return;}
+  /* IVDR sledljivost lotov: trda blokada poteklega lota (daysLeft<0) */
+  const expired=(S.wiz.selectedQcs||[]).find(qc=>qc.daysLeft!=null&&qc.daysLeft<0);
+  if(expired){notify('Lot '+(expired.lot||'?')+' ('+expired.name+') je potekel '+fmtExp(expired.expiry)+' — vnos QC ni dovoljen','error');return;}
   const baseId=Date.now().toString();
   S.wiz.selectedQcs.forEach((qc,i)=>{
     const levels=S.wiz.qcLevels[qc.idx]||[];if(!levels.length)return;
     const results=[];levels.forEach(lvl=>{const picked=(S.wiz.pickedByQcLvl||{})[qc.idx+'_'+lvl]||[];picked.forEach(an=>{const skey=qc.idx+'_'+lvl+'_'+an;const sd=(S.wiz.sdMap||{})[skey]||'ok';const note=(S.wiz.notes||{})[skey]||'';results.push({assay:an,level:lvl,sd,note});});});
-    S.entries.push({id:baseId+'_'+i,datetime:S.wiz.datetime||new Date().toISOString(),instrId:S.wiz.instrId,qcName:qc.name,qcIdx:qc.idx,lot:qc.lot,levels,results,operatorId:S.pinValue,sessionId:baseId});
+    const ent={id:baseId+'_'+i,datetime:S.wiz.datetime||new Date().toISOString(),instrId:S.wiz.instrId,qcName:qc.name,qcIdx:qc.idx,lot:qc.lot,lotExpiry:qc.expiry||'',daysLeftAtEntry:(qc.daysLeft==null?null:qc.daysLeft),levels,results,operatorId:S.pinValue,sessionId:baseId};
+    S.entries.push(ent);
+    const nf=results.filter(r=>r.sd&&r.sd!=='ok').length;
+    _audit('create','entry',ent.id,'QC vnos '+ent.instrId+' · '+ent.qcName+(ent.lot?' · lot '+ent.lot:'')+' · '+results.length+' preiskav'+(nf?' ('+nf+' izpad)':' (vse OK)'),null,null,S.pinValue);
   });
   save();notify('QC vnosi shranjeni! ✓','success');initWizard();navQc('dashboard');
 }
@@ -2167,7 +2225,7 @@ function renderQcSignoff(){
   if(!revs.length){tb.innerHTML='<tr><td colspan="6" class="empty">Ni pregledov.</td></tr>';return;}
   tb.innerHTML=revs.map(r=>'<tr><td style="font-size:12px">'+(r.datetime||'').slice(0,16).replace('T',' ')+'</td><td><span class="badge badge-blue">'+r.instrId+'</span></td><td style="font-size:12px">'+(r.fromDate||'')+' &ndash; '+(r.toDate||'')+'</td><td>'+getOpName(r.reviewerId)+'</td><td style="font-size:12px;max-width:220px">'+(r.actions?_repEsc(r.actions):'<span class="muted">&ndash;</span>')+'</td><td style="white-space:nowrap"><button class="btn btn-g btn-sm" onclick="openQcReviewEdit(\''+r.id+'\')" style="margin-right:4px">&#9998;</button><button class="btn btn-d btn-sm" onclick="deleteQcReview(\''+r.id+'\')">&#128465;</button></td></tr>').join('');
 }
-function deleteQcReview(id){if(!confirm('Izbrisati ta pregled?'))return;S.qcReviews=(S.qcReviews||[]).filter(r=>r.id!==id);save();renderQcSignoff();notify('Pregled izbrisan');}
+function deleteQcReview(id){if(!confirm('Izbrisati ta pregled?'))return;const rec=(S.qcReviews||[]).find(r=>r.id===id);S.qcReviews=(S.qcReviews||[]).filter(r=>r.id!==id);if(rec)_audit('delete','qcreview',id,'Izbrisan pregled QC '+rec.instrId+' ('+(rec.fromDate||'')+'–'+(rec.toDate||'')+')',rec,null,'system');save();renderQcSignoff();notify('Pregled izbrisan');}
 function openQcReviewEdit(id){
   const rev=(S.qcReviews||[]).find(r=>r.id===id);if(!rev)return;
   qcReviewState={instrId:rev.instrId,editId:id};qcRevPin='';
@@ -2203,14 +2261,16 @@ function saveQcReview(){
   // UREDI obstoječi pregled
   if(qcReviewState.editId){
     const idx=S.qcReviews.findIndex(r=>r.id===qcReviewState.editId);
-    if(idx>=0)Object.assign(S.qcReviews[idx],{actions,reviewerId:qcRevPin,editedAt:new Date().toISOString()});
+    if(idx>=0){const before={actions:S.qcReviews[idx].actions,reviewerId:S.qcReviews[idx].reviewerId};Object.assign(S.qcReviews[idx],{actions,reviewerId:qcRevPin,editedAt:new Date().toISOString()});_audit('update','qcreview',S.qcReviews[idx].id,'Urejen pregled QC '+S.qcReviews[idx].instrId+' ('+(S.qcReviews[idx].fromDate||'')+'–'+(S.qcReviews[idx].toDate||'')+')',before,{actions,reviewerId:qcRevPin},qcRevPin);}
     save();closeMo('qcReviewModal');renderQcSignoff();notify('Pregled posodobljen ✓','success');
     try{if(typeof AndroidBridge!=='undefined'&&AndroidBridge.msIsSignedIn&&AndroidBridge.msIsSignedIn())msUpload('qclab_v2',JSON.stringify(S));}catch(e){}
     return;
   }
   // NOV pregled
   const instrId=qcReviewState.instrId;const today=new Date().toISOString().slice(0,10);const from=_qcReviewFrom(instrId);
-  S.qcReviews.push({id:Date.now().toString(),datetime:new Date().toISOString(),instrId,fromDate:from,toDate:today,reviewerId:qcRevPin,actions,note:''});
+  const rid=Date.now().toString();
+  S.qcReviews.push({id:rid,datetime:new Date().toISOString(),instrId,fromDate:from,toDate:today,reviewerId:qcRevPin,actions,note:''});
+  _audit('create','qcreview',rid,'Pregled QC '+instrId+' ('+from+'–'+today+')'+(actions?' · ukrepi: '+actions:' · brez ukrepov'),null,null,qcRevPin);
   if(actions){if(!S.notifications)S.notifications=[];S.notifications.push({id:(Date.now()+1).toString(),datetime:new Date().toISOString(),type:'qcreview',message:actions,authorId:qcRevPin,instrId,resolved:false});_updateNotifBadge();}
   save();closeMo('qcReviewModal');renderQcSignoff();notify('Pregled QC zabeležen ✓','success');
   _syncNotifLog();
@@ -2449,11 +2509,11 @@ function saveQcMaterial(){const name=$i('qcName').value.trim(),type=$i('qcType')
 /* ===== OPERATORS ===== */
 function renderOperators(){const q=($i('opSearch')?.value||'').toLowerCase();const filtered=S.operators.filter(o=>(o.first+' '+o.last+' '+o.id).toLowerCase().includes(q));$i('operatorBody').innerHTML=filtered.map(o=>{const ri=S.operators.indexOf(o);return '<tr><td><span class="badge badge-blue">'+o.id+'</span></td><td>'+o.first+'</td><td>'+o.last+'</td><td><button class="btn btn-outline btn-sm" onclick="openOperatorModal('+ri+')">✏️</button> <button class="btn btn-d btn-sm" onclick="deleteOperator('+ri+')">🗑️</button></td></tr>';}).join('')||'<tr><td colspan="4" class="empty">Ni rezultatov.</td></tr>';}
 function openOperatorModal(idx){S.editingOpIdx=idx??null;$i('operatorModalTitle').textContent=idx!=null?'Uredi operaterja':'Nov operater';if(idx!=null){const o=S.operators[idx];$i('opId').value=o.id;$i('opFirst').value=o.first;$i('opLast').value=o.last;}else{$i('opId').value='';$i('opFirst').value='';$i('opLast').value='';}showMo('operatorModal');}
-function deleteOperator(i){if(!confirm('Izbriši operaterja?'))return;S.operators.splice(i,1);save();renderOperators();_autoSyncOps();notify('Operater izbrisan');}
+function deleteOperator(i){if(!confirm('Izbriši operaterja?'))return;const o=S.operators[i];S.operators.splice(i,1);if(o)_audit('delete','operator',o.id,'Izbrisan operater '+o.first+' '+o.last+' ('+o.id+')',o,null,'system');save();renderOperators();_autoSyncOps();notify('Operater izbrisan');}
 /* Operaterji so vir resnice v tej aplikaciji; ob spremembi se tiho naložijo v OneDrive (DigiLab/operators.json), od koder jih Zebra (Pregled BK) samo prebere. */
 function _autoSyncOps(){try{if(_hasBridge()&&AndroidBridge.msIsSignedIn&&AndroidBridge.msIsSignedIn())AndroidBridge.msUpload('operators',JSON.stringify(S.operators));}catch(e){}}
 function msUploadOperators(){if(!_hasBridge()){notify('Samo na napravi','warn');return;}try{if(!(AndroidBridge.msIsSignedIn&&AndroidBridge.msIsSignedIn())){notify('Najprej se prijavite v OneDrive (Več → Sinhronizacija)','warn');return;}notify('Nalagam operaterje v OneDrive…','ok');AndroidBridge.msUpload('operators',JSON.stringify(S.operators));}catch(e){notify('Napaka nalaganja','err');}}
-function saveOperator(){const id=$i('opId').value.trim(),first=$i('opFirst').value.trim(),last=$i('opLast').value.trim();if(!id||id.length!==5||isNaN(id)){notify('ID mora biti točno 5 številk','warning');return;}if(!first||!last){notify('Vnesite ime in priimek','warning');return;}if(S.editingOpIdx!=null)S.operators[S.editingOpIdx]={id,first,last};else{if(S.operators.find(o=>o.id===id)){notify('ID že obstaja','error');return;}S.operators.push({id,first,last});}save();closeMo('operatorModal');renderOperators();_autoSyncOps();notify('Operater shranjen','success');}
+function saveOperator(){const id=$i('opId').value.trim(),first=$i('opFirst').value.trim(),last=$i('opLast').value.trim();if(!id||id.length!==5||isNaN(id)){notify('ID mora biti točno 5 številk','warning');return;}if(!first||!last){notify('Vnesite ime in priimek','warning');return;}if(S.editingOpIdx!=null){const before={id:S.operators[S.editingOpIdx].id,first:S.operators[S.editingOpIdx].first,last:S.operators[S.editingOpIdx].last};S.operators[S.editingOpIdx]={id,first,last};_audit('update','operator',id,'Urejen operater '+first+' '+last+' ('+id+')',before,{id,first,last},'system');}else{if(S.operators.find(o=>o.id===id)){notify('ID že obstaja','error');return;}S.operators.push({id,first,last});_audit('create','operator',id,'Dodan operater '+first+' '+last+' ('+id+')',null,{id,first,last},'system');}save();closeMo('operatorModal');renderOperators();_autoSyncOps();notify('Operater shranjen','success');}
 function exportOperators(){const blob=new Blob([JSON.stringify(S.operators,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='operaterji.json';a.click();notify('Operaterji izvoženi','success');}
 function importOperators(input){const f=input.files[0];if(!f)return;const r=new FileReader();r.onload=e=>{try{const arr=JSON.parse(e.target.result);if(Array.isArray(arr)){let added=0;arr.forEach(o=>{if(!o.id)return;const norm={id:o.id,first:o.first||o.name||'',last:o.last||o.surname||''};if(!S.operators.find(x=>x.id===norm.id)){S.operators.push(norm);added++;}});save();renderOperators();notify('Uvoženih '+added+' operaterjev','success');}}catch(err){notify('Napaka pri uvozu','error');}};r.readAsText(f);input.value='';}
 
@@ -2463,10 +2523,16 @@ function exportCSV(){const hdr=['Datum','Čas','Inštrument','QC Material','Lot'
 /* ===== LOT HISTORY ===== */
 let currentLotQcIdx=null;
 function openLotHistory(idx){currentLotQcIdx=idx;const qc=S.qcMaterials[idx];$i('lotModalTitle').textContent='Loti – '+qc.name;renderLotHistory(qc);const now=new Date();now.setMinutes(now.getMinutes()-now.getTimezoneOffset());$i('newLotDate').value=now.toISOString().slice(0,10);$i('newLotNum').value='';$i('newLotNote').value='';showMo('lotModal');}
-function renderLotHistory(qc){const lots=qc.lotHistory||[{lot:qc.lot||'–',date:'',type:'qc',note:'Začetni lot'}];const typeInfo={qc:{label:'🔴 QC lot',color:'#dc2626'},cal:{label:'🟠 Kalibrator',color:'#f97316'},note:{label:'📝 Opomba',color:'#8b5cf6'}};let lastQcIdx=-1;lots.forEach((l,i)=>{if((l.type||'qc')==='qc')lastQcIdx=i;});$i('lotHistoryBody').innerHTML='<div class="tbl-wrap"><table><thead><tr><th>Tip</th><th>Lot</th><th>Datum</th><th>Analizatorji</th><th>Opomba</th><th></th></tr></thead><tbody>'+lots.map((l,i)=>{const ti=typeInfo[l.type||'qc']||typeInfo.qc;const isActive=(l.type||'qc')==='qc'&&i===lastQcIdx;const analHtml=(l.type==='cal'&&l.analyzers&&l.analyzers.length)?l.analyzers.map(a=>'<span class="badge badge-blue" style="font-size:11px;margin-right:2px">'+a+'</span>').join(''):'<span class="muted" style="font-size:11px">—</span>';return '<tr><td><span style="font-size:12px;color:'+ti.color+';font-weight:600">'+ti.label+'</span></td><td><strong>'+(l.lot||'–')+'</strong>'+(isActive?'<span class="badge badge-ok" style="margin-left:6px">Aktiven</span>':'')+'</td><td style="font-size:12px">'+(l.date||'–')+'</td><td>'+analHtml+'</td><td style="font-size:12px" class="muted">'+(l.note||'')+'</td><td>'+(i>0?'<button class="btn btn-d btn-sm" onclick="deleteLot('+i+')">🗑️</button>':'<span style="font-size:10px" class="muted">Izhodiščni</span>')+'</td></tr>';}).join('')+'</tbody></table></div>';}
+/* rok lota: najprej iz uradnih vrednosti (qcFindValues), sicer iz zaloge po baznem lotu */
+function _lotExpiry(qc,lot){try{const v=qcFindValues(lot);if(v&&v.expiry)return v.expiry;}catch(e){}const d=qcStockLotsDistinct(qc).find(x=>qcBaseLot(x.lot)===qcBaseLot(lot));return d?d.expiry:'';}
+/* število QC vnosov, ki so uporabili ta (bazni) lot */
+function _lotEntries(qcName,lot){const b=qcBaseLot(lot);return (S.entries||[]).filter(e=>e.qcName===qcName&&qcBaseLot(e.lot)===b);}
+function renderLotHistory(qc){const lots=qc.lotHistory||[{lot:qc.lot||'–',date:'',type:'qc',note:'Začetni lot'}];const typeInfo={qc:{label:'🔴 QC lot',color:'#dc2626'},cal:{label:'🟠 Kalibrator',color:'#f97316'},note:{label:'📝 Opomba',color:'#8b5cf6'}};let lastQcIdx=-1;lots.forEach((l,i)=>{if((l.type||'qc')==='qc')lastQcIdx=i;});$i('lotHistoryBody').innerHTML='<div class="tbl-wrap"><table><thead><tr><th>Tip</th><th>Lot</th><th>Datum</th><th>Rok</th><th>Vnosi</th><th>Analizatorji</th><th>Opomba</th><th></th></tr></thead><tbody>'+lots.map((l,i)=>{const ti=typeInfo[l.type||'qc']||typeInfo.qc;const isActive=(l.type||'qc')==='qc'&&i===lastQcIdx;const analHtml=(l.type==='cal'&&l.analyzers&&l.analyzers.length)?l.analyzers.map(a=>'<span class="badge badge-blue" style="font-size:11px;margin-right:2px">'+a+'</span>').join(''):'<span class="muted" style="font-size:11px">—</span>';const isQc=(l.type||'qc')==='qc'&&l.lot&&l.lot!=='–';const exp=isQc?_lotExpiry(qc,l.lot):'';const dl=exp?daysLeft(exp):null;const rokHtml=isQc?(exp?fmtExp(exp)+' '+expiryBadge(dl):'<span class="muted" style="font-size:11px">—</span>'):'';const nE=isQc?_lotEntries(qc.name,l.lot).length:0;const vnosiHtml=isQc?(nE?'<button class="btn btn-a btn-sm" onclick="showLotEntries('+currentLotQcIdx+',\''+_repEsc(l.lot)+'\')">'+nE+'</button>':'<span class="muted" style="font-size:11px">0</span>'):'';return '<tr><td><span style="font-size:12px;color:'+ti.color+';font-weight:600">'+ti.label+'</span></td><td><strong>'+(l.lot||'–')+'</strong>'+(isActive?'<span class="badge badge-ok" style="margin-left:6px">Aktiven</span>':'')+'</td><td style="font-size:12px">'+(l.date||'–')+'</td><td style="font-size:12px;white-space:nowrap">'+rokHtml+'</td><td>'+vnosiHtml+'</td><td>'+analHtml+'</td><td style="font-size:12px" class="muted">'+(l.note||'')+'</td><td>'+(i>0?'<button class="btn btn-d btn-sm" onclick="deleteLot('+i+')">🗑️</button>':'<span style="font-size:10px" class="muted">Izhodiščni</span>')+'</td></tr>';}).join('')+'</tbody></table></div><div id="lotTraceBody" style="margin-top:8px"></div>';}
+/* sledljivost: seznam QC vnosov za izbrani lot */
+function showLotEntries(qcIdx,lot){const qc=S.qcMaterials[qcIdx];if(!qc)return;const ents=_lotEntries(qc.name,lot).sort((a,b)=>(b.datetime||'').localeCompare(a.datetime||''));const box=$i('lotTraceBody');if(!box)return;if(!ents.length){box.innerHTML='<div class="empty">Ni vnosov za lot '+_repEsc(lot)+'.</div>';return;}let h='<div style="font-weight:600;font-size:13px;margin-bottom:6px">Sledljivost — vnosi z lotom '+_repEsc(lot)+' ('+ents.length+')</div><div class="tbl-wrap"><table><thead><tr><th>Datum</th><th>Analizator</th><th>Operater</th><th>Izpadi</th></tr></thead><tbody>';ents.forEach(e=>{const nf=(e.results||[]).filter(r=>r.sd&&r.sd!=='ok').length;h+='<tr><td style="font-size:12px;white-space:nowrap">'+new Date(e.datetime).toLocaleString('sl-SI')+'</td><td><span class="badge badge-blue">'+_repEsc(e.instrId||'')+'</span></td><td style="font-size:12px">'+_repEsc(getOpName(e.operatorId))+'</td><td>'+(nf?'<span class="badge badge-2sd">'+nf+'</span>':'<span class="badge badge-ok">0</span>')+'</td></tr>';});h+='</tbody></table></div>';box.innerHTML=h;}
 function toggleLotTypeFields(){const type=$i('newLotType').value;const numWrap=$i('newLotNumWrap');const analWrap=$i('newLotAnalWrap');if(type==='note'){numWrap.style.display='none';analWrap.style.display='none';}else{numWrap.style.display='';$i('newLotNumLabel').textContent=type==='cal'?'Nova lot številka kalibratorja':'Nova lot številka QC kontrole';analWrap.style.display=type==='cal'?'':'none';if(type!=='cal')['calAL01','calAL02','calAL03','calAL04'].forEach(id=>{const el=$i(id);if(el)el.checked=false;});}}
-function addLot(){const type=$i('newLotType').value,lot=$i('newLotNum').value.trim(),date=$i('newLotDate').value,note=$i('newLotNote').value.trim();if(type!=='note'&&!lot){notify('Vpišite lot številko','warning');return;}if(!date){notify('Izberite datum','warning');return;}const qc=S.qcMaterials[currentLotQcIdx];if(!qc.lotHistory)qc.lotHistory=[{lot:qc.lot||'–',date:'',type:'qc',note:'Začetni lot'}];const entry={lot:lot||'–',date,type,note};if(type==='cal'){entry.analyzers=['AL01','AL02','AL03','AL04'].filter(id=>{const el=$i('cal'+id);return el&&el.checked;});}qc.lotHistory.push(entry);if(type==='qc'&&lot)qc.lot=lot;save();renderLotHistory(qc);renderQcMats();notify('Vnos zabeležen','success');$i('newLotNum').value='';$i('newLotNote').value='';['calAL01','calAL02','calAL03','calAL04'].forEach(id=>{const el=$i(id);if(el)el.checked=false;});}
-function deleteLot(i){if(!confirm('Izbriši lot?'))return;const qc=S.qcMaterials[currentLotQcIdx];if(qc.lotHistory)qc.lotHistory.splice(i,1);save();renderLotHistory(qc);notify('Lot izbrisan');}
+function addLot(){const type=$i('newLotType').value,lot=$i('newLotNum').value.trim(),date=$i('newLotDate').value,note=$i('newLotNote').value.trim();if(type!=='note'&&!lot){notify('Vpišite lot številko','warning');return;}if(!date){notify('Izberite datum','warning');return;}const qc=S.qcMaterials[currentLotQcIdx];if(!qc.lotHistory)qc.lotHistory=[{lot:qc.lot||'–',date:'',type:'qc',note:'Začetni lot'}];const entry={lot:lot||'–',date,type,note};if(type==='cal'){entry.analyzers=['AL01','AL02','AL03','AL04'].filter(id=>{const el=$i('cal'+id);return el&&el.checked;});}qc.lotHistory.push(entry);if(type==='qc'&&lot)qc.lot=lot;_audit('create','lot',qc.name+'/'+(lot||'–'),'Dodan lot ('+type+') '+(lot||'–')+' za '+qc.name+(date?' · '+date:''),null,entry,'system');save();renderLotHistory(qc);renderQcMats();notify('Vnos zabeležen','success');$i('newLotNum').value='';$i('newLotNote').value='';['calAL01','calAL02','calAL03','calAL04'].forEach(id=>{const el=$i(id);if(el)el.checked=false;});}
+function deleteLot(i){if(!confirm('Izbriši lot?'))return;const qc=S.qcMaterials[currentLotQcIdx];const rec=qc.lotHistory?qc.lotHistory[i]:null;if(qc.lotHistory)qc.lotHistory.splice(i,1);if(rec)_audit('delete','lot',qc.name+'/'+(rec.lot||'–'),'Izbrisan lot '+(rec.lot||'–')+' za '+qc.name,rec,null,'system');save();renderLotHistory(qc);notify('Lot izbrisan');}
 
 /* ===== QC VREDNOSTI (uradne Abbott vrednosti lotov: XML + PDF) ===== */
 /* Naš SD = 2/3 proizvajalčevega (Mean nespremenjen): naš ±3SD = proizvajalčev ±2SD (ožje meje). */
@@ -2519,6 +2585,7 @@ function storeQcValues(parsed,source,xmlRaw){
     fileVersion:parsed.fileVersion,fileDate:parsed.fileDate,assays:parsed.assays,
     assayCount,importedAt:new Date().toISOString(),source:source||'manual',
     xmlRaw:xmlRaw||prev.xmlRaw||'',pdfPath:prev.pdfPath};
+  _audit(prev.lot?'update':'create','qcvalue',parsed.lot,'Uvoz uradnih QC vrednosti '+(parsed.control||'')+' · lot '+parsed.lot+' · '+assayCount+' preiskav · vir '+(source||'manual')+(parsed.fileVersion?' · v'+parsed.fileVersion:''),prev.lot?{fileVersion:prev.fileVersion,assayCount:prev.assayCount}:null,{fileVersion:parsed.fileVersion,assayCount},'system');
   save();
   return {lot:parsed.lot,control:parsed.control,assays:assayCount};
 }
@@ -3148,7 +3215,8 @@ function _reportFoot(everzija,klas,ob){
   return '<div class="rfoot2"><div class="row"><span class="l">e - verzija '+everzija+'</span>'
     +'<span class="c">klas. znak izpolnjenega obrazca: '+klas+'</span>'
     +'<span class="c">OB KIKKB '+ob+'</span>'
-    +'<span class="r">str. 1</span></div></div>';
+    +'<span class="r">str. 1</span></div>'
+    +'<div class="row" style="margin-top:1px"><span class="l" style="font-size:6px;color:#666">Pripomoček (in-house, čl. 5(5) IVDR): '+IVDR_INFO.udiDi+'</span><span class="r"></span></div></div>';
 }
 
 /* ---- VZDRŽEVANJE (OB KIKKB 213/64) ---- */
@@ -3809,7 +3877,52 @@ function renderVec(){
   }catch(e){}}
   else {$i('aboutDevice').textContent='Naprava: brskalnik (test)';$i('aboutBuild').textContent='Build: – (brskalnik; verzija vidna na napravi)';}
   try{const qcSize=(localStorage.getItem('qclab_v2')||'').length;const pbSize=(localStorage.getItem('pregledBK_db')||'').length;$i('aboutStorage').textContent='Pomnilnik: qclab_v2 '+(qcSize/1024).toFixed(1)+' KB, pregledBK_db '+(pbSize/1024).toFixed(1)+' KB';}catch(e){}
+  /* IVDR identifikacija pripomočka */
+  try{
+    $i('aboutMfr').textContent=IVDR_INFO.legalManufacturer;
+    let ver=$i('aboutVersion').textContent||'';let build='';try{build=JSON.parse(AndroidBridge.getDeviceInfo()).appBuild||'';}catch(e){}
+    $i('aboutUdi').textContent=IVDR_INFO.udiDi+' · '+ver+(build?' (build '+build+')':'');
+    $i('aboutIntended').textContent=IVDR_INFO.intendedUse;
+    $i('aboutContact').textContent=IVDR_INFO.contact;
+    $i('aboutInhouse').innerHTML='&#127973; '+IVDR_INFO.inHouse;
+  }catch(e){}
+  renderAuditLog();
   const oc=$i('vecOpCount');if(oc)oc.textContent='Registriranih: '+(S.operators||[]).length;
+}
+/* ===== REVIZIJSKA SLED — prikaz + izvoz ===== */
+const _AU_ACT={create:{l:'Ustvarjeno',c:'badge-ok'},update:{l:'Urejeno',c:'badge-2sd'},delete:{l:'Izbrisano',c:'badge-3sd'}};
+const _AU_ENT={entry:'QC vnos',qcreview:'Pregled QC',operator:'Operater',lot:'Lot',qcvalue:'Uradne vrednosti'};
+function _auditFiltered(){
+  const fe=$i('auFilterEntity')?$i('auFilterEntity').value:'';const df=$i('auFilterFrom')?$i('auFilterFrom').value:'';const dt=$i('auFilterTo')?$i('auFilterTo').value:'';
+  let logs=[...(S.auditLog||[])];
+  if(fe)logs=logs.filter(a=>a.entity===fe);
+  if(df)logs=logs.filter(a=>(a.ts||'')>=df);
+  if(dt)logs=logs.filter(a=>(a.ts||'')<=dt+'T23:59:59');
+  logs.sort((a,b)=>(b.ts||'').localeCompare(a.ts||''));
+  return logs;
+}
+function renderAuditLog(){
+  const body=$i('auditLogBody');if(!body)return;
+  const logs=_auditFiltered();
+  if(!logs.length){body.innerHTML='<div class="empty">Ni zapisov v revizijski sledi.</div>';return;}
+  let h='<div class="tbl-wrap"><table><thead><tr><th>Čas</th><th>Dejanje</th><th>Entiteta</th><th>Opis</th><th>Izvajalec</th></tr></thead><tbody>';
+  logs.slice(0,500).forEach(a=>{const act=_AU_ACT[a.action]||{l:a.action,c:'badge-blue'};
+    h+='<tr><td style="font-size:12px;white-space:nowrap">'+(a.ts||'').slice(0,16).replace('T',' ')+'</td>'+
+       '<td><span class="badge '+act.c+'">'+act.l+'</span></td>'+
+       '<td style="font-size:12px">'+(_AU_ENT[a.entity]||a.entity)+'</td>'+
+       '<td style="font-size:12px;max-width:280px">'+_repEsc(a.summary)+'</td>'+
+       '<td style="font-size:12px">'+_repEsc(_auditWho(a.operatorId))+'</td></tr>';
+  });
+  h+='</tbody></table></div>';
+  if(logs.length>500)h+='<div class="muted" style="font-size:11px;margin-top:6px">Prikazanih zadnjih 500 od '+logs.length+' zapisov. Za celoto izvozite CSV.</div>';
+  body.innerHTML=h;
+}
+function exportAuditCSV(){
+  const logs=_auditFiltered();
+  const rows=[['Čas','Dejanje','Entiteta','EntityId','Opis','Izvajalec ID','Izvajalec','Build']];
+  logs.forEach(a=>rows.push([(a.ts||'').replace('T',' ').slice(0,19),(_AU_ACT[a.action]?_AU_ACT[a.action].l:a.action),(_AU_ENT[a.entity]||a.entity),a.entityId||'',a.summary||'',a.operatorId||'',_auditWho(a.operatorId),a.appBuild||'']));
+  const csv=rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');
+  const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='Revizijska_sled_'+new Date().toISOString().slice(0,10)+'.csv';a.click();notify('Revizijska sled izvožena','success');
 }
 function toggleDark(){document.body.classList.toggle('dark',$i('darkToggle').checked);localStorage.setItem('bioAlinity_dark',$i('darkToggle').checked?'1':'0');}
 
