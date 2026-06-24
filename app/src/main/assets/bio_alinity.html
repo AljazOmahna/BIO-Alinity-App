@@ -3007,7 +3007,8 @@ function buildQcXmlReportHtml(lot,matNameOvr){
       }
       if(!lvs.length)continue;
       keptRows++;
-      body+='<tr><td>'+_repEsc(name)+'</td><td>'+_repEsc(unit)+'</td>';
+      const numPad=String(num).padStart(4,'0');
+      body+='<tr><td>'+_repEsc(name)+'</td><td style="font-family:Courier New,monospace;font-size:7.5pt;color:#555;text-align:center">'+numPad+'</td><td>'+_repEsc(unit)+'</td>';
       lvs.forEach(lc=>{body+='<td>'+_repEsc(lc.m)+'</td><td'+(lc.ov?' class="ov"':'')+'>'+_repEsc(lc.sd)+'</td><td>'+_repEsc(lc.low)+' – '+_repEsc(lc.high)+'</td>';});
       for(let p=lvs.length;p<3;p++)body+='<td colspan="3" style="color:#bbb;text-align:center">—</td>';
       body+='</tr>';
@@ -3042,10 +3043,21 @@ function buildQcXmlReportHtml(lot,matNameOvr){
   '@page{size:A4 landscape;margin:10mm}</style></head><body>'+
   '<h1>QC XML — '+_repEsc(matName)+' — Lot '+_repEsc(lot)+'</h1>'+
   '<div class="sub">SD<sub>naš</sub> = '+fracStr+' &times; SD<sub>mfr</sub> &nbsp;|&nbsp; meje = Mean &plusmn; 2&times;SD &nbsp;|&nbsp; datum: '+today+expStr+' &nbsp;|&nbsp; '+cntStr+' &nbsp;|&nbsp; <b>krepko SD</b> = lastna vrednost laboratorija</div>'+
-  '<table><thead><tr><th rowspan="2">Preiskava</th><th rowspan="2">Enota</th>'+
+  '<table><thead><tr><th rowspan="2">Preiskava</th><th rowspan="2" style="font-size:7pt">Assay#</th><th rowspan="2">Enota</th>'+
   '<th colspan="3" class="g">Nivo 1</th><th colspan="3" class="g">Nivo 2</th><th colspan="3" class="g">Nivo 3</th></tr>'+
   '<tr><th>Mean</th><th>SD</th><th>Low – High</th><th>Mean</th><th>SD</th><th>Low – High</th><th>Mean</th><th>SD</th><th>Low – High</th></tr>'+
   '</thead><tbody>'+body+'</tbody></table>'+
+  '<div style="margin-top:6px;font-size:7pt;color:#555;border:1px solid #ddd;border-radius:3px;padding:5px 8px;background:#f8f9fc">'+
+  '<b>Legenda:</b> '+
+  '<b>Assay#</b> = Abbott interna koda preiskave (4-mestna, za identifikacijo v Alinity) &nbsp;|&nbsp; '+
+  '<b>Enota</b> = merska enota, ki jo uporabljamo v laboratoriju &nbsp;|&nbsp; '+
+  '<b>Mean</b> = ciljno povprečje (proizvajalec) &nbsp;|&nbsp; '+
+  '<b>SD</b> = naša standardna deviacija ('+fracStr+' &times; SD<sub>mfr</sub>)'+
+  (Math.abs(fpdf-1/3)<0.01?' &rarr; naš &plusmn;3SD = proi&shy;zvajalčev &plusmn;1SD':'&rarr; naš &plusmn;3SD = proi&shy;zvajalčev &plusmn;2SD')+
+  ' &nbsp;|&nbsp; <b>Low&nbsp;&ndash;&nbsp;High</b> = kontrolne meje (Mean &plusmn; 2&times;SD) &nbsp;|&nbsp; '+
+  '<b>Nivo 1/2/3</b> = nizek/normalen/visok kontrolni material &nbsp;|&nbsp; '+
+  '<b style="color:#5b21b6">krepko SD</b> = ročno določena vrednost laboratorija (override)'+
+  '</div>'+
   '<div class="foot">'+_repEsc(IVDR_INFO.udiDi)+' &nbsp;|&nbsp; Pripravljeno: '+today+' &nbsp;|&nbsp; Kontrola: '+_repEsc(matName)+' &nbsp;|&nbsp; Lot: '+_repEsc(lot)+'</div>'+
   '<div class="sig"><h2>&#10003; Pregled in potrditev specialista</h2>'+
   '<p>Pregledal/a vrednosti QC kontrole ('+_repEsc(matName)+', lot '+_repEsc(lot)+') in potrdil/a, da so vrednosti Mean, SD in meje sprejemljive za vpeljavo v rutinsko delo.</p>'+
@@ -3055,7 +3067,7 @@ function buildQcXmlReportHtml(lot,matNameOvr){
   '<div class="sig-field" style="flex:2"><div class="sig-label">Podpis</div><div class="sig-line"></div></div>'+
   '</div>'+
   '<div class="sig-row"><div class="sig-field" style="flex:1"><div class="sig-label">Opomba / ugotovitve</div><div class="sig-line"></div></div></div>'+
-  '<div class="sig-note">Dokument shraniti v mapo dokumentacije oddelka (ISO 15189 &sect; 7.3 / IVDR &ccedil;l. 5(5)c).</div>'+
+  '<div class="sig-note">Dokument shraniti v mapo dokumentacije oddelka (ISO 15189 &sect; 7.3 / IVDR &#x010D;l. 5(5)c).</div>'+
   '</div>'+
   '</body></html>';
 }
