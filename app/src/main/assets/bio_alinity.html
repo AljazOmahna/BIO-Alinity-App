@@ -1286,12 +1286,12 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
         </select>
       </div>
       <div id="meList" style="display:flex;flex-direction:column;gap:6px;max-height:46vh;overflow-y:auto"></div>
-      <div style="display:flex;gap:8px;margin-top:12px">
-        <input id="meNewText" placeholder="Novo opravilo..." style="flex:1">
-        <button class="btn btn-teal btn-sm" onclick="maintEditAdd()">+ Dodaj</button>
-      </div>
-      <div class="muted" style="font-size:11px;margin-top:8px">Spremembe veljajo za vse analizatorje izbrane vrste (c/i). Zapisani podpisi v dnevniku ostanejo nespremenjeni.</div>
     </div>
+    <div style="padding:10px 18px 0;display:flex;gap:8px;flex-shrink:0">
+      <input id="meNewText" placeholder="Novo opravilo..." style="flex:1">
+      <button class="btn btn-teal btn-sm" onclick="maintEditAdd()">+ Dodaj</button>
+    </div>
+    <div class="muted" style="font-size:11px;padding:6px 18px 0;flex-shrink:0">Spremembe veljajo za vse analizatorje izbrane vrste (c/i). Zapisani podpisi v dnevniku ostanejo nespremenjeni.</div>
     <div class="mf">
       <button class="btn btn-d btn-sm" onclick="maintEditRestore()">&#8634; Povrni privzeto</button>
       <button class="btn btn-blue" onclick="closeMo('maintEditModal');renderMaintContent()">Zapri</button>
