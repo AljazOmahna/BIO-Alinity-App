@@ -347,9 +347,27 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
     </select>
   </div>
   <div class="card" style="padding:0">
-    <div class="tbl-wrap"><table>
-      <thead><tr><th>Naziv</th><th>Lot</th><th>Rok</th><th>Kos</th><th>Tip</th><th>Prejeto</th></tr></thead>
+    <div style="max-height:44vh;overflow:auto;-webkit-overflow-scrolling:touch;border-radius:10px"><table>
+      <thead style="position:sticky;top:0;background:var(--bg2);z-index:1"><tr><th>Naziv</th><th>Lot</th><th>Rok</th><th title="Prejeto (aktivni kosi)">Prej.</th><th title="Zaloga">Zal.</th><th>Tip</th></tr></thead>
       <tbody id="zalogaBody"></tbody>
+    </table></div>
+  </div>
+
+  <div class="sec-hdr" style="margin-top:14px"><div class="sec-title">&#128683; Poraba</div>
+    <span class="muted" style="font-size:12px">Porabljeni artikli (zaprte seje)</span></div>
+  <div class="card" style="padding:0">
+    <div style="max-height:26vh;overflow:auto;-webkit-overflow-scrolling:touch;border-radius:10px"><table>
+      <thead style="position:sticky;top:0;background:var(--bg2);z-index:1"><tr><th>Naziv</th><th>Lot</th><th>Porabljeno</th><th>Kos</th></tr></thead>
+      <tbody id="consumedBody"></tbody>
+    </table></div>
+  </div>
+
+  <div class="sec-hdr" style="margin-top:14px"><div class="sec-title">&#128230; Prejeto</div>
+    <span class="muted" style="font-size:12px">Podrobnosti prejetih kosov</span></div>
+  <div class="card" style="padding:0">
+    <div style="max-height:30vh;overflow:auto;-webkit-overflow-scrolling:touch;border-radius:10px"><table>
+      <thead style="position:sticky;top:0;background:var(--bg2);z-index:1"><tr><th>Naziv</th><th>Lot</th><th>Rok</th><th>Serial</th><th>RFID</th><th>Sprejeto</th></tr></thead>
+      <tbody id="receivedBody"></tbody>
     </table></div>
   </div>
 </div>
@@ -1484,16 +1502,55 @@ function renderZaloga(){
     if(da===null) return 1;if(db===null) return -1;return da-db;
   });
   const body=$i('zalogaBody');
-  if(!items.length){body.innerHTML='<tr><td colspan="6" class="empty">Ni artiklov. Sinhronizirajte z Zebro (OneDrive) ali uvozite pregledBK_db.</td></tr>';return;}
+  if(!items.length){body.innerHTML='<tr><td colspan="6" class="empty">Ni artiklov. Sinhronizirajte z Zebro (OneDrive) ali uvozite pregledBK_db.</td></tr>';renderPoraba();renderPrejeto();return;}
   body.innerHTML=items.map((it,idx)=>{
     const dl=daysLeft(it.expiry);
+    const recCnt=(DB_PREGLED.received||[]).filter(r=>r.gtin===it.gtin&&r.lot===it.lot&&r.status==='active').length;
     return '<tr class="'+expiryClass(dl)+'" onclick="showItemDetail('+DB_PREGLED.inventory.indexOf(it)+')" style="cursor:pointer">'+
       '<td><strong>'+(it.name||'&ndash;')+'</strong><div class="gtin">'+(it.gtin||'')+'</div></td>'+
       '<td><span class="lot-n">'+(it.lot||'&ndash;')+'</span></td>'+
       '<td>'+fmtExp(it.expiry)+'<br>'+expiryBadge(dl)+'</td>'+
-      '<td><strong>'+(it.qty||0)+'</strong></td>'+
+      '<td style="font-family:var(--mono);font-weight:700;color:var(--accent)">'+recCnt+'</td>'+
+      '<td style="font-family:var(--mono);font-weight:700;color:'+((it.qty||0)>0?'var(--green)':'var(--text3)')+'">'+(it.qty||0)+'</td>'+
       '<td><span class="badge '+(TYPE_BADGE[it.type]||'b-gray')+'">'+(TYPE_LABELS[it.type]||it.type||'&ndash;')+'</span></td>'+
-      '<td style="font-size:11px" class="muted">'+(it.received?new Date(it.received).toLocaleDateString('sl-SI'):'&ndash;')+'</td>'+
+    '</tr>';
+  }).join('');
+  renderPoraba();renderPrejeto();
+}
+
+/* Poraba (read-only): porabljeni artikli iz zaprtih sej (DB_PREGLED.consumed) */
+function renderPoraba(){
+  const tb=$i('consumedBody');if(!tb)return;
+  const items=(DB_PREGLED.consumed||[]).filter(c=>!c.restoredAt);
+  if(!items.length){tb.innerHTML='<tr><td colspan="4" class="empty">Ni porabljenih artiklov.</td></tr>';return;}
+  tb.innerHTML=items.slice().reverse().map(c=>{
+    const ca=c.consumedAt||'';
+    return '<tr>'+
+      '<td><strong>'+(c.name||'&ndash;')+'</strong><div class="muted" style="font-size:9px">'+(TYPE_LABELS[c.type]||c.type||'')+'</div></td>'+
+      '<td><span class="lot-n">'+(c.lot||'&ndash;')+'</span></td>'+
+      '<td style="font-size:10px;white-space:nowrap">'+(ca?ca.slice(0,16).replace('T',' '):'&ndash;')+'</td>'+
+      '<td style="font-family:var(--mono);font-weight:700">'+(c.qty||1)+'</td>'+
+    '</tr>';
+  }).join('');
+}
+
+/* Prejeto (read-only): podrobnosti prejetih kosov (DB_PREGLED.received) */
+function renderPrejeto(){
+  const tb=$i('receivedBody');if(!tb)return;
+  const items=(DB_PREGLED.received||[]).filter(r=>r.status==='active');
+  if(!items.length){tb.innerHTML='<tr><td colspan="6" class="empty">Ni prejetih artiklov.</td></tr>';return;}
+  items.sort((a,b)=>(b.receivedAt||'').localeCompare(a.receivedAt||''));
+  tb.innerHTML=items.map(r=>{
+    const dl=daysLeft(r.expiry);
+    const rfidShort=r.rfidEpc?r.rfidEpc.slice(0,8)+'…':'&ndash;';
+    const srcLine=[r.supplier,r.delivery].filter(x=>x).join(' · ');
+    return '<tr>'+
+      '<td><strong style="font-size:11px">'+(r.name||'&ndash;')+'</strong><div class="gtin">'+(r.gtin||'')+'</div>'+(srcLine?'<div class="muted" style="font-size:9px">'+srcLine+'</div>':'')+'</td>'+
+      '<td><span class="lot-n">'+(r.lot||'&ndash;')+'</span></td>'+
+      '<td style="font-size:10px;white-space:nowrap" class="'+expiryClass(dl)+'">'+fmtExp(r.expiry)+'</td>'+
+      '<td><span class="lot-n">'+(r.serial||'&ndash;')+'</span></td>'+
+      '<td style="font-size:9px;font-family:var(--mono);color:var(--text3)" title="'+(r.rfidEpc||'')+'">'+rfidShort+'</td>'+
+      '<td style="font-size:10px;color:var(--text3);white-space:nowrap">'+(r.receivedAt?r.receivedAt.slice(0,16).replace('T',' '):'&ndash;')+'</td>'+
     '</tr>';
   }).join('');
 }
