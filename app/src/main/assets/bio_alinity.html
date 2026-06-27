@@ -201,6 +201,8 @@ tr.r-28 td{background:rgba(176,120,0,.05)}
 .wizard-dot.done{background:var(--abbott-teal)}
 .wizard-dot.active{background:var(--abbott-blue)}
 .wizard-step{display:none}.wizard-step.active{display:block}
+.panel-btn{padding:5px 13px;border-radius:20px;border:1.5px solid var(--abbott-teal);color:var(--abbott-teal);background:transparent;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s}
+.panel-btn:hover,.panel-btn:active{background:var(--abbott-teal);color:#fff}
 
 .entry-block{background:rgba(0,48,135,.04);border:1px solid var(--border);border-radius:9px;padding:13px;margin-bottom:10px}
 .entry-block-header{font-weight:600;font-size:13px;color:var(--abbott-blue);margin-bottom:9px;
@@ -581,6 +583,7 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
       <!-- Step 2 -->
       <div class="wizard-step" id="ws2">
         <div class="card-title">3. Preiskave</div>
+        <div id="panelBtnsRow" style="display:none;gap:6px;flex-wrap:wrap;margin-bottom:10px"></div>
         <div id="assayPickWrap"></div>
         <div class="mf" style="border:none;padding:10px 0 0"><button class="btn btn-g" onclick="showWStep(1)">&larr; Nazaj</button><button class="btn btn-blue" onclick="wizardNext(2)">Naprej &rarr;</button></div>
       </div>
@@ -733,7 +736,11 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
 
   <!-- QC MATERIALS -->
   <div class="page qc-page" id="page-qcmaterials">
-    <div class="sec-hdr"><div class="sec-title" style="font-size:16px">QC Materiali</div><button class="btn btn-a" onclick="openQcModal()">+ Nov</button></div>
+    <div class="sec-hdr"><div class="sec-title" style="font-size:16px">QC Materiali</div>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-g btn-sm" onclick="openPanelModal()">&#127760; Paneli</button>
+        <button class="btn btn-a" onclick="openQcModal()">+ Nov</button>
+      </div></div>
     <div class="card" style="padding:0"><div class="tbl-wrap"><table><thead><tr><th>Naziv</th><th>Tip</th><th>Nivoji</th><th>Lot</th><th>Preiskave</th><th></th></tr></thead><tbody id="qcMatBody"></tbody></table></div></div>
   </div>
 
@@ -1139,6 +1146,25 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
       <div class="fg"><label>Tip</label><select id="assayType"><option value="biochem">Biokemija (c)</option><option value="immuno">Imunologija (i)</option></select></div>
     </div>
     <div class="mf"><button class="btn btn-g" onclick="closeMo('assayModal')">Prekliči</button><button class="btn btn-a" onclick="saveAssay()">Shrani</button></div>
+  </div>
+</div>
+
+<!-- PANEL PREISKAV MODAL -->
+<div class="mo" id="panelModal">
+  <div class="modal">
+    <div class="mh"><h3>Paneli preiskav</h3><button class="mc" onclick="closeMo('panelModal')">&#10005;</button></div>
+    <div class="mb">
+      <div id="panelList" style="margin-bottom:14px"></div>
+      <div style="border-top:1px solid var(--border);padding-top:12px">
+        <div class="card-title" style="margin-bottom:8px;font-size:13px" id="panelEditTitle">Nov panel</div>
+        <div class="fg" style="margin-bottom:8px"><label>Ime panela</label><input id="panelName" placeholder="Npr. Dežurstvo"></div>
+        <div class="fg"><label>Preiskave</label><div id="panelAssayList" style="display:flex;flex-direction:column;gap:4px;max-height:200px;overflow-y:auto"></div></div>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn btn-g" onclick="cancelPanelEdit()">Prekliči</button>
+      <button class="btn btn-teal" onclick="savePanelEntry()">&#10003; Shrani</button>
+    </div>
   </div>
 </div>
 
@@ -2061,6 +2087,7 @@ function initState(){
   if(!S.qcAssayMap)S.qcAssayMap={};
   if(!S.qcUnitMap)S.qcUnitMap={};
   if(!S.qcOverrides)S.qcOverrides={};
+  if(!S.qcPanels)S.qcPanels=[];
   if(!S.operators.length) S.operators=DEFAULT_OPERATORS;
 }
 /* Idempotentna nadgradnja QC materialov na shemo z GTIN povezavo + ločenima GFAP/UCHL + Multichem U/Myo.
@@ -2203,6 +2230,7 @@ function buildAssayPick(){
       return '<div class="entry-block"><div class="entry-block-header"><span>'+qc.name+' &ndash; Nivo '+lvl.replace('L','')+'</span><button class="btn btn-g btn-sm" onclick="toggleAllAssays(\''+key+'\')">&#10004; Vse</button></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;max-height:240px;overflow-y:auto">'+assayNames.map(an=>'<label class="assay-pick-item"><input type="checkbox" class="ap-cb" value="'+an+'" data-qcidx="'+qc.idx+'" data-level="'+lvl+'" onchange="this.closest(\'.assay-pick-item\').classList.toggle(\'picked\',this.checked)"><span style="font-size:12px;font-weight:500">'+an+'</span></label>').join('')+'</div></div>';
     }).join('');
   }).join('');
+  renderPanelBtns();
 }
 function selectAllAssays(key,val){const [qi,lvl]=key.split('_L');document.querySelectorAll('.ap-cb[data-qcidx="'+qi+'"][data-level="L'+lvl+'"]').forEach(cb=>{cb.checked=val;cb.closest('.assay-pick-item').classList.toggle('picked',val);});}
 function toggleAllAssays(key){const [qi,lvl]=key.split('_L');const cbs=[...document.querySelectorAll('.ap-cb[data-qcidx="'+qi+'"][data-level="L'+lvl+'"]')];const allOn=cbs.every(cb=>cb.checked);cbs.forEach(cb=>{cb.checked=!allOn;cb.closest('.assay-pick-item').classList.toggle('picked',!allOn);});}
@@ -2569,6 +2597,40 @@ function renderQcGtinPicker(sel){
 }
 function openQcModal(idx){S.editingQcIdx=idx??null;$i('qcModalTitle').textContent=idx!=null?'Uredi QC material':'Nov QC material';let sel=[],gsel=[];const inUse=$i('qcLotInUse');inUse.style.display='none';inUse.innerHTML='';if(idx!=null){const q=S.qcMaterials[idx];$i('qcName').value=q.name;$i('qcType').value=q.type;$i('qcLot').value=q.lot||'';$i('qcLevels').value=q.levels||2;sel=q.assays||[];gsel=q.gtins||[];const stock=qcStockLotsDistinct(q);if(stock.length){const lots=stock.map(s=>s.lot+' (rok '+fmtExp(s.expiry)+')').join(', ');inUse.innerHTML='🔗 Lot v uporabi (iz zaloge): <strong>'+lots+'</strong>';inUse.style.display='';$i('qcLotField').style.display='none';}else{$i('qcLotField').style.display='';}}else{$i('qcLotField').style.display='';$i('qcName').value='';$i('qcType').value='biochem';$i('qcLot').value='';$i('qcLevels').value=2;}$i('qcAssayList').innerHTML=S.assays.map(a=>'<label class="assay-check"><input type="checkbox" value="'+a.name+'" '+(sel.includes(a.name)?'checked':'')+'> '+a.name+' <span style="font-size:10px;color:var(--text3)">('+(a.type==='biochem'?'c':'i')+')</span></label>').join('');renderQcGtinPicker(gsel);showMo('qcModal');}
 function deleteQcMat(i){if(!confirm('Izbriši?'))return;S.qcMaterials.splice(i,1);save();renderQcMats();notify('Material izbrisan');}
+
+/* ===== QC PANELI PREISKAV ===== */
+let _editingPanelIdx=null;
+function openPanelModal(){_editingPanelIdx=null;_renderPanelAssayList([]);$i('panelName').value='';$i('panelEditTitle').textContent='Nov panel';renderPanelList();showMo('panelModal');}
+function renderPanelList(){
+  const ps=S.qcPanels||[];
+  $i('panelList').innerHTML=ps.length?ps.map((p,i)=>'<div style="display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--border)"><strong style="flex:1">'+p.name+'</strong><span style="font-size:11px;color:var(--text3);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+p.assays.join(', ')+'</span><button class="btn btn-outline btn-sm" onclick="editPanelEntry('+i+')">&#9998;</button><button class="btn btn-d btn-sm" onclick="deletePanelEntry('+i+')">&#128465;</button></div>').join(''):'<div class="muted" style="font-size:12px;padding:4px 0">Ni panelov. Dodajte prvega spodaj.</div>';
+}
+function _renderPanelAssayList(sel){
+  const all=[...new Set(S.assays.map(a=>a.name))];
+  $i('panelAssayList').innerHTML=all.map(n=>'<label class="assay-check"><input type="checkbox" class="panel-assay-cb" value="'+n+'" '+(sel.includes(n)?'checked':'')+'>'+n+'</label>').join('');
+}
+function editPanelEntry(i){_editingPanelIdx=i;const p=S.qcPanels[i];$i('panelName').value=p.name;$i('panelEditTitle').textContent='Uredi panel';_renderPanelAssayList(p.assays);}
+function cancelPanelEdit(){_editingPanelIdx=null;$i('panelName').value='';$i('panelEditTitle').textContent='Nov panel';_renderPanelAssayList([]);}
+function savePanelEntry(){
+  const name=$i('panelName').value.trim();if(!name){notify('Vnesite ime panela','warning');return;}
+  const assays=[...$i('panelAssayList').querySelectorAll('.panel-assay-cb:checked')].map(cb=>cb.value);
+  if(!assays.length){notify('Izberite vsaj eno preiskavo','warning');return;}
+  if(!S.qcPanels)S.qcPanels=[];
+  if(_editingPanelIdx!=null)S.qcPanels[_editingPanelIdx]={name,assays};else S.qcPanels.push({name,assays});
+  save();cancelPanelEdit();renderPanelList();notify('Panel shranjen','success');
+}
+function deletePanelEntry(i){if(!confirm('Izbriši panel?'))return;S.qcPanels.splice(i,1);save();renderPanelList();notify('Panel izbrisan');}
+function renderPanelBtns(){
+  const ps=S.qcPanels||[];const row=$i('panelBtnsRow');if(!row)return;
+  row.innerHTML=ps.map((p,i)=>'<button class="panel-btn" onclick="applyPanel('+i+')">'+p.name+'</button>').join('');
+  row.style.display=ps.length?'flex':'none';
+}
+function applyPanel(idx){
+  const p=(S.qcPanels||[])[idx];if(!p)return;
+  const set=new Set(p.assays);
+  document.querySelectorAll('.ap-cb').forEach(cb=>{const on=set.has(cb.value);cb.checked=on;cb.closest('.assay-pick-item').classList.toggle('picked',on);});
+  notify(p.name+': označene '+p.assays.length+' preiskave','ok');
+}
 function saveQcMaterial(){const name=$i('qcName').value.trim(),type=$i('qcType').value,lot=$i('qcLot').value.trim(),levels=parseInt($i('qcLevels').value);const assays=[...$i('qcAssayList').querySelectorAll('input:checked')].map(el=>el.value);const gtins=[...$i('qcGtinList').querySelectorAll('.qc-gtin-cb:checked')].map(el=>el.value);if(!name){notify('Vnesite naziv','warning');return;}const obj={name,type,lot,levels,gtins,assays};if(S.editingQcIdx!=null){const old=S.qcMaterials[S.editingQcIdx];if(old&&old.lotHistory)obj.lotHistory=old.lotHistory;S.qcMaterials[S.editingQcIdx]=obj;}else S.qcMaterials.push(obj);save();closeMo('qcModal');renderQcMats();notify('Material shranjen','success');}
 
 /* ===== OPERATORS ===== */
