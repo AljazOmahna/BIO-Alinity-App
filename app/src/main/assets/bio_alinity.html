@@ -566,7 +566,12 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
         <div class="card-title">1. Inštrument in QC materiali</div>
         <div class="frow">
           <div class="fg"><label>Inštrument</label><select id="entryInstr" onchange="populateEntryQcMaterials()"></select></div>
-          <div class="fg"><label>Datum / čas</label><input type="datetime-local" id="entryDateTime"></div>
+          <div class="fg"><label>Datum / čas</label><input type="datetime-local" id="entryDateTime" oninput="qcDateCheck()"></div>
+        </div>
+        <div id="qcLateWarn" style="display:none;margin:4px 0 8px;padding:8px 10px;background:#fef3c7;border:1px solid #d97706;border-radius:6px;font-size:12px">
+          <div style="font-weight:700;color:#92400e">&#9888; Naknadni vnos (IVDR/ALCOA+)</div>
+          <div style="color:#78350f;margin-top:2px">Datum je v preteklosti. Realni čas vnosa bo zabeležen ločeno &mdash; ni mogoče antidatirati.</div>
+          <div class="fg" style="margin-top:6px"><label style="font-size:11px">Razlog za naknadni vnos <span style="color:red">*</span></label><textarea id="qcLateReason" rows="2" placeholder="Npr. sistem ni deloval, pozabljeno..."></textarea></div>
         </div>
         <div class="fg"><label>QC materiali <button class="btn btn-g btn-sm" style="float:right;margin-top:-4px" onclick="toggleAllQcMats()">&#10004; Vse</button></label>
           <div id="qcMatCheckList" style="display:flex;flex-direction:column;gap:6px"></div></div>
@@ -2361,13 +2366,19 @@ function pregledLotHint(q){
 function selectAllQcMats(val){document.querySelectorAll('.qc-mat-cb').forEach(cb=>cb.checked=val);}
 function toggleAllQcMats(){const cbs=[...document.querySelectorAll('.qc-mat-cb')];const allOn=cbs.every(cb=>cb.checked);cbs.forEach(cb=>cb.checked=!allOn);}
 
-function initWizard(){S.wiz={};S.pinValue='';showWStep(0);clearPin();populateEntryQcMaterials();const now=new Date();now.setMinutes(now.getMinutes()-now.getTimezoneOffset());$i('entryDateTime').value=now.toISOString().slice(0,16);}
+function initWizard(){S.wiz={};S.pinValue='';showWStep(0);clearPin();populateEntryQcMaterials();const now=new Date();now.setMinutes(now.getMinutes()-now.getTimezoneOffset());$i('entryDateTime').value=now.toISOString().slice(0,16);qcDateCheck();}
+function qcDateCheck(){const v=$i('entryDateTime').value;const today=new Date().toISOString().slice(0,10);const late=v&&v.slice(0,10)<today;const w=$i('qcLateWarn');if(w)w.style.display=late?'block':'none';if(!late){const r=$i('qcLateReason');if(r)r.value='';} }
 function showWStep(n){document.querySelectorAll('.wizard-step').forEach((s,i)=>s.classList.toggle('active',i===n));document.querySelectorAll('.wizard-dot').forEach((d,i)=>{d.classList.remove('active','done');if(i<n)d.classList.add('done');else if(i===n)d.classList.add('active');});}
 function wizardNext(from){
   if(from===0){
     const instrId=$i('entryInstr').value;if(!instrId){notify('Izberite inštrument','warning');return;}
     const cbs=[...document.querySelectorAll('.qc-mat-cb:checked')];if(!cbs.length){notify('Izberite vsaj en QC material','warning');return;}
-    S.wiz={instrId,datetime:$i('entryDateTime').value,instrType:INSTRUMENTS.find(i=>i.id===instrId).type,selectedQcs:cbs.map(cb=>({idx:parseInt(cb.value),name:cb.dataset.qcname,lot:cb.dataset.lot,levels:parseInt(cb.dataset.levels)||2,expiry:cb.dataset.expiry||'',daysLeft:(cb.dataset.daysleft===''||cb.dataset.daysleft==null?null:parseInt(cb.dataset.daysleft))}))};
+    const dtVal=$i('entryDateTime').value;
+    const today=new Date().toISOString().slice(0,10);
+    const isLate=dtVal&&dtVal.slice(0,10)<today;
+    let lateReason='';
+    if(isLate){lateReason=($i('qcLateReason').value||'').trim();if(!lateReason){notify('Vpišite razlog za naknadni vnos','warning');return;}}
+    S.wiz={instrId,datetime:dtVal,instrType:INSTRUMENTS.find(i=>i.id===instrId).type,selectedQcs:cbs.map(cb=>({idx:parseInt(cb.value),name:cb.dataset.qcname,lot:cb.dataset.lot,levels:parseInt(cb.dataset.levels)||2,expiry:cb.dataset.expiry||'',daysLeft:(cb.dataset.daysleft===''||cb.dataset.daysleft==null?null:parseInt(cb.dataset.daysleft))})),lateReason:isLate?lateReason:''};
     buildLevelPills();showWStep(1);
   }else if(from===1){
     const qcLevels={};S.wiz.selectedQcs.forEach(qc=>{qcLevels[qc.idx]=[...document.querySelectorAll('.lp-pill[data-qc="'+qc.idx+'"].selected-pill')].map(p=>p.dataset.level);});
@@ -2436,13 +2447,18 @@ function saveEntry(){
   const expired=(S.wiz.selectedQcs||[]).find(qc=>qc.daysLeft!=null&&qc.daysLeft<0);
   if(expired){notify('Lot '+(expired.lot||'?')+' ('+expired.name+') je potekel '+fmtExp(expired.expiry)+' — vnos QC ni dovoljen','error');return;}
   const baseId=Date.now().toString();
+  const nowIso=new Date().toISOString();
+  const today=nowIso.slice(0,10);
+  const forDate=(S.wiz.datetime||nowIso).slice(0,10);
+  const isLate=forDate<today;
   S.wiz.selectedQcs.forEach((qc,i)=>{
     const levels=S.wiz.qcLevels[qc.idx]||[];if(!levels.length)return;
     const results=[];levels.forEach(lvl=>{const picked=(S.wiz.pickedByQcLvl||{})[qc.idx+'_'+lvl]||[];picked.forEach(an=>{const skey=qc.idx+'_'+lvl+'_'+an;const sd=(S.wiz.sdMap||{})[skey]||'ok';const note=(S.wiz.notes||{})[skey]||'';results.push({assay:an,level:lvl,sd,note});});});
-    const ent={id:baseId+'_'+i,datetime:S.wiz.datetime||new Date().toISOString(),instrId:S.wiz.instrId,qcName:qc.name,qcIdx:qc.idx,lot:qc.lot,lotExpiry:qc.expiry||'',daysLeftAtEntry:(qc.daysLeft==null?null:qc.daysLeft),levels,results,operatorId:S.pinValue,sessionId:baseId};
+    const ent={id:baseId+'_'+i,datetime:S.wiz.datetime||nowIso,forDate,enteredAt:nowIso,instrId:S.wiz.instrId,qcName:qc.name,qcIdx:qc.idx,lot:qc.lot,lotExpiry:qc.expiry||'',daysLeftAtEntry:(qc.daysLeft==null?null:qc.daysLeft),levels,results,operatorId:S.pinValue,sessionId:baseId};
+    if(isLate){ent.late=true;ent.lateReason=S.wiz.lateReason||'';}
     S.entries.push(ent);
     const nf=results.filter(r=>r.sd&&r.sd!=='ok').length;
-    _audit('create','entry',ent.id,'QC vnos '+ent.instrId+' · '+ent.qcName+(ent.lot?' · lot '+ent.lot:'')+' · '+results.length+' preiskav'+(nf?' ('+nf+' izpad)':' (vse OK)'),null,null,S.pinValue);
+    _audit('create','entry',ent.id,'QC vnos '+ent.instrId+' · '+ent.qcName+(ent.lot?' · lot '+ent.lot:'')+' · '+results.length+' preiskav'+(nf?' ('+nf+' izpad)':' (vse OK)')+(isLate?' · NAKNADNI VNOS: '+(S.wiz.lateReason||''):''),null,null,S.pinValue);
   });
   save();notify('QC vnosi shranjeni! ✓','success');initWizard();navQc('dashboard');
 }
@@ -3839,7 +3855,9 @@ function buildQcNonconfHtml(instrId,year,month){
       });
       var hasSess=sEnts.length>0;
       izpad.push(hasSess?(fails.length?fails.join('<br>'):'<span class="ok">OK</span>'):'');
-      ukrep.push(Array.from(new Set(notes)).join('<br>'));podpis.push(op);
+      ukrep.push(Array.from(new Set(notes)).join('<br>'));
+      var hasLate=sEnts.some(function(e){return e.late;});
+      podpis.push(hasSess?(op+(hasLate?'*':'')):'');
     }
     var rev=_qcReviewForDay(instrId,year,month,d);
     var pcell='';
@@ -3852,7 +3870,7 @@ function buildQcNonconfHtml(instrId,year,month){
   }
   var head2='<div class="rhdr"><table class="meta"><tr><td class="k">Oddelek:</td><td>'+oddelek+'</td><td class="k">Analizator:</td><td>Alinity '+_repEsc(instr.id)+'</td><td class="k">Mesec, Leto:</td><td>'+moName+'</td></tr></table></div>';
   var table='<table class="grid nc"><thead>'+head+'</thead>'+body+'</table>';
-  var legend='<div class="legend">Vzrok neskladja in ukrepi — Legenda: A – Ponovitev kontrole; B – Preventivna kalibracija; C – Menjava reagenta; D – Servis</div>';
+  var legend='<div class="legend">Vzrok neskladja in ukrepi — Legenda: A – Ponovitev kontrole; B – Preventivna kalibracija; C – Menjava reagenta; D – Servis &middot; * = naknadni vnos (glej revizijsko sled)</div>';
   // Pregledi QC (podpis + ukrepi) v tem mesecu
   var revs=_qcReviewsForMonth(instrId,year,month);
   var revSec='';
