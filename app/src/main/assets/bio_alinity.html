@@ -760,7 +760,7 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
 
   <!-- QC MAINTENANCE -->
   <div class="page qc-page" id="page-maintenance">
-    <div class="sec-hdr"><div class="sec-title" style="font-size:16px">Vzdrževanje</div><button class="btn btn-g btn-sm" onclick="openMaintEdit()">&#9999;&#65039; Uredi opravila</button></div>
+    <div class="sec-hdr"><div class="sec-title" style="font-size:16px">Vzdrževanje</div><span style="display:flex;gap:6px"><button class="btn btn-g btn-sm" onclick="openMaintBack()">&#128340; Vnos za nazaj</button><button class="btn btn-g btn-sm" onclick="openMaintEdit()">&#9999;&#65039; Uredi opravila</button></span></div>
     <div class="tabs" id="maintTypeTabs">
       <div class="tab active" onclick="setMaintType('daily')">Dnevno</div>
       <div class="tab" onclick="setMaintType('weekly')">Tedensko</div>
@@ -1292,6 +1292,29 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
       <div style="text-align:center;margin-top:10px"><button class="btn btn-g btn-sm" onclick="clearMaintPin()">Pobriši</button></div>
     </div>
     <div class="mf"><button class="btn btn-g" onclick="closeMo('maintSignModal')">Prekliči</button><button class="btn btn-teal" onclick="saveMaintenance()">&#10003; Potrdi</button></div>
+  </div>
+</div>
+
+<!-- MAINT BACK MODAL (naknadni vnos vzdrževanja za nazaj / mirovanje) -->
+<div class="mo" id="maintBackModal">
+  <div class="modal" style="max-width:520px">
+    <div class="mh"><h3>&#128340; Naknadni vnos vzdrževanja</h3><button class="mc" onclick="closeMo('maintBackModal')">&#10005;</button></div>
+    <div class="mb">
+      <div class="frow">
+        <div class="fg"><label>Inštrument</label><select id="mbInstr" onchange="_maintBackRenderSteps()"></select></div>
+        <div class="fg"><label>Vrsta</label><select id="mbType" onchange="_maintBackRenderSteps()"><option value="daily">Dnevno</option><option value="weekly">Tedensko</option><option value="monthly">Mesečno</option><option value="quarterly">3-mesečno/po potrebi</option></select></div>
+      </div>
+      <div class="frow">
+        <div class="fg"><label>Datum dejanja</label><input type="date" id="mbDate" onchange="_maintBackRenderSteps()"></div>
+        <div class="fg"><label>Način</label><select id="mbMode" onchange="_maintBackRenderSteps()"><option value="done">Opravljeno vzdrževanje</option><option value="idle">💤 Aparat v mirovanju</option></select></div>
+      </div>
+      <div id="mbLateWarn" style="display:none;background:rgba(180,83,9,.08);border:1px solid #b45309;border-radius:7px;padding:8px 12px;margin-bottom:10px;font-size:12px;color:#b45309">⏱️ <strong>Naknadni vnos</strong> — zabeleži se dejanski datum vnosa (danes) in razlog. Antidatiranje ni dovoljeno (IVDR/ALCOA+).</div>
+      <div id="mbStepsWrap" style="margin-bottom:10px"></div>
+      <div class="fg" id="mbReasonWrap" style="display:none"><label>Razlog za naknadni vnos <span style="color:var(--red)">*</span></label><textarea id="mbReason" placeholder="Npr. pozabljen vpis, vneseno naknadno..."></textarea></div>
+      <div class="fg"><label>Opomba / ugotovitve</label><textarea id="mbNote" placeholder="Neobvezno..."></textarea></div>
+      <div class="fg"><label>Matična številka operaterja</label><input type="tel" id="mbOp" maxlength="5" inputmode="numeric" placeholder="5-mestna" oninput="_maintBackOpName()"><div id="mbOpName" style="font-size:12px;font-weight:600;color:var(--abbott-teal);min-height:16px;margin-top:3px"></div></div>
+    </div>
+    <div class="mf"><button class="btn btn-g" onclick="closeMo('maintBackModal')">Prekliči</button><button class="btn btn-teal" onclick="saveMaintBack()">&#10003; Shrani</button></div>
   </div>
 </div>
 
@@ -3514,20 +3537,24 @@ function renderMaintContent(){
   wrap.innerHTML=INSTRUMENTS.map(instr=>{
     const steps=getMaintSteps(type,instr.type);const key=instr.id+'_'+type;const checked=maintState.checked[key]||{};const ti=MAINT_TYPES[type];
     const todayRec=_maintCurRec(instr.id,type);
-    const confirmed={};if(todayRec)todayRec.steps.forEach(s=>{if(s.done)confirmed[s.id]=true;});
+    const isIdle=!!(todayRec&&todayRec.idle);
+    const confirmed={};if(todayRec&&!isIdle)todayRec.steps.forEach(s=>{if(s.done)confirmed[s.id]=true;});
     const doneCount=steps.filter(s=>confirmed[s.id]||(!confirmed[s.id]&&!!checked[s.id])).length;
     const allDone=steps.length>0&&doneCount===steps.length;
     const hasNewChecks=steps.some(s=>!confirmed[s.id]&&!!checked[s.id]);
     const newCount=steps.filter(s=>!confirmed[s.id]&&!!checked[s.id]).length;
     const instrLabel=instr.type==='l'?'Abbott linija':'Alinity '+instr.type.toUpperCase();
-    let bottomHtml='<div style="margin-top:12px;text-align:right">';
+    let bottomHtml='<div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end;align-items:center">';
+    if(!isIdle&&!allDone&&steps.length>0)bottomHtml+='<button class="btn btn-outline btn-sm" style="border-color:#b45309;color:#b45309" onclick="openMaintIdle(\''+instr.id+'\',\''+type+'\')">💤 Mirovanje</button>';
     if(hasNewChecks)bottomHtml+='<button class="btn '+(allDone?'btn-teal':'btn-outline')+' btn-sm" onclick="openMaintSign(\''+instr.id+'\',\''+type+'\')">'+(allDone?'✅ Potrdi in podpiši':'⚠️ Potrdi ('+newCount+' novih)')+'</button>';
+    else if(isIdle)bottomHtml+='<span class="badge" style="background:rgba(180,83,9,.12);color:#b45309;font-size:12px;padding:6px 12px">💤 V mirovanju '+_maintPeriodWord(type)+'</span>';
     else if(allDone)bottomHtml+='<span class="badge badge-ok" style="font-size:12px;padding:6px 12px">✅ Vse potrjeno '+_maintPeriodWord(type)+'</span>';
     else bottomHtml+='<button class="btn btn-g btn-sm" disabled>⚠️ Potrdi</button>';
     bottomHtml+='</div>';
-    return '<div class="card" style="border-left:4px solid '+(allDone?'var(--success)':ti.color)+'">'
-      +'<div class="card-title"><span>'+ti.icon+' '+instr.id+' &ndash; '+instr.name+'</span><span style="font-size:12px;font-weight:400;color:'+(allDone?'var(--success)':'var(--text3)')+'">'+(allDone?'✅ Vse opravljeno':doneCount+' / '+steps.length+' korakov')+'</span></div>'
-      +(todayRec?'<div style="background:var(--gbg);border:1px solid var(--green);border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:12px;color:var(--accent2)">✅ '+doneCount+'/'+steps.length+' potrjeno '+_maintPeriodWord(type)+' &ndash; zadnjič '+new Date(todayRec.datetime).toLocaleDateString('sl-SI',{day:'2-digit',month:'2-digit'})+' ob '+new Date(todayRec.datetime).toLocaleTimeString('sl-SI',{hour:'2-digit',minute:'2-digit'})+' ('+getOpName(todayRec.operatorId)+')</div>':'')
+    const headBorder=isIdle?'#b45309':(allDone?'var(--success)':ti.color);
+    return '<div class="card" style="border-left:4px solid '+headBorder+'">'
+      +'<div class="card-title"><span>'+ti.icon+' '+instr.id+' &ndash; '+instr.name+'</span><span style="font-size:12px;font-weight:400;color:'+(isIdle?'#b45309':(allDone?'var(--success)':'var(--text3)'))+'">'+(isIdle?'💤 V mirovanju':(allDone?'✅ Vse opravljeno':doneCount+' / '+steps.length+' korakov'))+'</span></div>'
+      +(isIdle?'<div style="background:rgba(180,83,9,.07);border:1px solid #b45309;border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:12px;color:#b45309">💤 Aparat '+_maintPeriodWord(type)+' v mirovanju (ni obratoval) &ndash; '+new Date(todayRec.datetime).toLocaleDateString('sl-SI',{day:'2-digit',month:'2-digit'})+' ('+getOpName(todayRec.operatorId)+')'+(todayRec.late?' · naknadni vnos':'')+'</div>':(todayRec?'<div style="background:var(--gbg);border:1px solid var(--green);border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:12px;color:var(--accent2)">✅ '+doneCount+'/'+steps.length+' potrjeno '+_maintPeriodWord(type)+' &ndash; zadnjič '+new Date(todayRec.datetime).toLocaleDateString('sl-SI',{day:'2-digit',month:'2-digit'})+' ob '+new Date(todayRec.datetime).toLocaleTimeString('sl-SI',{hour:'2-digit',minute:'2-digit'})+' ('+getOpName(todayRec.operatorId)+')'+(todayRec.late?' · naknadni vnos':'')+'</div>':''))
       +(steps.length===0?'<div class="muted" style="font-size:13px;padding:8px">Koraki bodo dodani za '+ti.label.toLowerCase()+' – '+instrLabel+'.</div>'
         :'<div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:10px"><button class="btn btn-g btn-sm" onclick="checkAllMaint(\''+instr.id+'\',\''+type+'\',true)">✔ Vse</button><button class="btn btn-g btn-sm" onclick="checkAllMaint(\''+instr.id+'\',\''+type+'\',false)">☐ Počisti</button></div>'
         +steps.map(step=>{
@@ -3546,7 +3573,69 @@ function buildMaintPinGrid(){const keys=[1,2,3,4,5,6,7,8,9,'',0,'⌫'];$i('maint
 function maintPinPress(k){if(k===''||k==='undefined')return;if(k==='⌫')maintPinVal=maintPinVal.slice(0,-1);else if(maintPinVal.length<5)maintPinVal+=k;updateMaintPinDisplay();}
 function clearMaintPin(){maintPinVal='';updateMaintPinDisplay();}
 function updateMaintPinDisplay(){for(let i=0;i<5;i++)$i('mpd'+i)?.classList.toggle('filled',i<maintPinVal.length);const op=S.operators.find(o=>o.id===maintPinVal);$i('maintPinName').textContent=op?'✓ '+op.first+' '+op.last:(maintPinVal.length===5?'⚠ Operater ni najden':'');}
-function saveMaintenance(){if(maintPinVal.length<5){notify('Vpišite matično številko','warning');return;}const op=S.operators.find(o=>o.id===maintPinVal);if(!op){notify('Operater ni registriran','error');return;}const {instrId,type}=maintState.pendingSign;const instr=INSTRUMENTS.find(i=>i.id===instrId);const steps=getMaintSteps(type,instr.type);const key=instrId+'_'+type;const checked=maintState.checked[key]||{};const note=$i('maintSignNote').value.trim();if(!S.maintenanceLog)S.maintenanceLog=[];const _pk=_maintPeriodKey(type,new Date().toISOString().slice(0,10));const existIdx=S.maintenanceLog.findIndex(m=>m.instrId===instrId&&m.type===type&&_maintPeriodKey(type,(m.datetime||'').slice(0,10))===_pk);if(existIdx>=0){const ex=S.maintenanceLog[existIdx];ex.steps.forEach(s=>{if(checked[s.id])s.done=true;});ex.doneCount=ex.steps.filter(s=>s.done).length;ex.datetime=new Date().toISOString();if(note)ex.note=ex.note?ex.note+' / '+note:note;ex.operatorId=maintPinVal;}else{S.maintenanceLog.push({id:Date.now().toString(),datetime:new Date().toISOString(),instrId,integration:instr.integration,type,steps:steps.map(s=>({id:s.id,text:s.text,done:!!checked[s.id]})),doneCount:steps.filter(s=>checked[s.id]).length,totalSteps:steps.length,note,operatorId:maintPinVal});}save();closeMo('maintSignModal');maintState.checked[key]={};renderMaintContent();notify('Vzdrževanje potrjeno! ✓','success');}
+/* ---- naknadni vnos vzdrževanja za nazaj / mirovanje ---- */
+function openMaintBack(){const today=new Date().toISOString().slice(0,10);$i('mbInstr').innerHTML=INSTRUMENTS.map(i=>'<option value="'+i.id+'">'+i.id+' &ndash; '+i.name+'</option>').join('');$i('mbType').value=maintState.type==='triannual'?'quarterly':maintState.type;$i('mbDate').max=today;$i('mbDate').value=today;$i('mbMode').value='done';$i('mbNote').value='';$i('mbReason').value='';$i('mbOp').value='';$i('mbOpName').textContent='';_maintBackRenderSteps();showMo('maintBackModal');}
+function _maintBackRenderSteps(){
+  const instrId=$i('mbInstr').value,type=$i('mbType').value,date=$i('mbDate').value,mode=$i('mbMode').value;
+  const today=new Date().toISOString().slice(0,10);const late=date&&date<today;
+  $i('mbLateWarn').style.display=late?'block':'none';
+  $i('mbReasonWrap').style.display=late?'block':'none';
+  const instr=INSTRUMENTS.find(i=>i.id===instrId);
+  const wrap=$i('mbStepsWrap');
+  if(mode==='idle'){wrap.innerHTML='<div style="background:rgba(180,83,9,.06);border:1px solid #b45309;border-radius:7px;padding:10px 12px;font-size:13px;color:#b45309">💤 Aparat je bil na izbrani datum v mirovanju (ni obratoval). Koraki se ne beležijo.</div>';return;}
+  const steps=getMaintSteps(type,instr?instr.type:'c');
+  if(!steps.length){wrap.innerHTML='<div class="muted" style="font-size:13px;padding:8px">Ni opravil za to vrsto/inštrument.</div>';return;}
+  wrap.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><label style="font-size:12px;font-weight:600;color:var(--text3)">Opravljeni koraki</label><button class="btn btn-g btn-sm" type="button" onclick="document.querySelectorAll(\'.mb-step\').forEach(c=>c.checked=true)">✔ Vse</button></div>'+steps.map(s=>'<label style="display:flex;align-items:flex-start;gap:9px;padding:6px 8px;border-radius:6px;background:var(--bg2);border:1px solid var(--border);margin-bottom:4px;cursor:pointer"><input type="checkbox" class="mb-step" value="'+s.id+'" style="width:16px;height:16px;margin-top:1px;accent-color:var(--success)"><span style="font-size:13px">'+_repEsc(s.text)+'</span></label>').join('');
+}
+function _maintBackOpName(){const v=$i('mbOp').value.replace(/\D/g,'').slice(0,5);$i('mbOp').value=v;const op=S.operators.find(o=>o.id===v);$i('mbOpName').textContent=op?'✓ '+op.first+' '+op.last:(v.length===5?'⚠ Operater ni najden':'');}
+function saveMaintBack(){
+  const instrId=$i('mbInstr').value,type=$i('mbType').value,date=$i('mbDate').value,mode=$i('mbMode').value;
+  const opId=$i('mbOp').value.replace(/\D/g,'').slice(0,5);
+  const today=new Date().toISOString().slice(0,10);const late=date&&date<today;
+  if(!date){notify('Izberite datum','warning');return;}
+  if(date>today){notify('Datum ne sme biti v prihodnosti','error');return;}
+  const op=S.operators.find(o=>o.id===opId);if(!op){notify('Vpišite veljavno matično številko operaterja','error');return;}
+  const reason=$i('mbReason').value.trim();
+  if(late&&!reason){notify('Pri naknadnem vnosu je razlog obvezen','warning');return;}
+  const idle=mode==='idle';
+  const checked={};if(!idle)document.querySelectorAll('.mb-step:checked').forEach(c=>{checked[c.value]=true;});
+  if(!idle&&!Object.keys(checked).length){notify('Označite vsaj en korak (ali izberite mirovanje)','warning');return;}
+  _commitMaint({instrId,type,forDate:date,checked,idle,note:$i('mbNote').value.trim(),operatorId:opId,lateReason:reason});
+  closeMo('maintBackModal');renderMaintContent();notify(idle?'Mirovanje zabeleženo 💤':'Naknadni vnos shranjen ✓','success');
+}
+/* poišče zapis za isto obdobje glede na efektivni datum (forDate, sicer datetime) */
+function _maintFindIdx(instrId,type,forDate){const pk=_maintPeriodKey(type,forDate);return (S.maintenanceLog||[]).findIndex(m=>m.instrId===instrId&&m.type===type&&_maintPeriodKey(type,(m.forDate||(m.datetime||'').slice(0,10)))===pk);}
+/* jedrni zapis vzdrževanja — IVDR/ALCOA+: ločeno hrani datum dejanja (forDate→datetime) in realni čas vnosa (enteredAt); naknadni vnos označi (late) + razlog */
+function _commitMaint(o){
+  const instr=INSTRUMENTS.find(i=>i.id===o.instrId);if(!instr)return;
+  const steps=getMaintSteps(o.type,instr.type);
+  if(!S.maintenanceLog)S.maintenanceLog=[];
+  const today=new Date().toISOString().slice(0,10);
+  const late=o.forDate<today;
+  const nowIso=new Date().toISOString();
+  const effIso=(o.forDate===today)?nowIso:(o.forDate+'T12:00:00.000Z');
+  const ti=MAINT_TYPES[o.type]||{label:o.type};
+  const idx=_maintFindIdx(o.instrId,o.type,o.forDate);
+  let rec;
+  if(idx>=0){
+    rec=S.maintenanceLog[idx];const before={doneCount:rec.doneCount,idle:!!rec.idle};
+    if(o.idle){rec.idle=true;rec.steps=steps.map(s=>({id:s.id,text:s.text,done:false}));rec.doneCount=0;}
+    else{rec.idle=false;if(!rec.steps||!rec.steps.length)rec.steps=steps.map(s=>({id:s.id,text:s.text,done:false}));rec.steps.forEach(s=>{if(o.checked[s.id])s.done=true;});rec.doneCount=rec.steps.filter(s=>s.done).length;}
+    rec.datetime=effIso;rec.enteredAt=nowIso;rec.forDate=o.forDate;rec.operatorId=o.operatorId;rec.totalSteps=steps.length;
+    if(late){rec.late=true;if(o.lateReason)rec.lateReason=o.lateReason;}
+    if(o.note)rec.note=rec.note?rec.note+' / '+o.note:o.note;
+    _audit('update','maintenance',o.instrId+'/'+o.type+'/'+o.forDate,'Vzdrževanje '+o.instrId+' · '+ti.label+' · '+o.forDate+(o.idle?' · MIROVANJE':' · '+rec.doneCount+'/'+steps.length+' korakov')+(late?' · NAKNADNI VNOS'+(o.lateReason?': '+o.lateReason:''):''),before,{doneCount:rec.doneCount,idle:!!rec.idle},o.operatorId);
+  }else{
+    rec={id:Date.now().toString(),datetime:effIso,enteredAt:nowIso,forDate:o.forDate,instrId:o.instrId,integration:instr.integration,type:o.type,idle:!!o.idle,steps:steps.map(s=>({id:s.id,text:s.text,done:o.idle?false:!!o.checked[s.id]})),doneCount:o.idle?0:steps.filter(s=>o.checked[s.id]).length,totalSteps:steps.length,note:o.note||'',operatorId:o.operatorId};
+    if(late){rec.late=true;rec.lateReason=o.lateReason||'';}
+    S.maintenanceLog.push(rec);
+    _audit('create','maintenance',o.instrId+'/'+o.type+'/'+o.forDate,'Vzdrževanje '+o.instrId+' · '+ti.label+' · '+o.forDate+(o.idle?' · MIROVANJE':' · '+rec.doneCount+'/'+steps.length+' korakov')+(late?' · NAKNADNI VNOS'+(o.lateReason?': '+o.lateReason:''):''),null,null,o.operatorId);
+  }
+  save();return rec;
+}
+function saveMaintenance(){if(maintPinVal.length<5){notify('Vpišite matično številko','warning');return;}const op=S.operators.find(o=>o.id===maintPinVal);if(!op){notify('Operater ni registriran','error');return;}const {instrId,type,idle}=maintState.pendingSign;const key=instrId+'_'+type;const checked=maintState.checked[key]||{};const note=$i('maintSignNote').value.trim();_commitMaint({instrId,type,forDate:new Date().toISOString().slice(0,10),checked,idle:!!idle,note,operatorId:maintPinVal});closeMo('maintSignModal');maintState.checked[key]={};renderMaintContent();notify(idle?'Mirovanje zabeleženo 💤':'Vzdrževanje potrjeno! ✓','success');}
+/* označi aparat v mirovanju za tekoče obdobje (sočasno) — preko istega PIN modala */
+function openMaintIdle(instrId,type){const instr=INSTRUMENTS.find(i=>i.id===instrId);const ti=MAINT_TYPES[type];const pw=_maintPeriodWord(type);maintState.pendingSign={instrId,type,idle:true};maintPinVal='';$i('maintSignTitle').textContent='Mirovanje – '+instrId;$i('maintSignSummary').innerHTML='<div style="background:rgba(180,83,9,.07);border:1px solid var(--orange,#b45309);border-radius:8px;padding:10px 14px"><div style="font-weight:600;font-size:14px;color:#b45309;margin-bottom:4px">💤 Aparat v mirovanju</div><div style="font-size:13px">'+ti.icon+' '+ti.label+' – '+instrId+'<br>Beležite, da aparat <strong>'+pw+'</strong> ni obratoval, zato vzdrževanje ni bilo potrebno.</div></div>';$i('maintSignNote').value='';updateMaintPinDisplay();buildMaintPinGrid();showMo('maintSignModal');}
 function getOpName(id){const op=S.operators.find(o=>o.id===id);return op?op.first+' '+op.last:id;}
 /* ---- urejevalnik opravil vzdrževanja ---- */
 function openMaintEdit(){$i('meType').value=maintState.type==='triannual'?'quarterly':maintState.type;renderMaintEdit();showMo('maintEditModal');}
@@ -3664,7 +3753,7 @@ function _maintDailyTable(instrId,instrType,year,month){
     body+='</tr>';
   });
   body+='<tr><td class="lbl">Podpis/parafa</td>';
-  for(var d2=1;d2<=dim;d2++){var rec=(byDay[d2]||[])[0];body+='<td>'+(rec?_opParafa(rec.operatorId):'')+'</td>';}
+  for(var d2=1;d2<=dim;d2++){var rec=(byDay[d2]||[])[0];body+='<td>'+(rec?(rec.idle?'M':_opParafa(rec.operatorId))+(rec.late?'*':''):'')+'</td>';}
   body+='</tr>';
   return '<div class="sechd">Dnevno vzdrževanje</div><table class="grid daily"><thead>'+head+'</thead><tbody>'+body+'</tbody></table>';
 }
@@ -3680,19 +3769,21 @@ function _maintWeeklyTable(instrId,instrType,year,month){
   steps.forEach(function(st){
     body+='<tr><td class="lbl">'+_repEsc(st.text)+'</td>'+[1,2,3,4].map(function(w){var done=(byWeek[w]||[]).some(function(r){return _stepDoneIn(r,st.id);});return '<td>'+(done?'✓':'')+'</td>';}).join('')+'</tr>';
   });
-  body+='<tr><td class="lbl">Podpis/parafa</td>'+[1,2,3,4].map(function(w){var rec=(byWeek[w]||[])[0];return '<td>'+(rec?_opParafa(rec.operatorId):'')+'</td>';}).join('')+'</tr>';
+  body+='<tr><td class="lbl">Podpis/parafa</td>'+[1,2,3,4].map(function(w){var rec=(byWeek[w]||[])[0];return '<td>'+(rec?(rec.idle?'M':_opParafa(rec.operatorId))+(rec.late?'*':''):'')+'</td>';}).join('')+'</tr>';
   return '<div class="sechd">Tedensko vzdrževanje</div><table class="grid weekly"><thead>'+head+'</thead><tbody>'+body+'</tbody></table>';
 }
 
 function _maintDatumTable(instrId,instrType,year,month,type,heading){
   var steps=getMaintSteps(type,instrType);if(!steps.length)return '';
   var recs=_maintRecordsFor(instrId,type,year,month);
+  var idleRec=recs.find(function(r){return r.idle;});
   var body='';
   steps.forEach(function(st){
     var rec=recs.find(function(r){return _stepDoneIn(r,st.id);});
+    if(!rec&&idleRec)rec=idleRec;
     var dt=rec?new Date(rec.datetime):null;
     var datum=dt?(_rp2(dt.getDate())+'.'+_rp2(dt.getMonth()+1)+'.'+dt.getFullYear()):'';
-    var par=rec?_opParafa(rec.operatorId):'';
+    var par=rec?((rec.idle?'M':_opParafa(rec.operatorId))+(rec.late?'*':'')):'';
     body+='<tr><td class="lbl">'+_repEsc(st.text)+'</td><td>'+datum+'</td><td>'+par+'</td></tr>';
   });
   return '<div class="sechd">'+_repEsc(heading)+'</div><table class="grid datum"><thead><tr><th class="lbl">'+_repEsc(heading)+'</th><th>DATUM</th><th>Parafa</th></tr></thead><tbody>'+body+'</tbody></table>';
@@ -3709,8 +3800,9 @@ function buildMaintReportHtml(instrId,year,month){
     _maintDatumTable(instr.id,instr.type,year,month,'monthly','Mesečno vzdrževanje'),
     _maintDatumTable(instr.id,instr.type,year,month,'quarterly','3-mesečno vzdrževanje oz. po potrebi')
   ].filter(Boolean).join('<div class="gap"></div>');
+  var legend='<div style="margin-top:6px;font-size:7px;color:#444">M = aparat v mirovanju (ni obratoval) &middot; * = naknadni vnos (glej revizijsko sled)</div>';
   var foot=_reportFoot('4.0','78431','213/64');
-  return _reportDoc('Evidenca periodičnega vzdrževanja opreme',head+secs+foot);
+  return _reportDoc('Evidenca periodičnega vzdrževanja opreme',head+secs+legend+foot);
 }
 
 /* ---- NESKLADJA NOTRANJE QC (OB KIKKB 216/64) ---- */
