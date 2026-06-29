@@ -2220,22 +2220,34 @@ function initState(){
 /* Idempotentna nadgradnja QC materialov na shemo z GTIN povezavo + ločenima GFAP/UCHL + Multichem U/Myo.
    Ne briše uporabniških dodatkov; ne dira S.entries (zgodovinski qcName ostane). */
 function migrateQcMaterials(){
-  if(S.qcMatSchema>=2)return;
   const byName=n=>S.qcMaterials.find(q=>q.name===n);
-  S.qcMaterials.forEach(q=>{if(!Array.isArray(q.gtins))q.gtins=[];});
-  const sPlus=byName('Multichem S Plus');if(sPlus){sPlus.levels=3;sPlus.gtins=[QC_GTINS.sPlusL1,QC_GTINS.sPlusL2,QC_GTINS.sPlusL3];}
-  const ia=byName('Multichem IA');if(ia&&!ia.gtins.length)ia.gtins=[QC_GTINS.ia];
-  const pct=byName('Abbott PCT single QC');if(pct&&!pct.gtins.length)pct.gtins=[QC_GTINS.pct];
-  /* razdeli kombinirani GFAP/UCHL na ločena materiala */
-  const combo=byName('Abbott GFAP/UCHL single QC');
-  if(combo){const i=S.qcMaterials.indexOf(combo);
-    const repl=[{name:'GFAP single QC',type:'single',levels:2,lot:combo.lot||'',gtins:[QC_GTINS.gfap],assays:['GFAP']},
-                {name:'UCH-L1 single QC',type:'single',levels:2,lot:'',gtins:[QC_GTINS.uchl],assays:['UCHL']}];
-    S.qcMaterials.splice(i,1,...repl);}
-  else{const g=byName('GFAP single QC');if(g&&!g.gtins.length)g.gtins=[QC_GTINS.gfap];const u=byName('UCH-L1 single QC');if(u&&!u.gtins.length)u.gtins=[QC_GTINS.uchl];}
-  if(!byName('Multichem U'))S.qcMaterials.push({name:'Multichem U',type:'biochem',levels:2,lot:'',gtins:[QC_GTINS.mU],assays:['U-Albumin','U/CSF Proteini']});
-  if(!byName('Myo single QC'))S.qcMaterials.push({name:'Myo single QC',type:'single',levels:2,lot:'',gtins:[],assays:['Mioglobin']});
-  S.qcMatSchema=2;save();
+  if(S.qcMatSchema<2){
+    S.qcMaterials.forEach(q=>{if(!Array.isArray(q.gtins))q.gtins=[];});
+    const sPlus=byName('Multichem S Plus');if(sPlus){sPlus.levels=3;sPlus.gtins=[QC_GTINS.sPlusL1,QC_GTINS.sPlusL2,QC_GTINS.sPlusL3];}
+    const ia=byName('Multichem IA');if(ia&&!ia.gtins.length)ia.gtins=[QC_GTINS.ia];
+    const pct=byName('Abbott PCT single QC');if(pct&&!pct.gtins.length)pct.gtins=[QC_GTINS.pct];
+    const combo=byName('Abbott GFAP/UCHL single QC');
+    if(combo){const i=S.qcMaterials.indexOf(combo);
+      const repl=[{name:'GFAP single QC',type:'single',levels:2,lot:combo.lot||'',gtins:[QC_GTINS.gfap],assays:['GFAP']},
+                  {name:'UCH-L1 single QC',type:'single',levels:2,lot:'',gtins:[QC_GTINS.uchl],assays:['UCHL']}];
+      S.qcMaterials.splice(i,1,...repl);}
+    else{const g=byName('GFAP single QC');if(g&&!g.gtins.length)g.gtins=[QC_GTINS.gfap];const u=byName('UCH-L1 single QC');if(u&&!u.gtins.length)u.gtins=[QC_GTINS.uchl];}
+    if(!byName('Multichem U'))S.qcMaterials.push({name:'Multichem U',type:'biochem',levels:2,lot:'',gtins:[QC_GTINS.mU],assays:['U-Albumin','U/CSF Proteini']});
+    if(!byName('Myo single QC'))S.qcMaterials.push({name:'Myo single QC',type:'single',levels:2,lot:'',gtins:[],assays:['Mioglobin']});
+    S.qcMatSchema=2;save();
+  }
+  if(S.qcMatSchema<3){
+    /* prisilno obnovi GTINe na vseh napravah (tablica + PC) */
+    S.qcMaterials.forEach(q=>{if(!Array.isArray(q.gtins))q.gtins=[];});
+    const _g=(name,gtins)=>{const q=byName(name);if(q)q.gtins=gtins;};
+    _g('Multichem S Plus',[QC_GTINS.sPlusL1,QC_GTINS.sPlusL2,QC_GTINS.sPlusL3]);
+    _g('Multichem IA',[QC_GTINS.ia]);
+    _g('Multichem U',[QC_GTINS.mU]);
+    _g('Abbott PCT single QC',[QC_GTINS.pct]);
+    _g('GFAP single QC',[QC_GTINS.gfap]);
+    _g('UCH-L1 single QC',[QC_GTINS.uchl]);
+    S.qcMatSchema=3;save();
+  }
 }
 function save(){localStorage.setItem('qclab_v2',JSON.stringify(S));}
 
