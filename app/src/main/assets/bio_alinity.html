@@ -1103,6 +1103,85 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
   <div id="deliveriesBody" style="padding:8px 4px"></div>
 </div>
 
+<!-- ============ REKLAMACIJE ============ -->
+<div class="page-main" id="main-reklamacije">
+  <div class="qc-subnav" id="reklSubnav">
+    <div class="tab active" data-rekl="vpis" onclick="navRekl('vpis')">&#43; Vpis</div>
+    <div class="tab" data-rekl="odprte" onclick="navRekl('odprte')">Odprte</div>
+    <div class="tab" data-rekl="zakljucene" onclick="navRekl('zakljucene')">Zaključene</div>
+    <div class="tab" data-rekl="statistika" onclick="navRekl('statistika')">Statistika</div>
+  </div>
+
+  <!-- REKL VPIS -->
+  <div class="page rekl-page active" id="rekl-vpis">
+    <div class="sec-hdr"><div class="sec-title" style="font-size:16px" id="reklFormTitle">Vpis reklamacije</div></div>
+    <div class="card">
+      <div class="frow">
+        <div class="fg" style="flex:2"><label>Artikel / material *</label><input id="rfArtikel" placeholder="Npr. Multichem S Plus, Alinity c CHOL Reagent..."></div>
+        <div class="fg"><label>Lot / serija *</label><input id="rfLot" placeholder="Npr. 12345A"></div>
+        <div class="fg"><label>Količina</label><input id="rfKolicina" placeholder="Npr. 2×5 mL, 3 kosi"></div>
+      </div>
+      <div class="frow">
+        <div class="fg">
+          <label>Dobavitelj *</label>
+          <select id="rfDobavitelj" onchange="reklDobaviteljChange()">
+            <option value="">— izberi —</option>
+            <option value="Abbott Diagnostics">Abbott Diagnostics</option>
+            <option value="Salus d.o.o.">Salus d.o.o.</option>
+            <option value="BioMérieux">BioMérieux</option>
+            <option value="Roche Diagnostics">Roche Diagnostics</option>
+            <option value="Beckman Coulter">Beckman Coulter</option>
+            <option value="Siemens Healthineers">Siemens Healthineers</option>
+            <option value="_drugo">Drugo...</option>
+          </select>
+        </div>
+        <div class="fg" id="rfDobaviteljWrap" style="display:none"><label>Dobavitelj (prosto)</label><input id="rfDobaviteljFree" placeholder="Ime dobavitelja"></div>
+        <div class="fg"><label>Kontakt dobavitelja</label><input id="rfKontakt" placeholder="Ime, e-pošta ali telefon"></div>
+      </div>
+      <div class="frow">
+        <div class="fg">
+          <label>Razlog reklamacije *</label>
+          <select id="rfRazlog">
+            <option value="">— izberi —</option>
+            <option value="Vrednosti izven meja">Vrednosti izven meja</option>
+            <option value="Poškodba embalaže">Poškodba embalaže</option>
+            <option value="Potekel rok">Potekel rok</option>
+            <option value="Napaka lota/serije">Napaka lota/serije</option>
+            <option value="Ni ustrezal specifikacijam">Ni ustrezal specifikacijam</option>
+            <option value="Drugo">Drugo</option>
+          </select>
+        </div>
+      </div>
+      <div class="fg"><label>Podrobni opis napake *</label><textarea id="rfOpis" rows="3" placeholder="Opišite natančno, kaj je bilo narobe..."></textarea></div>
+      <div class="fg"><label>Interna opomba</label><textarea id="rfOpomba" rows="2" placeholder="Neobvezno — za interno uporabo"></textarea></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px;flex-wrap:wrap">
+        <button class="btn btn-g" id="reklCancelEdit" style="display:none" onclick="reklResetForm()">Prekliči urejanje</button>
+        <button class="btn btn-a" onclick="saveRekl()">&#128190; Shrani reklamacijo</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- REKL ODPRTE -->
+  <div class="page rekl-page" id="rekl-odprte">
+    <div class="sec-hdr"><div class="sec-title" style="font-size:16px">Odprte reklamacije</div></div>
+    <div id="reklOdprteBody" style="padding:4px"></div>
+  </div>
+
+  <!-- REKL ZAKLJUCENE -->
+  <div class="page rekl-page" id="rekl-zakljucene">
+    <div class="sec-hdr"><div class="sec-title" style="font-size:16px">Zaključene reklamacije</div></div>
+    <div class="card">
+      <div class="tbl-wrap"><table><thead><tr><th>Datum</th><th>Artikel</th><th>Lot</th><th>Dobavitelj</th><th>Razlog</th><th>Rešitev</th><th>Zaključil</th><th></th></tr></thead><tbody id="reklZakljBody"></tbody></table></div>
+    </div>
+  </div>
+
+  <!-- REKL STATISTIKA -->
+  <div class="page rekl-page" id="rekl-statistika">
+    <div class="sec-hdr"><div class="sec-title" style="font-size:16px">Statistika reklamacij</div></div>
+    <div id="reklStatBody" style="padding:4px"></div>
+  </div>
+</div>
+
 </main>
 </div>
 
@@ -1116,6 +1195,7 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
   <div class="bn-item" data-main="deliveries" onclick="navMain('deliveries')"><div class="bn-icon">&#128666;</div>Dobavnice</div>
   <div class="bn-item" data-main="servis" onclick="navMain('servis')"><div class="bn-icon">&#128295;</div>Servis</div>
   <div class="bn-item" data-main="qc" onclick="navMain('qc')"><div class="bn-icon">&#128202;</div>QC</div>
+  <div class="bn-item" data-main="reklamacije" onclick="navMain('reklamacije')"><div class="bn-icon">&#9888;&#65039;</div>Reklam.</div>
   <div class="bn-item" data-main="vec" onclick="navMain('vec')"><div class="bn-icon">&#9776;</div>Več</div>
 </nav>
 
@@ -1339,6 +1419,31 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
   </div>
 </div>
 
+<!-- REKLAMACIJA ZAKLJUČI MODAL -->
+<div class="mo" id="reklCloseModal">
+  <div class="modal" style="max-width:480px">
+    <div class="mh"><h3>&#9989; Zaključi reklamacijo</h3><button class="mc" onclick="closeMo('reklCloseModal')">&#10005;</button></div>
+    <div class="mb">
+      <div id="reklCloseSummary" style="margin-bottom:12px;padding:10px;background:var(--bg2);border-radius:8px;font-size:13px"></div>
+      <div class="fg"><label>Rešitev *</label>
+        <select id="reklCloseResitev">
+          <option value="">— izberi —</option>
+          <option value="zamenjava">Zamenjava artikla</option>
+          <option value="dobropis">Dobropis / povračilo</option>
+          <option value="drugo">Drugo</option>
+        </select>
+      </div>
+      <div class="fg"><label>Opomba ob zaključku</label><textarea id="reklCloseOpomba" rows="2" placeholder="Npr. dobavitelj poslal nov lot, rok za dobropis 30 dni..."></textarea></div>
+      <div style="font-size:13px;font-weight:600;color:var(--abbott-blue);text-align:center;margin:12px 0 6px">Matična številka za potrditev</div>
+      <div class="pin-display"><div class="pin-dot" id="rpd0"></div><div class="pin-dot" id="rpd1"></div><div class="pin-dot" id="rpd2"></div><div class="pin-dot" id="rpd3"></div><div class="pin-dot" id="rpd4"></div></div>
+      <div id="reklPinName" style="text-align:center;font-size:13px;font-weight:600;color:var(--abbott-teal);min-height:20px;margin-bottom:10px"></div>
+      <div class="pin-grid" id="reklPinGrid"></div>
+      <div style="text-align:center;margin-top:10px"><button class="btn btn-g btn-sm" onclick="clearReklPin()">Pobriši</button></div>
+    </div>
+    <div class="mf"><button class="btn btn-g" onclick="closeMo('reklCloseModal')">Prekliči</button><button class="btn btn-a" onclick="confirmReklClose()">&#9989; Zaključi reklamacijo</button></div>
+  </div>
+</div>
+
 <!-- MAINT EDIT MODAL (urejanje opravil vzdrževanja) -->
 <div class="mo" id="maintEditModal">
   <div class="modal" style="max-width:680px">
@@ -1448,6 +1553,7 @@ function navMain(tab){
   if(tab==='narocila') navOrd(currentOrd||'prepare');
   if(tab==='servis') navSrv(currentSrv||'entry');
   if(tab==='deliveries') renderDeliveries();
+  if(tab==='reklamacije') navRekl(currentRekl||'vpis');
 }
 
 /* ============ QC SUB-NAVIGATION ============ */
@@ -2223,6 +2329,7 @@ function initState(){
   if(!S.serviceLog)S.serviceLog=[];
   if(!S.deliveries)S.deliveries=[];
   if(!S.qcReviews)S.qcReviews=[];
+  if(!S.reklamacije)S.reklamacije=[];
   if(!S.auditLog)S.auditLog=[];
   if(!S.notifications)S.notifications=[];
   if(!S.reports)S.reports=[];
@@ -4394,6 +4501,214 @@ function exportSrvStatsCSV(){
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='Statistika_servisov_'+new Date().toISOString().slice(0,10)+'.csv';a.click();
   notify('CSV izvožen','success');
 }
+/* ============================================================
+   REKLAMACIJE — beleženje in vračanje artiklov ob reklamaciji
+   ============================================================ */
+let currentRekl='vpis';let _reklPin='';let _reklCloseId=null;let _reklEditId=null;
+
+function navRekl(page){
+  currentRekl=page;
+  document.querySelectorAll('.rekl-page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('#reklSubnav .tab').forEach(t=>t.classList.remove('active'));
+  $i('rekl-'+page).classList.add('active');
+  document.querySelector('#reklSubnav .tab[data-rekl="'+page+'"]')?.classList.add('active');
+  if(page==='odprte')renderReklOdprte();
+  if(page==='zakljucene')renderReklZakljucene();
+  if(page==='statistika')renderReklStatistika();
+  if(page==='vpis'&&!_reklEditId)reklResetForm();
+}
+
+function reklDobaviteljChange(){
+  const v=$i('rfDobavitelj').value;
+  $i('rfDobaviteljWrap').style.display=v==='_drugo'?'block':'none';
+}
+
+function reklResetForm(){
+  _reklEditId=null;
+  ['rfArtikel','rfLot','rfKolicina','rfKontakt','rfOpis','rfOpomba','rfDobaviteljFree'].forEach(id=>{const el=$i(id);if(el)el.value='';});
+  $i('rfDobavitelj').value='';$i('rfRazlog').value='';
+  $i('rfDobaviteljWrap').style.display='none';
+  $i('reklFormTitle').textContent='Vpis reklamacije';
+  $i('reklCancelEdit').style.display='none';
+}
+
+function saveRekl(){
+  const artikel=($i('rfArtikel').value||'').trim();
+  const lot=($i('rfLot').value||'').trim();
+  const dobSel=$i('rfDobavitelj').value;
+  const dobavitelj=dobSel==='_drugo'?($i('rfDobaviteljFree').value||'').trim():dobSel;
+  const razlog=$i('rfRazlog').value;
+  const opis=($i('rfOpis').value||'').trim();
+  if(!artikel){notify('Vpišite naziv artikla','warning');return;}
+  if(!lot){notify('Vpišite lot/serijsko številko','warning');return;}
+  if(!dobavitelj){notify('Izberite dobavitelja','warning');return;}
+  if(!razlog){notify('Izberite razlog reklamacije','warning');return;}
+  if(!opis){notify('Opišite napako','warning');return;}
+  const nowIso=new Date().toISOString();
+  const rec={
+    artikel,lot,
+    kolicina:($i('rfKolicina').value||'').trim(),
+    dobavitelj,
+    kontakt:($i('rfKontakt').value||'').trim(),
+    razlog,opis,
+    opomba:($i('rfOpomba').value||'').trim(),
+    status:'odprta',poslanAt:'',poslanBy:'',
+    resitev:null,resenoAt:'',resenoBy:''
+  };
+  if(!S.reklamacije)S.reklamacije=[];
+  if(_reklEditId){
+    const idx=S.reklamacije.findIndex(r=>r.id===_reklEditId);
+    if(idx>=0){const before={...S.reklamacije[idx]};Object.assign(S.reklamacije[idx],rec,{updatedAt:nowIso});_audit('update','reklamacija',_reklEditId,'Reklamacija posodobljena: '+artikel+' lot '+lot,before,S.reklamacije[idx],'system');}
+    notify('Reklamacija posodobljena ✓','success');
+  } else {
+    const id=nowIso.replace(/\D/g,'').slice(0,13);
+    Object.assign(rec,{id,createdAt:nowIso,updatedAt:nowIso});
+    S.reklamacije.push(rec);
+    _audit('create','reklamacija',id,'Nova reklamacija: '+artikel+' lot '+lot+' ('+dobavitelj+') — '+razlog,null,rec,'system');
+    notify('Reklamacija shranjena ✓','success');
+  }
+  save();reklResetForm();navRekl('odprte');
+}
+
+function editRekl(id){
+  const r=(S.reklamacije||[]).find(x=>x.id===id);if(!r)return;
+  _reklEditId=id;
+  $i('rfArtikel').value=r.artikel||'';
+  $i('rfLot').value=r.lot||'';
+  $i('rfKolicina').value=r.kolicina||'';
+  $i('rfKontakt').value=r.kontakt||'';
+  $i('rfOpis').value=r.opis||'';
+  $i('rfOpomba').value=r.opomba||'';
+  const knownDob=['Abbott Diagnostics','Salus d.o.o.','BioMérieux','Roche Diagnostics','Beckman Coulter','Siemens Healthineers'];
+  if(knownDob.includes(r.dobavitelj)){$i('rfDobavitelj').value=r.dobavitelj;$i('rfDobaviteljWrap').style.display='none';}
+  else{$i('rfDobavitelj').value='_drugo';$i('rfDobaviteljFree').value=r.dobavitelj||'';$i('rfDobaviteljWrap').style.display='block';}
+  $i('rfRazlog').value=r.razlog||'';
+  $i('reklFormTitle').textContent='Uredi reklamacijo';
+  $i('reklCancelEdit').style.display='inline-flex';
+  navRekl('vpis');
+}
+
+function deleteRekl(id){
+  const r=(S.reklamacije||[]).find(x=>x.id===id);if(!r)return;
+  if(!confirm('Izbrišete reklamacijo: '+r.artikel+' lot '+r.lot+'?'))return;
+  S.reklamacije=S.reklamacije.filter(x=>x.id!==id);
+  _audit('delete','reklamacija',id,'Izbrisana reklamacija: '+r.artikel+' lot '+r.lot,r,null,'system');
+  save();renderReklOdprte();notify('Reklamacija izbrisana');
+}
+
+function reklOznaciPoslano(id){
+  const r=(S.reklamacije||[]).find(x=>x.id===id);if(!r)return;
+  const op=prompt('Matična številka operaterja (5 mest):');if(!op)return;
+  const opTrim=(op||'').trim();
+  if(opTrim.length!==5){notify('Matična mora imeti 5 mest','warning');return;}
+  if(!S.operators.find(o=>o.id===opTrim)){notify('Operater ni registriran','error');return;}
+  const before={...r};
+  r.status='poslana';r.poslanAt=new Date().toISOString();r.poslanBy=opTrim;r.updatedAt=new Date().toISOString();
+  _audit('update','reklamacija',id,'Reklamacija označena kot poslana dobavitelju: '+r.dobavitelj,before,{status:r.status,poslanAt:r.poslanAt},opTrim);
+  save();renderReklOdprte();notify('Reklamacija označena kot poslana ✓','success');
+}
+
+function openReklClose(id){
+  const r=(S.reklamacije||[]).find(x=>x.id===id);if(!r)return;
+  _reklCloseId=id;_reklPin='';
+  $i('reklCloseSummary').innerHTML='<b>'+_repEsc(r.artikel)+'</b> &middot; Lot: '+_repEsc(r.lot)+(r.kolicina?' &middot; Kol: '+_repEsc(r.kolicina):'')+'<br>Dobavitelj: '+_repEsc(r.dobavitelj)+'<br>Razlog: '+_repEsc(r.razlog);
+  $i('reklCloseResitev').value='';$i('reklCloseOpomba').value='';
+  updateReklPinDisplay();
+  const keys=[1,2,3,4,5,6,7,8,9,'',0,'⌫'];
+  $i('reklPinGrid').innerHTML=keys.map(k=>'<div class="pin-key" onclick="reklPinPress(\''+k+'\')">'+k+'</div>').join('');
+  $i('reklCloseModal').classList.add('active');
+}
+
+function reklPinPress(k){
+  if(k===''||k==='undefined')return;
+  if(k==='⌫')_reklPin=_reklPin.slice(0,-1);
+  else if(_reklPin.length<5)_reklPin+=k;
+  updateReklPinDisplay();
+}
+function clearReklPin(){_reklPin='';updateReklPinDisplay();}
+function updateReklPinDisplay(){
+  for(let i=0;i<5;i++)$i('rpd'+i).classList.toggle('filled',i<_reklPin.length);
+  const op=S.operators.find(o=>o.id===_reklPin);
+  $i('reklPinName').textContent=op?'✓ '+op.first+' '+op.last:(_reklPin.length===5?'⚠ Operater ni najden':'');
+}
+
+function confirmReklClose(){
+  if(_reklPin.length<5){notify('Vpišite vseh 5 mest matične','warning');return;}
+  const op=S.operators.find(o=>o.id===_reklPin);if(!op){notify('Operater ni registriran','error');return;}
+  const resitev=$i('reklCloseResitev').value;if(!resitev){notify('Izberite rešitev','warning');return;}
+  const r=(S.reklamacije||[]).find(x=>x.id===_reklCloseId);if(!r)return;
+  const before={...r};
+  r.status='resena';r.resitev=resitev;r.resenoAt=new Date().toISOString();r.resenoBy=_reklPin;
+  r.opomba=(r.opomba?r.opomba+'\n':'')+($i('reklCloseOpomba').value||'').trim();r.updatedAt=r.resenoAt;
+  const resitveTxt={zamenjava:'Zamenjava artikla',dobropis:'Dobropis/povračilo',drugo:'Drugo'}[resitev]||resitev;
+  _audit('update','reklamacija',r.id,'Reklamacija zaključena: '+resitveTxt+' | '+r.artikel+' lot '+r.lot,before,{status:r.status,resitev:r.resitev,resenoAt:r.resenoAt},_reklPin);
+  save();closeMo('reklCloseModal');navRekl('zakljucene');notify('Reklamacija zaključena ✓','success');
+}
+
+const REKL_STATUS={odprta:'<span class="badge badge-3sd">Odprta</span>',poslana:'<span class="badge badge-2sd">Poslana</span>',resena:'<span class="badge badge-ok">Rešena</span>'};
+const REKL_RESITEV={zamenjava:'<span class="badge badge-blue">Zamenjava</span>',dobropis:'<span class="badge badge-teal">Dobropis</span>',drugo:'<span class="badge badge-g">Drugo</span>'};
+
+function renderReklOdprte(){
+  const list=(S.reklamacije||[]).filter(r=>r.status!=='resena').sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+  const wrap=$i('reklOdprteBody');
+  if(!list.length){wrap.innerHTML='<div class="card empty" style="padding:24px;text-align:center;color:var(--text3)">Ni odprtih reklamacij.</div>';return;}
+  wrap.innerHTML=list.map(r=>{
+    const dt=new Date(r.createdAt);const dtStr=dt.toLocaleDateString('sl-SI')+' '+dt.toLocaleTimeString('sl-SI',{hour:'2-digit',minute:'2-digit'});
+    return '<div class="card" style="margin-bottom:10px">'+
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:6px">'+
+        '<div><b style="font-size:15px">'+_repEsc(r.artikel)+'</b> <span class="muted" style="font-size:12px">Lot: '+_repEsc(r.lot)+(r.kolicina?' &middot; '+_repEsc(r.kolicina):'')+'</span></div>'+
+        '<div style="display:flex;gap:6px;flex-wrap:wrap">'+REKL_STATUS[r.status]+'</div>'+
+      '</div>'+
+      '<div style="font-size:12px;color:var(--text3);margin:4px 0">'+_repEsc(r.dobavitelj)+(r.kontakt?' &middot; '+_repEsc(r.kontakt):'')+'</div>'+
+      '<div style="font-size:13px;margin:4px 0"><b>'+_repEsc(r.razlog)+'</b> — '+_repEsc(r.opis)+'</div>'+
+      (r.opomba?'<div style="font-size:12px;color:var(--text3)">'+_repEsc(r.opomba)+'</div>':'')+
+      '<div style="font-size:11px;color:var(--text3);margin-top:4px">Vpisano: '+dtStr+(r.poslanAt?' &middot; Poslano: '+new Date(r.poslanAt).toLocaleDateString('sl-SI'):'')+'</div>'+
+      '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">'+
+        '<button class="btn btn-g btn-sm" onclick="editRekl(\''+r.id+'\')">&#9999;&#65039; Uredi</button>'+
+        (r.status==='odprta'?'<button class="btn btn-teal btn-sm" onclick="reklOznaciPoslano(\''+r.id+'\')">&#128229; Označi kot poslano</button>':'')+
+        '<button class="btn btn-a btn-sm" onclick="openReklClose(\''+r.id+'\')">&#9989; Zaključi</button>'+
+        '<button class="btn btn-d btn-sm" onclick="deleteRekl(\''+r.id+'\')">&#128465;</button>'+
+      '</div></div>';
+  }).join('');
+}
+
+function renderReklZakljucene(){
+  const list=(S.reklamacije||[]).filter(r=>r.status==='resena').sort((a,b)=>b.resenoAt.localeCompare(a.resenoAt));
+  const tbody=$i('reklZakljBody');
+  if(!list.length){tbody.innerHTML='<tr><td colspan="8" class="empty">Ni zaključenih reklamacij.</td></tr>';return;}
+  tbody.innerHTML=list.map(r=>{
+    const dtC=new Date(r.createdAt).toLocaleDateString('sl-SI');
+    return '<tr><td style="font-size:12px">'+dtC+'</td><td>'+_repEsc(r.artikel)+'</td><td style="font-size:12px">'+_repEsc(r.lot)+'</td><td style="font-size:12px">'+_repEsc(r.dobavitelj)+'</td><td style="font-size:12px">'+_repEsc(r.razlog)+'</td><td>'+(REKL_RESITEV[r.resitev]||_repEsc(r.resitev||''))+'</td><td style="font-size:12px">'+_repEsc(getOpName(r.resenoBy))+'</td><td><button class="btn btn-d btn-sm" onclick="deleteRekl(\''+r.id+'\')">&#128465;</button></td></tr>';
+  }).join('');
+}
+
+function renderReklStatistika(){
+  const all=S.reklamacije||[];
+  const odprte=all.filter(r=>r.status==='odprta').length;
+  const poslane=all.filter(r=>r.status==='poslana').length;
+  const resene=all.filter(r=>r.status==='resena').length;
+  const mesec=new Date().toISOString().slice(0,7);
+  const taMesec=all.filter(r=>r.createdAt.slice(0,7)===mesec).length;
+  const byDob={};all.forEach(r=>{const k=r.dobavitelj||'—';if(!byDob[k])byDob[k]=0;byDob[k]++;});
+  const byRaz={};all.forEach(r=>{const k=r.razlog||'—';if(!byRaz[k])byRaz[k]=0;byRaz[k]++;});
+  let h='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">';
+  [{l:'Odprte',v:odprte,c:'#dc2626'},{l:'Poslane',v:poslane,c:'#d97706'},{l:'Rešene',v:resene,c:'#16a34a'},{l:'Ta mesec',v:taMesec,c:'var(--abbott-blue)'}].forEach(s=>{
+    h+='<div class="card" style="text-align:center;padding:12px"><div style="font-size:24px;font-weight:700;color:'+s.c+'">'+s.v+'</div><div style="font-size:11px;color:var(--text3)">'+s.l+'</div></div>';
+  });
+  h+='</div>';
+  if(Object.keys(byDob).length){
+    h+='<div class="card" style="margin-bottom:10px"><div class="card-title">Po dobavitelju</div><div class="tbl-wrap"><table><thead><tr><th>Dobavitelj</th><th>Reklamacij</th></tr></thead><tbody>';
+    Object.entries(byDob).sort((a,b)=>b[1]-a[1]).forEach(([k,v])=>{h+='<tr><td>'+_repEsc(k)+'</td><td>'+v+'</td></tr>';});
+    h+='</tbody></table></div></div>';
+  }
+  if(Object.keys(byRaz).length){
+    h+='<div class="card"><div class="card-title">Po razlogu</div><div class="tbl-wrap"><table><thead><tr><th>Razlog</th><th>Reklamacij</th></tr></thead><tbody>';
+    Object.entries(byRaz).sort((a,b)=>b[1]-a[1]).forEach(([k,v])=>{h+='<tr><td>'+_repEsc(k)+'</td><td>'+v+'</td></tr>';});
+    h+='</tbody></table></div></div>';
+  }
+  $i('reklStatBody').innerHTML=h||'<div class="empty" style="padding:24px;text-align:center">Ni podatkov.</div>';
+}
+
 function renderMaintReview(){const tf=$i('mrFilterType').value,ig=$i('mrFilterInteg').value,df=$i('mrFilterFrom').value,dt=$i('mrFilterTo').value;let logs=[...(S.maintenanceLog||[])];if(tf)logs=logs.filter(m=>m.type===tf);if(ig)logs=logs.filter(m=>m.integration===ig);if(df)logs=logs.filter(m=>m.datetime>=df);if(dt)logs=logs.filter(m=>m.datetime<=dt+'T23:59:59');logs.sort((a,b)=>b.datetime.localeCompare(a.datetime));const tl={daily:'Dnevno',weekly:'Tedensko',monthly:'Mesečno',quarterly:'3-mesečno',triannual:'3-mesečno'};const tbody=$i('maintReviewBody');if(!logs.length){tbody.innerHTML='<tr><td colspan="7" class="empty">Ni podatkov.</td></tr>';return;}tbody.innerHTML=logs.map(m=>{const allDone=m.doneCount===m.totalSteps;const dt2=new Date(m.datetime);return '<tr><td>'+dt2.toLocaleString('sl-SI')+'</td><td>'+(tl[m.type]||m.type)+'</td><td>'+m.integration+'</td><td><span class="badge badge-blue">'+m.instrId+'</span></td><td><span class="badge '+(allDone?'badge-ok':'badge-2sd')+'">'+m.doneCount+'/'+m.totalSteps+'</span></td><td>'+getOpName(m.operatorId)+'</td><td style="font-size:12px" class="muted">'+(m.note||'')+'</td></tr>';}).join('');}
 function exportMaintCSV(){const rows=[['Datum','Čas','Tip','Integracija','Analizator','Korak','Opravljeno','Operater','Opomba']];(S.maintenanceLog||[]).forEach(m=>{const dt=new Date(m.datetime);(m.steps||[]).forEach(s=>{rows.push([dt.toLocaleDateString('sl-SI'),dt.toLocaleTimeString('sl-SI'),m.type,m.integration,m.instrId,s.text,s.done?'DA':'NE',getOpName(m.operatorId),m.note||'']);});});const csv=rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='Vzdrzevanje_'+new Date().toISOString().slice(0,10)+'.csv';a.click();notify('CSV izvožen','success');}
 
