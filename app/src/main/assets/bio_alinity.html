@@ -2793,7 +2793,7 @@ function renderAlertUI(){
   }
   /* modal (če je odprt) */
   const mb=$i('alertModalBody');
-  if(mb&&$i('alertModal').classList.contains('active')){
+  if(mb&&$i('alertModal').classList.contains('open')){
     mb.innerHTML=alerts.length?alerts.map(a=>'<div style="border:1px solid var(--border);border-left:4px solid '+ALERT_SEV[a.sev].col+';border-radius:8px;padding:10px">'+
       '<div style="display:flex;gap:8px;align-items:flex-start"><span style="font-size:18px">'+a.icon+'</span><div style="flex:1"><div style="font-size:13px;font-weight:700">'+a.title+'</div><div style="font-size:12px;color:var(--text3);margin-top:2px">'+a.detail+'</div></div><span style="font-size:9px;font-weight:700;color:'+ALERT_SEV[a.sev].col+'">'+ALERT_SEV[a.sev].lbl+'</span></div>'+
       '<div style="display:flex;gap:6px;margin-top:8px;justify-content:flex-end">'+
@@ -2803,7 +2803,7 @@ function renderAlertUI(){
       :'<div class="empty" style="padding:24px;text-align:center">&#9989; Ni aktivnih opozoril.</div>';
   }
 }
-function openAlertModal(){$i('alertModal').classList.add('active');renderAlertUI();}
+function openAlertModal(){showMo('alertModal');renderAlertUI();}
 
 /* ===== OBVESTILA ===== */
 function _updateNotifBadge(){
@@ -4757,7 +4757,7 @@ function openReklClose(id){
   updateReklPinDisplay();
   const keys=[1,2,3,4,5,6,7,8,9,'',0,'⌫'];
   $i('reklPinGrid').innerHTML=keys.map(k=>'<div class="pin-key" onclick="reklPinPress(\''+k+'\')">'+k+'</div>').join('');
-  $i('reklCloseModal').classList.add('active');
+  showMo('reklCloseModal');
 }
 
 function reklPinPress(k){
