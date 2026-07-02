@@ -322,6 +322,7 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
   <div class="hdr-stat"><div class="hdr-stat-num" id="hs-tot">0</div><div class="hdr-stat-lbl">Kos</div></div>
   <div class="hdr-stat"><div class="hdr-stat-num" style="color:var(--red)" id="hs-exp">0</div><div class="hdr-stat-lbl">Exp</div></div>
   <div class="hdr-stat"><div class="hdr-stat-num" style="color:var(--orange)" id="hs-14">0</div><div class="hdr-stat-lbl">14d</div></div>
+  <div class="hdr-sync" id="alertBell" onclick="openAlertModal()" style="position:relative">&#128276;<span id="alertBadge" style="display:none;position:absolute;top:-6px;right:-8px;background:var(--red);color:#fff;border-radius:10px;font-size:10px;padding:1px 5px;font-weight:700"></span></div>
   <div class="hdr-sync" id="syncChip" onclick="openSyncModal()">&#9729; Sync</div>
 </header>
 
@@ -535,6 +536,7 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
 
   <!-- QC DASHBOARD -->
   <div class="page qc-page active" id="page-dashboard">
+    <div id="dashAlerts"></div>
     <div class="stat-grid">
       <div class="stat-card"><div class="stat-num" id="stat-today">0</div><div class="stat-lbl">QC danes</div></div>
       <div class="stat-card"><div class="stat-num" id="stat-week">0</div><div class="stat-lbl">QC ta teden</div></div>
@@ -1266,6 +1268,7 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
       <div class="frow">
         <div class="fg" id="qcLotField"><label>Ročni lot <span style="font-weight:400;color:var(--text3);font-size:11px">(le brez povezave z zalogo)</span></label><input id="qcLot"></div>
         <div class="fg"><label>Nivoji</label><select id="qcLevels"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option></select></div>
+        <div class="fg"><label>Min. zaloga <span style="font-weight:400;color:var(--text3);font-size:11px">(kos — za opozorilo)</span></label><input type="number" id="qcMinQty" min="0" step="1" placeholder="2"></div>
       </div>
       <div class="fg"><label>Povezava z zalogo (GTIN)</label><div style="font-size:11px;color:var(--text3);margin-bottom:4px">Označi kontrole/kalibratorje iz zaloge, ki pripadajo temu materialu — aplikacija samodejno potegne pravi lot in rok.</div><div id="qcGtinList" style="display:grid;grid-template-columns:1fr;gap:3px;max-height:160px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:6px"></div></div>
       <div class="fg"><label>Preiskave</label><div id="qcAssayList" style="display:grid;grid-template-columns:1fr 1fr;gap:4px;max-height:240px;overflow-y:auto"></div></div>
@@ -1419,6 +1422,17 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
   </div>
 </div>
 
+<!-- ALERT CENTER MODAL -->
+<div class="mo" id="alertModal">
+  <div class="modal" style="max-width:640px">
+    <div class="mh"><h3>&#128276; Opozorila</h3><button class="mc" onclick="closeMo('alertModal')">&#10005;</button></div>
+    <div class="mb">
+      <div id="alertModalBody" style="display:flex;flex-direction:column;gap:8px;max-height:60vh;overflow-y:auto"></div>
+    </div>
+    <div class="mf"><span class="muted" style="font-size:11px;margin-right:auto">Opozorila se izračunajo samodejno iz podatkov. „Utišaj" skrije opozorilo za 7 dni.</span><button class="btn btn-blue" onclick="closeMo('alertModal')">Zapri</button></div>
+  </div>
+</div>
+
 <!-- REKLAMACIJA ZAKLJUČI MODAL -->
 <div class="mo" id="reklCloseModal">
   <div class="modal" style="max-width:480px">
@@ -1554,6 +1568,7 @@ function navMain(tab){
   if(tab==='servis') navSrv(currentSrv||'entry');
   if(tab==='deliveries') renderDeliveries();
   if(tab==='reklamacije') navRekl(currentRekl||'vpis');
+  try{renderAlertUI();}catch(e){}
 }
 
 /* ============ QC SUB-NAVIGATION ============ */
@@ -2335,6 +2350,7 @@ function initState(){
   if(!S.deliveries)S.deliveries=[];
   if(!S.qcReviews)S.qcReviews=[];
   if(!S.reklamacije)S.reklamacije=[];
+  if(!S.alertMute)S.alertMute={};
   if(!S.auditLog)S.auditLog=[];
   if(!S.notifications)S.notifications=[];
   if(!S.reports)S.reports=[];
@@ -2420,6 +2436,7 @@ function buildInstrMap(){
 }
 function renderDashboard(){
   _updateNotifBadge();
+  try{renderAlertUI();}catch(e){}
   const today=new Date().toDateString();
   const weekAgo=new Date();weekAgo.setDate(weekAgo.getDate()-7);
   $i('stat-today').textContent=S.entries.filter(e=>new Date(e.datetime).toDateString()===today).length;
@@ -2669,6 +2686,125 @@ function _qcReviewsForMonth(instrId,year,month){
   return (S.qcReviews||[]).filter(r=>r.instrId===instrId&&(r.toDate||'').slice(0,7)===pref).sort((a,b)=>(a.toDate||'').localeCompare(b.toDate||''));
 }
 
+/* ===== OPOZORILNI CENTER (pravila, brez AI) ===== */
+function _alertMuted(key){
+  const until=(S.alertMute||{})[key];
+  return !!until&&until>=new Date().toISOString().slice(0,10);
+}
+function muteAlert(key,days){
+  const d=new Date();d.setDate(d.getDate()+(days||7));
+  S.alertMute[key]=d.toISOString().slice(0,10);
+  save();renderAlertUI();
+}
+function computeAlerts(){
+  const A=[];const now=new Date();const hh=now.getHours();const dow=now.getDay();const dom=now.getDate();
+  const push=(key,sev,icon,title,detail,nav)=>{if(!_alertMuted(key))A.push({key,sev,icon,title,detail,nav});};
+  /* 1-3: manjkajoče vzdrževanje po obdobjih */
+  try{
+    INSTRUMENTS.forEach(ins=>{
+      if(hh>=10&&!_maintCurRec(ins.id,'daily')){
+        push('maint_daily_'+ins.id,hh>=14?'crit':'warn','🔧','Dnevno vzdrževanje manjka: '+ins.id,'Danes še ni zabeleženo dnevno vzdrževanje (niti mirovanje).',"navMain('qc');navQc('maintenance')");
+      }
+      if(dow>=4&&!_maintCurRec(ins.id,'weekly')){
+        push('maint_weekly_'+ins.id,'warn','🔧','Tedensko vzdrževanje manjka: '+ins.id,'Ta teden še ni zabeleženo tedensko vzdrževanje.',"navMain('qc');navQc('maintenance')");
+      }
+      if(dom>=20&&!_maintCurRec(ins.id,'monthly')){
+        push('maint_monthly_'+ins.id,dom>=27?'crit':'warn','🔧','Mesečno vzdrževanje manjka: '+ins.id,'Ta mesec še ni zabeleženo mesečno vzdrževanje.',"navMain('qc');navQc('maintenance')");
+      }
+      /* 4: periodično (3-mesečno) sledi */
+      const qs=(S.maintenanceLog||[]).filter(m=>m.instrId===ins.id&&m.type==='quarterly').sort((a,b)=>(b.datetime||'').localeCompare(a.datetime||''));
+      if(qs.length){
+        const dLast=Math.round((now-new Date(qs[0].datetime))/86400000);
+        if(dLast>80)push('maint_quart_'+ins.id,'info','🗓️','Periodično vzdrževanje sledi: '+ins.id,'Zadnje 3-mesečno vzdrževanje pred '+dLast+' dnevi.',"navMain('qc');navQc('maintenance')");
+      }
+    });
+  }catch(e){}
+  /* 5: roki iz zaloge */
+  try{
+    let nExp=0,n14=0;
+    (DB_PREGLED.inventory||[]).forEach(it=>{const dl=daysLeft(it.expiry);if(dl==null)return;if(dl<0)nExp+=(it.qty||1);else if(dl<=14)n14+=(it.qty||1);});
+    if(nExp>0)push('roki_exp','crit','⏰','Potekli artikli na zalogi: '+nExp+' kos','Preveri zavihek Roki in umakni potekle artikle.',"navMain('roki')");
+    if(n14>0)push('roki_14','warn','⏰','Artikli s potekom <14 dni: '+n14+' kos','Preveri zavihek Roki in pripravi nadomestila.',"navMain('roki')");
+  }catch(e){}
+  /* 6-10: QC materiali */
+  try{
+    (S.qcMaterials||[]).forEach((q,qi)=>{
+      if(!(q.gtins||[]).length)return;
+      const stock=qcStockLots(q);
+      const distinct=qcStockLotsDistinct(q);
+      /* 6: nizka zaloga */
+      const totQty=stock.reduce((s,it)=>s+(it.qty||1),0);
+      const minQ=(q.minQty!=null?q.minQty:2);
+      if(totQty<=minQ)push('qc_stock_'+qi,'warn','📦','Zaloga pada: '+q.name,'Na zalogi še '+totQty+' kos (min: '+minQ+'). Pripravi naročilo.',"navMain('narocila')");
+      /* tekoči lot */
+      const cur=distinct[0];
+      if(cur){
+        /* 9: tekoči lot izteka */
+        if(cur.daysLeft!=null&&cur.daysLeft>=0&&cur.daysLeft<=14)
+          push('qc_curexp_'+qi,'warn','🧪','QC lot izteka: '+q.name,'Lot '+cur.lot+' poteče čez '+cur.daysLeft+' dni — preveri svežino in pripravi nov lot.',"navMain('qc');navQc('qcmaterials')");
+        /* 8: tekoči lot brez uradnih vrednosti */
+        if(!qcFindValues(cur.lot))
+          push('qc_noval_cur_'+qi,'warn','📊','Ni uradnih vrednosti: '+q.name,'Za lot '+cur.lot+' ni uvoženih Abbott vrednosti (XML).',"navMain('qc');navQc('qcmaterials')");
+        /* 10: dovolj podatkov za lastne vrednosti */
+        const nEnt=_lotEntries(q.name,cur.lot).length;
+        const hasOvr=!!(S.qcOverrides&&S.qcOverrides[qcBaseLot(cur.lot)])||!!(S.qcOverrides&&S.qcOverrides[cur.lot]);
+        if(nEnt>=20&&!hasOvr)
+          push('qc_ownval_'+qi,'info','📈','Lastne vrednosti: '+q.name,'Na lotu '+cur.lot+' je že '+nEnt+' vnosov — razmisli o postavitvi lastnih Mean/SD.',"navMain('qc');navQc('qcmaterials')");
+      }
+      /* 7: naslednji lot brez validacije */
+      const next=distinct[1];
+      if(next){
+        const used=_lotEntries(q.name,next.lot).length>0;
+        const inHist=(q.lotHistory||[]).some(h=>qcBaseLot(h.lot||'')===qcBaseLot(next.lot));
+        if(!used&&!inHist)
+          push('qc_newlot_'+qi+'_'+qcBaseLot(next.lot),'warn','🆕','Nov lot čaka validacijo: '+q.name,'Lot '+next.lot+' je na zalogi — opravi lot-to-lot primerjavo/ovrednotenje pred uporabo.',"navMain('qc');navQc('qcmaterials')");
+        if(!qcFindValues(next.lot))
+          push('qc_noval_next_'+qi,'info','📊','Nov lot brez vrednosti: '+q.name,'Za prihajajoči lot '+next.lot+' še ni uvoženih Abbott vrednosti (XML).',"navMain('qc');navQc('qcmaterials')");
+      }
+    });
+  }catch(e){}
+  /* 11: ne-ovrednoteni loti v Pregled BK */
+  try{
+    const unchecked=(DB_PREGLED.lots||[]).filter(l=>l.checked===false).length;
+    if(unchecked>0)push('pbk_unchecked','info','🔍','Ne-ovrednoteni loti (Pregled BK): '+unchecked,'V Pregled BK je '+unchecked+' lotov brez ovrednotenja.',"navMain('loti')");
+  }catch(e){}
+  const sevOrd={crit:0,warn:1,info:2};
+  A.sort((a,b)=>sevOrd[a.sev]-sevOrd[b.sev]);
+  return A;
+}
+const ALERT_SEV={crit:{col:'var(--red)',lbl:'KRITIČNO'},warn:{col:'var(--orange)',lbl:'OPOZORILO'},info:{col:'var(--text3)',lbl:'INFO'}};
+function renderAlertUI(){
+  const alerts=computeAlerts();
+  /* badge v headerju: crit+warn */
+  const n=alerts.filter(a=>a.sev!=='info').length;
+  const b=$i('alertBadge');
+  if(b){if(n>0){b.textContent=n;b.style.display='';}else{b.style.display='none';}}
+  /* dashboard kartica: prvi 3 */
+  const dash=$i('dashAlerts');
+  if(dash){
+    if(!alerts.length){dash.innerHTML='';}
+    else{
+      const top=alerts.slice(0,3);
+      dash.innerHTML='<div class="card" style="margin-bottom:12px;border-left:4px solid '+ALERT_SEV[alerts[0].sev].col+'">'+
+        '<div class="card-title" style="display:flex;justify-content:space-between;align-items:center"><span>&#128276; Opozorila ('+alerts.length+')</span><button class="btn btn-g btn-sm" onclick="openAlertModal()">Prikaži vse</button></div>'+
+        top.map(a=>'<div style="display:flex;gap:8px;align-items:flex-start;padding:5px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="'+a.nav.replace(/"/g,'&quot;')+'"><span>'+a.icon+'</span><div><div style="font-size:13px;font-weight:600">'+a.title+'</div><div style="font-size:11px;color:var(--text3)">'+a.detail+'</div></div></div>').join('')+
+        '</div>';
+    }
+  }
+  /* modal (če je odprt) */
+  const mb=$i('alertModalBody');
+  if(mb&&$i('alertModal').classList.contains('active')){
+    mb.innerHTML=alerts.length?alerts.map(a=>'<div style="border:1px solid var(--border);border-left:4px solid '+ALERT_SEV[a.sev].col+';border-radius:8px;padding:10px">'+
+      '<div style="display:flex;gap:8px;align-items:flex-start"><span style="font-size:18px">'+a.icon+'</span><div style="flex:1"><div style="font-size:13px;font-weight:700">'+a.title+'</div><div style="font-size:12px;color:var(--text3);margin-top:2px">'+a.detail+'</div></div><span style="font-size:9px;font-weight:700;color:'+ALERT_SEV[a.sev].col+'">'+ALERT_SEV[a.sev].lbl+'</span></div>'+
+      '<div style="display:flex;gap:6px;margin-top:8px;justify-content:flex-end">'+
+      '<button class="btn btn-g btn-sm" onclick="muteAlert(\''+a.key+'\',7)">&#128263; Utišaj 7 dni</button>'+
+      '<button class="btn btn-blue btn-sm" onclick="closeMo(\'alertModal\');'+a.nav.replace(/"/g,'&quot;')+'">Odpri</button>'+
+      '</div></div>').join('')
+      :'<div class="empty" style="padding:24px;text-align:center">&#9989; Ni aktivnih opozoril.</div>';
+  }
+}
+function openAlertModal(){$i('alertModal').classList.add('active');renderAlertUI();}
+
 /* ===== OBVESTILA ===== */
 function _updateNotifBadge(){
   const n=(S.notifications||[]).filter(x=>!x.resolved).length;
@@ -2885,7 +3021,7 @@ function renderQcGtinPicker(sel){
   opts.sort((a,b)=>a.name.localeCompare(b.name));
   $i('qcGtinList').innerHTML=opts.length?opts.map(o=>'<label class="assay-check" style="display:flex;align-items:center;gap:8px"><input type="checkbox" class="qc-gtin-cb" value="'+o.gtin+'" '+(sel.includes(o.gtin)?'checked':'')+'> <span style="flex:1">'+o.name+(o.type?' <span style="font-size:10px;color:var(--text3)">'+(o.type==='control'?'kontrola':'kalibrator')+'</span>':'')+'</span><span style="font-size:10px;color:var(--text3)">'+o.gtin+'</span></label>').join(''):'<div class="muted" style="font-size:12px">Ni kontrol v zalogi (sinhronizirajte z Zebro).</div>';
 }
-function openQcModal(idx){S.editingQcIdx=idx??null;$i('qcModalTitle').textContent=idx!=null?'Uredi QC material':'Nov QC material';let sel=[],gsel=[];const inUse=$i('qcLotInUse');inUse.style.display='none';inUse.innerHTML='';if(idx!=null){const q=S.qcMaterials[idx];$i('qcName').value=q.name;$i('qcType').value=q.type;$i('qcLot').value=q.lot||'';$i('qcLevels').value=q.levels||2;sel=q.assays||[];gsel=q.gtins||[];const stock=qcStockLotsDistinct(q);if(stock.length){const lots=stock.map(s=>s.lot+' (rok '+fmtExp(s.expiry)+')').join(', ');inUse.innerHTML='🔗 Lot v uporabi (iz zaloge): <strong>'+lots+'</strong>';inUse.style.display='';$i('qcLotField').style.display='none';}else{$i('qcLotField').style.display='';}}else{$i('qcLotField').style.display='';$i('qcName').value='';$i('qcType').value='biochem';$i('qcLot').value='';$i('qcLevels').value=2;}$i('qcAssayList').innerHTML=S.assays.map(a=>'<label class="assay-check"><input type="checkbox" value="'+a.name+'" '+(sel.includes(a.name)?'checked':'')+'> '+a.name+' <span style="font-size:10px;color:var(--text3)">('+(a.type==='biochem'?'c':'i')+')</span></label>').join('');renderQcGtinPicker(gsel);showMo('qcModal');}
+function openQcModal(idx){S.editingQcIdx=idx??null;$i('qcModalTitle').textContent=idx!=null?'Uredi QC material':'Nov QC material';let sel=[],gsel=[];const inUse=$i('qcLotInUse');inUse.style.display='none';inUse.innerHTML='';if(idx!=null){const q=S.qcMaterials[idx];$i('qcName').value=q.name;$i('qcType').value=q.type;$i('qcLot').value=q.lot||'';$i('qcLevels').value=q.levels||2;$i('qcMinQty').value=(q.minQty!=null?q.minQty:'');sel=q.assays||[];gsel=q.gtins||[];const stock=qcStockLotsDistinct(q);if(stock.length){const lots=stock.map(s=>s.lot+' (rok '+fmtExp(s.expiry)+')').join(', ');inUse.innerHTML='🔗 Lot v uporabi (iz zaloge): <strong>'+lots+'</strong>';inUse.style.display='';$i('qcLotField').style.display='none';}else{$i('qcLotField').style.display='';}}else{$i('qcLotField').style.display='';$i('qcName').value='';$i('qcType').value='biochem';$i('qcLot').value='';$i('qcLevels').value=2;$i('qcMinQty').value='';}$i('qcAssayList').innerHTML=S.assays.map(a=>'<label class="assay-check"><input type="checkbox" value="'+a.name+'" '+(sel.includes(a.name)?'checked':'')+'> '+a.name+' <span style="font-size:10px;color:var(--text3)">('+(a.type==='biochem'?'c':'i')+')</span></label>').join('');renderQcGtinPicker(gsel);showMo('qcModal');}
 function deleteQcMat(i){if(!confirm('Izbriši?'))return;S.qcMaterials.splice(i,1);save();renderQcMats();notify('Material izbrisan');}
 
 /* ===== QC PANELI PREISKAV ===== */
@@ -2923,7 +3059,7 @@ function applyPanel(idx){
   panelCbs.forEach(cb=>{cb.checked=!allOn;cb.closest('.assay-pick-item').classList.toggle('picked',!allOn);});
   notify(allOn?(p.name+': odznačeno'):( p.name+': označene '+p.assays.length+' preiskave'),'ok');
 }
-function saveQcMaterial(){const name=$i('qcName').value.trim(),type=$i('qcType').value,lot=$i('qcLot').value.trim(),levels=parseInt($i('qcLevels').value);const assays=[...$i('qcAssayList').querySelectorAll('input:checked')].map(el=>el.value);const gtins=[...$i('qcGtinList').querySelectorAll('.qc-gtin-cb:checked')].map(el=>el.value);if(!name){notify('Vnesite naziv','warning');return;}const obj={name,type,lot,levels,gtins,assays};if(S.editingQcIdx!=null){const old=S.qcMaterials[S.editingQcIdx];if(old&&old.lotHistory)obj.lotHistory=old.lotHistory;S.qcMaterials[S.editingQcIdx]=obj;}else S.qcMaterials.push(obj);save();closeMo('qcModal');renderQcMats();notify('Material shranjen','success');}
+function saveQcMaterial(){const name=$i('qcName').value.trim(),type=$i('qcType').value,lot=$i('qcLot').value.trim(),levels=parseInt($i('qcLevels').value);const assays=[...$i('qcAssayList').querySelectorAll('input:checked')].map(el=>el.value);const gtins=[...$i('qcGtinList').querySelectorAll('.qc-gtin-cb:checked')].map(el=>el.value);if(!name){notify('Vnesite naziv','warning');return;}const mq=parseInt($i('qcMinQty').value);const obj={name,type,lot,levels,gtins,assays};if(isFinite(mq)&&mq>=0)obj.minQty=mq;if(S.editingQcIdx!=null){const old=S.qcMaterials[S.editingQcIdx];if(old&&old.lotHistory)obj.lotHistory=old.lotHistory;S.qcMaterials[S.editingQcIdx]=obj;}else S.qcMaterials.push(obj);save();closeMo('qcModal');renderQcMats();notify('Material shranjen','success');}
 
 /* ===== OPERATORS ===== */
 function renderOperators(){const q=($i('opSearch')?.value||'').toLowerCase();const filtered=S.operators.filter(o=>(o.first+' '+o.last+' '+o.id).toLowerCase().includes(q));$i('operatorBody').innerHTML=filtered.map(o=>{const ri=S.operators.indexOf(o);return '<tr><td><span class="badge badge-blue">'+o.id+'</span></td><td>'+o.first+'</td><td>'+o.last+'</td><td><button class="btn btn-outline btn-sm" onclick="openOperatorModal('+ri+')">✏️</button> <button class="btn btn-d btn-sm" onclick="deleteOperator('+ri+')">🗑️</button></td></tr>';}).join('')||'<tr><td colspan="4" class="empty">Ni rezultatov.</td></tr>';}
