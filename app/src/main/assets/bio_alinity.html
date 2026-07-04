@@ -392,7 +392,12 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
     <div class="sec-title">&#127991; GTIN baza</div>
     <button class="btn btn-g btn-sm" onclick="loadGtinDemo()">&#128229; Naloži privzete</button>
     <button class="btn btn-g btn-sm" onclick="openImportGtin()">&#128218; Uvozi CSV</button>
+    <button class="btn btn-g btn-sm" onclick="openPkgIns()">&#128196; Package insert</button>
     <button class="btn btn-a btn-sm" onclick="openGtinMo()">+ GTIN</button>
+  </div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+    <button class="btn btn-g btn-sm" style="flex:1;border-color:#00a3ad;color:#00a3ad" onclick="importNarocGtins(false)">&#128218; Preveri naročilnico</button>
+    <button class="btn btn-sm" style="flex:1;background:#00a3ad;color:#fff" onclick="importNarocGtins(true)">&#10133; Uvozi naročilnico</button>
   </div>
   <div style="font-size:11px;color:var(--text3);margin-bottom:8px">&#128161; GTIN baza je skupna z Zebro (pregledBK_db). Spremembe so vidne na obeh napravah po sinhronizaciji.</div>
   <div class="fr">
@@ -441,6 +446,18 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
         <div class="fg" style="flex:1"><label>Proizvajalec</label><input type="text" id="gtinMfr"></div>
         <div class="fg" style="flex:1"><label>Kataloška št.</label><input type="text" id="gtinCatalog" maxlength="30"></div>
       </div>
+      <div class="fr" style="gap:8px">
+        <div class="fg" style="flex:1"><label>Ident</label><input type="text" id="gtinIdent"></div>
+        <div class="fg" style="flex:1"><label>IVDR razred tveganja</label>
+          <select id="gtinRisk">
+            <option value="">&mdash;</option>
+            <option value="A">A</option>
+            <option value="B">B</option>
+            <option value="C">C</option>
+            <option value="D">D</option>
+          </select></div>
+      </div>
+      <div class="fg"><label>Package insert (IFU) &mdash; povezava</label><input type="text" id="gtinPiUrl" placeholder="https://..."></div>
       <div class="fg"><label>Opomba</label><input type="text" id="gtinNote"></div>
       <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin:4px 0">
         <input type="checkbox" id="gtinLotNotify" style="width:18px;height:18px;flex-shrink:0">
@@ -450,6 +467,21 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
     <div class="mf">
       <button class="btn btn-g" onclick="closeMo('moGtin')">Prekliči</button>
       <button class="btn btn-a" onclick="saveGtin()">Shrani</button>
+    </div>
+  </div>
+</div>
+
+<!-- PACKAGE INSERT (IFU) MODAL -->
+<div class="mo" id="moPkgIns">
+  <div class="modal">
+    <div class="mh"><h3>&#128196; Package inserti</h3><button class="mc" onclick="closeMo('moPkgIns')">&#10005;</button></div>
+    <div class="mb">
+      <div style="font-size:11px;color:var(--text3);margin-bottom:8px">Dokumenti so shranjeni na OneDrive. Povezavo uredi prek &#9998; (Uredi GTIN).</div>
+      <div class="fg"><input type="text" id="pkgInsSrch" placeholder="&#128269; Išči artikel..." oninput="renderPkgIns()"></div>
+      <div id="pkgInsBody"></div>
+    </div>
+    <div class="mf">
+      <button class="btn btn-a" onclick="closeMo('moPkgIns')" style="width:100%;justify-content:center">Zapri</button>
     </div>
   </div>
 </div>
@@ -1071,6 +1103,7 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
 <div id="orderPrintArea"></div>
 
 <script src="order_templates.js"></script>
+<script src="naroc_gtins.js"></script>
 
 <!-- DETAIL MODAL (Zaloga item) -->
 <div class="mo" id="detailModal">
@@ -1740,15 +1773,109 @@ function renderGtins(){
     return '<tr style="border-bottom:1px solid var(--border)">'+
       '<td class="gtin" style="padding:6px 4px;white-space:nowrap">'+g.gtin+'</td>'+
       '<td style="padding:6px 4px"><div style="font-size:12px;font-weight:600">'+_ge(g.name)+'</div>'+(g.note?'<div style="font-size:10px;color:var(--text3)">'+_ge(g.note)+'</div>':'')+'</td>'+
-      '<td style="padding:6px 4px"><span class="badge '+badge+'">'+lbl+'</span></td>'+
+      '<td style="padding:6px 4px"><span class="badge '+badge+'">'+lbl+'</span> '+riskBadge(g.riskClass)+'</td>'+
       '<td style="padding:6px 4px;font-size:11px;color:var(--text2)">'+(g.analyser||'&ndash;')+'</td>'+
       '<td style="padding:6px 4px;white-space:nowrap;text-align:right">'+
+      '<button class="btn btn-g btn-sm" onclick="toggleLotNotify('+ri+')" title="Lot opozorilo" style="padding:4px 7px;min-height:30px">'+(g.lotNotify!==false?'&#128276;':'&#128277;')+'</button> '+
       '<button class="btn btn-g btn-sm" onclick="openGtinMo('+ri+')" style="padding:4px 8px;min-height:30px">&#9998;</button> '+
       '<button class="btn btn-d btn-sm" onclick="delGtin('+ri+')" style="padding:4px 8px;min-height:30px">&#128465;</button>'+
       '</td></tr>';
   }).join('');
 }
 function _ge(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+/* IVDR razred tveganja (Priloga VIII): A=najnižje … D=najvišje */
+function riskBadge(rc){
+  if(!rc)return '<span class="badge b-gray" title="Razred tveganja IVDR ni določen">&mdash;</span>';
+  var col={A:'#64748b',B:'var(--accent)',C:'var(--orange)',D:'var(--red)'}[rc]||'#64748b';
+  return '<span class="badge" style="background:transparent;border:1px solid '+col+';color:'+col+'" title="IVDR razred tveganja '+rc+'">'+rc+'</span>';
+}
+function toggleLotNotify(idx){
+  var g=(DB_PREGLED.gtins||[])[idx];if(!g)return;
+  g.lotNotify=(g.lotNotify===false);
+  savePregledDB();renderGtins();
+  notify((g.lotNotify?'🔔':'🔕')+' Lot opozorilo '+(g.lotNotify?'VKLOPLJENO':'IZKLOPLJENO')+' za '+g.name);
+  try{if(_hasBridge()&&AndroidBridge.msIsSignedIn&&AndroidBridge.msIsSignedIn())msUpload('pregledBK_db');}catch(e){}
+}
+/* Package insert (IFU) — pregled po IVDR razredih tveganja */
+function openPkgIns(){$i('pkgInsSrch').value='';renderPkgIns();showMo('moPkgIns');}
+function renderPkgIns(){
+  var q=($i('pkgInsSrch').value||'').toLowerCase().trim();
+  var items=(DB_PREGLED.gtins||[]).filter(function(g){
+    if(EVAL_TYPES.indexOf(g.type)<0)return false;
+    if(q&&g.name.toLowerCase().indexOf(q)<0&&g.gtin.indexOf(q)<0)return false;
+    return true;
+  });
+  var h='';
+  var cdMissing=(DB_PREGLED.gtins||[]).filter(function(g){
+    return EVAL_TYPES.indexOf(g.type)>=0&&(g.riskClass==='C'||g.riskClass==='D')&&!(g.piUrl&&g.piUrl.trim());
+  }).length;
+  if(cdMissing){
+    h+='<div style="display:flex;gap:6px;align-items:center;padding:8px 10px;background:var(--rbg,#fef2f2);border:1px solid var(--red);border-radius:8px;margin-bottom:10px">'+
+      '<span style="color:var(--red);font-size:14px">&#9888;</span>'+
+      '<span style="font-size:11px;color:var(--red);font-weight:700">'+cdMissing+' artikel'+(cdMissing===1?'':'(ov)')+' razreda C/D brez navodil za uporabo (IVDR obvezno)</span></div>';
+  }
+  LOT_TYPE_ORDER.forEach(function(type){
+    var tItems=items.filter(function(g){return g.type===type;});
+    if(!tItems.length)return;
+    h+='<div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--text3);padding:6px 0 3px">'+(TYPE_LABELS[type]||type)+'</div>';
+    tItems.forEach(function(g){
+      var ri=(DB_PREGLED.gtins||[]).indexOf(g);
+      var has=!!(g.piUrl&&g.piUrl.trim());
+      var updStr=g.piUpdatedAt?g.piUpdatedAt.slice(0,10):'';
+      var isCD=(g.riskClass==='C'||g.riskClass==='D');
+      var mandMiss=!has&&isCD;
+      var bg=has?'':(mandMiss?';background:var(--rbg,#fef2f2)':';background:var(--obg,#fffbeb)');
+      h+='<div style="padding:8px;border:1px solid '+(mandMiss?'var(--red)':'var(--border)')+';border-radius:6px;margin-bottom:6px'+bg+'">';
+      h+='<div style="display:flex;align-items:center;gap:6px">';
+      h+='<div style="flex:1">';
+      h+='<div style="font-size:11px;font-weight:600">'+_ge(g.name)+' '+riskBadge(g.riskClass)+'</div>';
+      h+='<div style="font-size:10px;color:'+(has?'var(--success,#16a34a)':(mandMiss?'var(--red)':'var(--orange)'))+';margin-top:2px">'+
+        (has?'&#128279; povezava &middot; Zadnja sprememba: '+updStr:(mandMiss?'&#9888; IFU OBVEZNO (razred '+g.riskClass+')':'&#9888; povezava manjka'))+'</div>';
+      h+='</div>';
+      if(has)h+='<button class="btn btn-a btn-sm" onclick="openPiUrl('+ri+')" style="padding:5px 9px;min-height:32px">Odpri</button>';
+      h+='<button class="btn btn-g btn-sm" onclick="closeMo(\'moPkgIns\');openGtinMo('+ri+')" style="padding:5px 8px;min-height:32px">&#9998;</button>';
+      h+='</div></div>';
+    });
+  });
+  if(!h)h='<div style="text-align:center;color:var(--text3);font-size:12px;padding:16px">Ni artiklov.</div>';
+  $i('pkgInsBody').innerHTML=h;
+}
+function openPiUrl(idx){
+  var g=(DB_PREGLED.gtins||[])[idx];
+  if(!g||!g.piUrl){notify('Povezava ni nastavljena','warn');return;}
+  try{window.open(g.piUrl,'_blank');}catch(e){notify('Povezave ni mogoče odpreti','err');}
+}
+/* Preveri/uvozi GTIN podatke iz predlog naročilnic (NAROC_GTINS, naroc_gtins.js) */
+function importNarocGtins(doImport){
+  if(typeof NAROC_GTINS==='undefined'){notify('Predloge naročilnic niso naložene','warn');return;}
+  var byIdent={};var byCatalog={};
+  (DB_PREGLED.gtins||[]).forEach(function(g,i){
+    if(g.ident)byIdent[g.ident]=i;
+    if(g.catalog)byCatalog[g.catalog]=i;
+  });
+  var nNew=0,nUpdate=0,nSkip=0;
+  var toAdd=[];
+  NAROC_GTINS.forEach(function(n){
+    var idx=byIdent[n.ident]!=null?byIdent[n.ident]:(n.catalog&&byCatalog[n.catalog]!=null?byCatalog[n.catalog]:null);
+    if(idx!=null){
+      var g=DB_PREGLED.gtins[idx];
+      var changed=false;
+      if(!g.ident&&n.ident){g.ident=n.ident;changed=true;}
+      if(!g.catalog&&n.catalog){g.catalog=n.catalog;changed=true;}
+      if(!g.analyser&&n.analyser){g.analyser=n.analyser;changed=true;}
+      if(!g.manufacturer&&n.manufacturer){g.manufacturer=n.manufacturer;changed=true;}
+      if(changed)nUpdate++;else nSkip++;
+    } else {
+      toAdd.push(n);
+      nNew++;
+    }
+  });
+  var msg='Naročilnica: '+nNew+' novih, '+nUpdate+' posodobljenih, '+nSkip+' obstoječih';
+  if(!doImport){notify(msg+' — pritisni Uvozi za potrditev','ok');return;}
+  toAdd.forEach(function(n){DB_PREGLED.gtins.push({gtin:n.gtin,name:n.name,type:n.type,manufacturer:n.manufacturer,analyser:n.analyser,ident:n.ident,catalog:n.catalog,note:n.note,lotNotify:n.lotNotify});});
+  savePregledDB();renderGtins();notify(msg,'ok');
+  try{if(_hasBridge()&&AndroidBridge.msIsSignedIn&&AndroidBridge.msIsSignedIn())msUpload('pregledBK_db');}catch(e){}
+}
 function openGtinMo(idx){
   _editGtinIdx=idx!=null?idx:null;
   $i('gtinMoT').textContent=idx!=null?'Uredi GTIN':'Dodaj GTIN';
@@ -1757,10 +1884,11 @@ function openGtinMo(idx){
     $i('gtinCode').value=g.gtin;$i('gtinName').value=g.name;$i('gtinTypeVal').value=g.type;
     $i('gtinMfr').value=g.manufacturer||'';$i('gtinAnal').value=g.analyser||'';
     $i('gtinNote').value=g.note||'';$i('gtinCatalog').value=g.catalog||'';
+    $i('gtinIdent').value=g.ident||'';$i('gtinRisk').value=g.riskClass||'';$i('gtinPiUrl').value=g.piUrl||'';
     $i('gtinLotNotify').checked=(g.lotNotify!==false);
   }else{
-    ['gtinCode','gtinName','gtinMfr','gtinAnal','gtinNote','gtinCatalog'].forEach(function(id){$i(id).value='';});
-    $i('gtinTypeVal').value='control';$i('gtinLotNotify').checked=true;
+    ['gtinCode','gtinName','gtinMfr','gtinAnal','gtinNote','gtinCatalog','gtinIdent','gtinPiUrl'].forEach(function(id){$i(id).value='';});
+    $i('gtinTypeVal').value='control';$i('gtinRisk').value='';$i('gtinLotNotify').checked=true;
   }
   showMo('moGtin');
 }
@@ -1776,7 +1904,12 @@ function saveGtin(){
   if(!name){notify('Vpišite naziv','warn');return;}
   var obj={gtin:gtin,name:name,type:$i('gtinTypeVal').value,manufacturer:$i('gtinMfr').value.trim(),
            analyser:$i('gtinAnal').value.trim(),note:$i('gtinNote').value.trim(),
-           catalog:$i('gtinCatalog').value.trim(),lotNotify:$i('gtinLotNotify').checked};
+           catalog:$i('gtinCatalog').value.trim(),ident:$i('gtinIdent').value.trim(),
+           riskClass:$i('gtinRisk').value,lotNotify:$i('gtinLotNotify').checked};
+  var piUrl=$i('gtinPiUrl').value.trim();
+  var prevForPi=_editGtinIdx!=null?(DB_PREGLED.gtins||[])[_editGtinIdx]:null;
+  obj.piUrl=piUrl;
+  obj.piUpdatedAt=(prevForPi&&prevForPi.piUrl===piUrl)?(prevForPi.piUpdatedAt||''):(piUrl?new Date().toISOString():'');
   if(_editGtinIdx!=null){
     var prev=(DB_PREGLED.gtins||[])[_editGtinIdx];
     if(prev&&prev.type!==obj.type)(DB_PREGLED.inventory||[]).forEach(function(inv){if(inv.gtin===obj.gtin)inv.type=obj.type;});
