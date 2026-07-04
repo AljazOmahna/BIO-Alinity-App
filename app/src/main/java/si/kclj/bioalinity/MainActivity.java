@@ -95,6 +95,7 @@ public class MainActivity extends AppCompatActivity {
         // view.draw() izriše CELOTEN dokument (ne le vidnega pasu) — nujno za
         // pravilen večstranski izris poročil v PDF.
         WebView.enableSlowWholeDocumentDraw();
+        WebView.setWebContentsDebuggingEnabled(true);
         setContentView(R.layout.activity_main);
 
         webView = findViewById(R.id.webView);
