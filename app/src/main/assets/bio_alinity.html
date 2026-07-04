@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="sl">
 <head>
 <meta charset="UTF-8">
@@ -201,6 +201,8 @@ tr.r-28 td{background:rgba(176,120,0,.05)}
 .wizard-dot.done{background:var(--abbott-teal)}
 .wizard-dot.active{background:var(--abbott-blue)}
 .wizard-step{display:none}.wizard-step.active{display:block}
+.panel-btn{padding:5px 13px;border-radius:20px;border:1.5px solid var(--abbott-teal);color:var(--abbott-teal);background:transparent;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s}
+.panel-btn:hover,.panel-btn:active{background:var(--abbott-teal);color:#fff}
 
 .entry-block{background:rgba(0,48,135,.04);border:1px solid var(--border);border-radius:9px;padding:13px;margin-bottom:10px}
 .entry-block-header{font-weight:600;font-size:13px;color:var(--abbott-blue);margin-bottom:9px;
@@ -320,6 +322,7 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
   <div class="hdr-stat"><div class="hdr-stat-num" id="hs-tot">0</div><div class="hdr-stat-lbl">Kos</div></div>
   <div class="hdr-stat"><div class="hdr-stat-num" style="color:var(--red)" id="hs-exp">0</div><div class="hdr-stat-lbl">Exp</div></div>
   <div class="hdr-stat"><div class="hdr-stat-num" style="color:var(--orange)" id="hs-14">0</div><div class="hdr-stat-lbl">14d</div></div>
+  <div class="hdr-sync" id="alertBell" onclick="openAlertModal()" style="position:relative">&#128276;<span id="alertBadge" style="display:none;position:absolute;top:-6px;right:-8px;background:var(--red);color:#fff;border-radius:10px;font-size:10px;padding:1px 5px;font-weight:700"></span></div>
   <div class="hdr-sync" id="syncChip" onclick="openSyncModal()">&#9729; Sync</div>
 </header>
 
@@ -347,9 +350,27 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
     </select>
   </div>
   <div class="card" style="padding:0">
-    <div class="tbl-wrap"><table>
-      <thead><tr><th>Naziv</th><th>Lot</th><th>Rok</th><th>Kos</th><th>Tip</th><th>Prejeto</th></tr></thead>
+    <div style="max-height:44vh;overflow:auto;-webkit-overflow-scrolling:touch;border-radius:10px"><table>
+      <thead style="position:sticky;top:0;background:var(--bg2);z-index:1"><tr><th>Naziv</th><th>Lot</th><th>Rok</th><th title="Prejeto (aktivni kosi)">Prej.</th><th title="Zaloga">Zal.</th><th>Tip</th></tr></thead>
       <tbody id="zalogaBody"></tbody>
+    </table></div>
+  </div>
+
+  <div class="sec-hdr" style="margin-top:14px"><div class="sec-title">&#128683; Poraba</div>
+    <span class="muted" style="font-size:12px">Porabljeni artikli (zaprte seje)</span></div>
+  <div class="card" style="padding:0">
+    <div style="max-height:26vh;overflow:auto;-webkit-overflow-scrolling:touch;border-radius:10px"><table>
+      <thead style="position:sticky;top:0;background:var(--bg2);z-index:1"><tr><th>Naziv</th><th>Lot</th><th>Porabljeno</th><th>Kos</th></tr></thead>
+      <tbody id="consumedBody"></tbody>
+    </table></div>
+  </div>
+
+  <div class="sec-hdr" style="margin-top:14px"><div class="sec-title">&#128230; Prejeto</div>
+    <span class="muted" style="font-size:12px">Podrobnosti prejetih kosov</span></div>
+  <div class="card" style="padding:0">
+    <div style="max-height:30vh;overflow:auto;-webkit-overflow-scrolling:touch;border-radius:10px"><table>
+      <thead style="position:sticky;top:0;background:var(--bg2);z-index:1"><tr><th>Naziv</th><th>Lot</th><th>Rok</th><th>Serial</th><th>RFID</th><th>Sprejeto</th></tr></thead>
+      <tbody id="receivedBody"></tbody>
     </table></div>
   </div>
 </div>
@@ -547,6 +568,7 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
 
   <!-- QC DASHBOARD -->
   <div class="page qc-page active" id="page-dashboard">
+    <div id="dashAlerts"></div>
     <div class="stat-grid">
       <div class="stat-card"><div class="stat-num" id="stat-today">0</div><div class="stat-lbl">QC danes</div></div>
       <div class="stat-card"><div class="stat-num" id="stat-week">0</div><div class="stat-lbl">QC ta teden</div></div>
@@ -578,9 +600,14 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
         <div class="card-title">1. Inštrument in QC materiali</div>
         <div class="frow">
           <div class="fg"><label>Inštrument</label><select id="entryInstr" onchange="populateEntryQcMaterials()"></select></div>
-          <div class="fg"><label>Datum / čas</label><input type="datetime-local" id="entryDateTime"></div>
+          <div class="fg"><label>Datum / čas</label><input type="datetime-local" id="entryDateTime" oninput="qcDateCheck()"></div>
         </div>
-        <div class="fg"><label>QC materiali <button class="btn btn-g btn-sm" style="float:right;margin-top:-4px" onclick="selectAllQcMats(true)">&#10004; Vse</button></label>
+        <div id="qcLateWarn" style="display:none;margin:4px 0 8px;padding:8px 10px;background:#fef3c7;border:1px solid #d97706;border-radius:6px;font-size:12px">
+          <div style="font-weight:700;color:#92400e">&#9888; Naknadni vnos (IVDR/ALCOA+)</div>
+          <div style="color:#78350f;margin-top:2px">Datum je v preteklosti. Realni čas vnosa bo zabeležen ločeno &mdash; ni mogoče antidatirati.</div>
+          <div class="fg" style="margin-top:6px"><label style="font-size:11px">Razlog za naknadni vnos <span style="color:red">*</span></label><textarea id="qcLateReason" rows="2" placeholder="Npr. sistem ni deloval, pozabljeno..."></textarea></div>
+        </div>
+        <div class="fg"><label>QC materiali <button class="btn btn-g btn-sm" style="float:right;margin-top:-4px" onclick="toggleAllQcMats()">&#10004; Vse</button></label>
           <div id="qcMatCheckList" style="display:flex;flex-direction:column;gap:6px"></div></div>
         <div style="text-align:right;margin-top:10px"><button class="btn btn-blue" onclick="wizardNext(0)">Naprej &rarr;</button></div>
       </div>
@@ -595,6 +622,7 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
       <!-- Step 2 -->
       <div class="wizard-step" id="ws2">
         <div class="card-title">3. Preiskave</div>
+        <div id="panelBtnsRow" style="display:none;gap:6px;flex-wrap:wrap;margin-bottom:10px"></div>
         <div id="assayPickWrap"></div>
         <div class="mf" style="border:none;padding:10px 0 0"><button class="btn btn-g" onclick="showWStep(1)">&larr; Nazaj</button><button class="btn btn-blue" onclick="wizardNext(2)">Naprej &rarr;</button></div>
       </div>
@@ -747,7 +775,11 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
 
   <!-- QC MATERIALS -->
   <div class="page qc-page" id="page-qcmaterials">
-    <div class="sec-hdr"><div class="sec-title" style="font-size:16px">QC Materiali</div><button class="btn btn-a" onclick="openQcModal()">+ Nov</button></div>
+    <div class="sec-hdr"><div class="sec-title" style="font-size:16px">QC Materiali</div>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-g btn-sm" onclick="openPanelModal()">&#127760; Paneli</button>
+        <button class="btn btn-a" onclick="openQcModal()">+ Nov</button>
+      </div></div>
     <div class="card" style="padding:0"><div class="tbl-wrap"><table><thead><tr><th>Naziv</th><th>Tip</th><th>Nivoji</th><th>Lot</th><th>Preiskave</th><th></th></tr></thead><tbody id="qcMatBody"></tbody></table></div></div>
   </div>
 
@@ -767,7 +799,7 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
 
   <!-- QC MAINTENANCE -->
   <div class="page qc-page" id="page-maintenance">
-    <div class="sec-hdr"><div class="sec-title" style="font-size:16px">Vzdrževanje</div><button class="btn btn-g btn-sm" onclick="openMaintEdit()">&#9999;&#65039; Uredi opravila</button></div>
+    <div class="sec-hdr"><div class="sec-title" style="font-size:16px">Vzdrževanje</div><span style="display:flex;gap:6px"><button class="btn btn-g btn-sm" onclick="openMaintBack()">&#128340; Vnos za nazaj</button><button class="btn btn-g btn-sm" onclick="openMaintEdit()">&#9999;&#65039; Uredi opravila</button></span></div>
     <div class="tabs" id="maintTypeTabs">
       <div class="tab active" onclick="setMaintType('daily')">Dnevno</div>
       <div class="tab" onclick="setMaintType('weekly')">Tedensko</div>
@@ -1061,14 +1093,38 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
   </div>
 
   <div class="card">
-    <div class="card-title">&#8505;&#65039; O aplikaciji</div>
-    <div style="font-size:13px;line-height:1.9">
-      <div><strong>BIO Alinity App</strong> <span id="aboutVersion">v1.0.0</span></div>
+    <div class="card-title">&#8505;&#65039; O aplikaciji &middot; identifikacija pripomočka (IVDR)</div>
+    <div style="font-size:13px;line-height:1.8">
+      <div><strong>BIO Alinity</strong> <span id="aboutVersion">v1.0.0</span></div>
       <div class="muted" id="aboutBuild">Build: &ndash;</div>
       <div class="muted" id="aboutDevice">Naprava: &ndash;</div>
       <div class="muted" id="aboutStorage">Pomnilnik: &ndash;</div>
-      <div class="muted">Namen: pregled zaloge + QC Abbott Alinity</div>
+      <div style="border-top:1px solid var(--border);margin:10px 0 8px"></div>
+      <div><span class="muted">Proizvajalec (in-house):</span><br><strong id="aboutMfr">&ndash;</strong></div>
+      <div style="margin-top:6px"><span class="muted">UDI-DI (interni identifikator):</span><br><code id="aboutUdi" style="font-size:12px">&ndash;</code></div>
+      <div style="margin-top:6px"><span class="muted">Namen uporabe:</span><br><span id="aboutIntended" style="font-size:12px">&ndash;</span></div>
+      <div style="margin-top:6px"><span class="muted">Kontakt:</span> <span id="aboutContact" style="font-size:12px">&ndash;</span></div>
+      <div id="aboutInhouse" style="margin-top:10px;background:rgba(0,48,135,.06);border:1px solid rgba(0,48,135,.25);border-radius:8px;padding:8px 12px;font-size:12px;line-height:1.5">&#127973; &ndash;</div>
     </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">&#128220; Revizijska sled (ALCOA+)</div>
+    <div class="muted" style="font-size:12px;margin-bottom:10px">Nespremenljiv dnevnik vseh sprememb (vnosi QC, pregledi, operaterji, loti, uradne vrednosti). Skladno z zahtevami celovitosti podatkov (IVDR / ISO 15189).</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+      <select id="auFilterEntity" onchange="renderAuditLog()" style="padding:6px 8px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);font-size:12px">
+        <option value="">Vse entitete</option>
+        <option value="entry">QC vnosi</option>
+        <option value="qcreview">Pregledi QC</option>
+        <option value="operator">Operaterji</option>
+        <option value="lot">Loti</option>
+        <option value="qcvalue">Uradne vrednosti</option>
+      </select>
+      <input type="date" id="auFilterFrom" onchange="renderAuditLog()" style="padding:6px 8px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);font-size:12px">
+      <input type="date" id="auFilterTo" onchange="renderAuditLog()" style="padding:6px 8px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);font-size:12px">
+      <button class="btn btn-g btn-sm" onclick="exportAuditCSV()">&#11015;&#65039; Izvozi CSV</button>
+    </div>
+    <div id="auditLogBody"></div>
   </div>
 </div>
 
@@ -1079,6 +1135,85 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
     <button class="btn btn-a btn-sm" onclick="salusCheckNew()">&#8635; Preveri</button>
   </div>
   <div id="deliveriesBody" style="padding:8px 4px"></div>
+</div>
+
+<!-- ============ REKLAMACIJE ============ -->
+<div class="page-main" id="main-reklamacije">
+  <div class="qc-subnav" id="reklSubnav">
+    <div class="tab active" data-rekl="vpis" onclick="navRekl('vpis')">&#43; Vpis</div>
+    <div class="tab" data-rekl="odprte" onclick="navRekl('odprte')">Odprte</div>
+    <div class="tab" data-rekl="zakljucene" onclick="navRekl('zakljucene')">Zaključene</div>
+    <div class="tab" data-rekl="statistika" onclick="navRekl('statistika')">Statistika</div>
+  </div>
+
+  <!-- REKL VPIS -->
+  <div class="page rekl-page active" id="rekl-vpis">
+    <div class="sec-hdr"><div class="sec-title" style="font-size:16px" id="reklFormTitle">Vpis reklamacije</div></div>
+    <div class="card">
+      <div class="frow">
+        <div class="fg" style="flex:2"><label>Artikel / material *</label><input id="rfArtikel" placeholder="Npr. Multichem S Plus, Alinity c CHOL Reagent..."></div>
+        <div class="fg"><label>Lot / serija *</label><input id="rfLot" placeholder="Npr. 12345A"></div>
+        <div class="fg"><label>Količina</label><input id="rfKolicina" placeholder="Npr. 2×5 mL, 3 kosi"></div>
+      </div>
+      <div class="frow">
+        <div class="fg">
+          <label>Dobavitelj *</label>
+          <select id="rfDobavitelj" onchange="reklDobaviteljChange()">
+            <option value="">— izberi —</option>
+            <option value="Abbott Diagnostics">Abbott Diagnostics</option>
+            <option value="Salus d.o.o.">Salus d.o.o.</option>
+            <option value="BioMérieux">BioMérieux</option>
+            <option value="Roche Diagnostics">Roche Diagnostics</option>
+            <option value="Beckman Coulter">Beckman Coulter</option>
+            <option value="Siemens Healthineers">Siemens Healthineers</option>
+            <option value="_drugo">Drugo...</option>
+          </select>
+        </div>
+        <div class="fg" id="rfDobaviteljWrap" style="display:none"><label>Dobavitelj (prosto)</label><input id="rfDobaviteljFree" placeholder="Ime dobavitelja"></div>
+        <div class="fg"><label>Kontakt dobavitelja</label><input id="rfKontakt" placeholder="Ime, e-pošta ali telefon"></div>
+      </div>
+      <div class="frow">
+        <div class="fg">
+          <label>Razlog reklamacije *</label>
+          <select id="rfRazlog">
+            <option value="">— izberi —</option>
+            <option value="Vrednosti izven meja">Vrednosti izven meja</option>
+            <option value="Poškodba embalaže">Poškodba embalaže</option>
+            <option value="Potekel rok">Potekel rok</option>
+            <option value="Napaka lota/serije">Napaka lota/serije</option>
+            <option value="Ni ustrezal specifikacijam">Ni ustrezal specifikacijam</option>
+            <option value="Drugo">Drugo</option>
+          </select>
+        </div>
+      </div>
+      <div class="fg"><label>Podrobni opis napake *</label><textarea id="rfOpis" rows="3" placeholder="Opišite natančno, kaj je bilo narobe..."></textarea></div>
+      <div class="fg"><label>Interna opomba</label><textarea id="rfOpomba" rows="2" placeholder="Neobvezno — za interno uporabo"></textarea></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px;flex-wrap:wrap">
+        <button class="btn btn-g" id="reklCancelEdit" style="display:none" onclick="reklResetForm()">Prekliči urejanje</button>
+        <button class="btn btn-a" onclick="saveRekl()">&#128190; Shrani reklamacijo</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- REKL ODPRTE -->
+  <div class="page rekl-page" id="rekl-odprte">
+    <div class="sec-hdr"><div class="sec-title" style="font-size:16px">Odprte reklamacije</div></div>
+    <div id="reklOdprteBody" style="padding:4px"></div>
+  </div>
+
+  <!-- REKL ZAKLJUCENE -->
+  <div class="page rekl-page" id="rekl-zakljucene">
+    <div class="sec-hdr"><div class="sec-title" style="font-size:16px">Zaključene reklamacije</div></div>
+    <div class="card">
+      <div class="tbl-wrap"><table><thead><tr><th>Datum</th><th>Artikel</th><th>Lot</th><th>Dobavitelj</th><th>Razlog</th><th>Rešitev</th><th>Zaključil</th><th></th></tr></thead><tbody id="reklZakljBody"></tbody></table></div>
+    </div>
+  </div>
+
+  <!-- REKL STATISTIKA -->
+  <div class="page rekl-page" id="rekl-statistika">
+    <div class="sec-hdr"><div class="sec-title" style="font-size:16px">Statistika reklamacij</div></div>
+    <div id="reklStatBody" style="padding:4px"></div>
+  </div>
 </div>
 
 </main>
@@ -1094,6 +1229,7 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
   <div class="bn-item" data-main="deliveries" onclick="navMain('deliveries')"><div class="bn-icon">&#128666;</div>Dobavnice</div>
   <div class="bn-item" data-main="servis" onclick="navMain('servis')"><div class="bn-icon">&#128295;</div>Servis</div>
   <div class="bn-item" data-main="qc" onclick="navMain('qc')"><div class="bn-icon">&#128202;</div>QC</div>
+  <div class="bn-item" data-main="reklamacije" onclick="navMain('reklamacije')"><div class="bn-icon">&#9888;&#65039;</div>Reklam.</div>
   <div class="bn-item" data-main="vec" onclick="navMain('vec')"><div class="bn-icon">&#9776;</div>Več</div>
 </nav>
 
@@ -1133,6 +1269,25 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
   </div>
 </div>
 
+<!-- PANEL PREISKAV MODAL -->
+<div class="mo" id="panelModal">
+  <div class="modal">
+    <div class="mh"><h3>Paneli preiskav</h3><button class="mc" onclick="closeMo('panelModal')">&#10005;</button></div>
+    <div class="mb">
+      <div id="panelList" style="margin-bottom:14px"></div>
+      <div style="border-top:1px solid var(--border);padding-top:12px">
+        <div class="card-title" style="margin-bottom:8px;font-size:13px" id="panelEditTitle">Nov panel</div>
+        <div class="fg" style="margin-bottom:8px"><label>Ime panela</label><input id="panelName" placeholder="Npr. Dežurstvo"></div>
+        <div class="fg"><label>Preiskave</label><div id="panelAssayList" style="display:flex;flex-direction:column;gap:4px;max-height:200px;overflow-y:auto"></div></div>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn btn-g" onclick="cancelPanelEdit()">Prekliči</button>
+      <button class="btn btn-teal" onclick="savePanelEntry()">&#10003; Shrani</button>
+    </div>
+  </div>
+</div>
+
 <!-- QC MATERIAL MODAL -->
 <div class="mo" id="qcModal">
   <div class="modal">
@@ -1146,6 +1301,7 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
       <div class="frow">
         <div class="fg" id="qcLotField"><label>Ročni lot <span style="font-weight:400;color:var(--text3);font-size:11px">(le brez povezave z zalogo)</span></label><input id="qcLot"></div>
         <div class="fg"><label>Nivoji</label><select id="qcLevels"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option></select></div>
+        <div class="fg"><label>Min. zaloga <span style="font-weight:400;color:var(--text3);font-size:11px">(kos — za opozorilo)</span></label><input type="number" id="qcMinQty" min="0" step="1" placeholder="2"></div>
       </div>
       <div class="fg"><label>Povezava z zalogo (GTIN)</label><div style="font-size:11px;color:var(--text3);margin-bottom:4px">Označi kontrole/kalibratorje iz zaloge, ki pripadajo temu materialu — aplikacija samodejno potegne pravi lot in rok.</div><div id="qcGtinList" style="display:grid;grid-template-columns:1fr;gap:3px;max-height:160px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:6px"></div></div>
       <div class="fg"><label>Preiskave</label><div id="qcAssayList" style="display:grid;grid-template-columns:1fr 1fr;gap:4px;max-height:240px;overflow-y:auto"></div></div>
@@ -1181,12 +1337,18 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
       <button class="mc" onclick="closeMo('qcXmlPrepModal')">&#10005;</button>
     </div>
     <div class="mb" style="padding-top:8px">
-      <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap">
         <input id="qcXmlSearch" type="search" placeholder="Filtriraj preiskave&#8230;"
           style="flex:1;min-width:180px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-size:13px;color:var(--text)"
           oninput="qcXmlFilterChanged()">
-        <span style="font-size:11px;color:var(--text3)">SD&#x2093;&#x2090;&#x161; = &#x2154; &#xD7; SD<sub>mfr</sub> &#xB7; meje = Mean &#xB1; 2&#xB7;SD &#xB7; kliknite SD za popravek</span>
+        <div style="display:flex;align-items:center;gap:10px;font-size:12px;padding:4px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:6px">
+          <span style="color:var(--text3);white-space:nowrap;font-weight:600">SD faktor:</span>
+          <label style="cursor:pointer;display:flex;align-items:center;gap:4px;margin:0"><input type="radio" name="qcxmlf" id="qcXmlF23" onchange="_qcXmlSetFactor(2/3)" checked><span>&#x2154; standard</span></label>
+          <label style="cursor:pointer;display:flex;align-items:center;gap:4px;margin:0;color:var(--orange)"><input type="radio" name="qcxmlf" id="qcXmlF13" onchange="_qcXmlSetFactor(1/3)"><span>&#x2153; tesnejše</span></label>
+        </div>
+        <label style="cursor:pointer;display:flex;align-items:center;gap:6px;font-size:12px;padding:4px 10px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;white-space:nowrap"><input type="checkbox" id="qcXmlOnlyUsed" onchange="_qcXmlToggleOnlyUsed(this.checked)" checked><span>Samo naše preiskave</span></label>
       </div>
+      <div style="margin-bottom:8px"><span id="qcXmlFactorHint" style="font-size:11px;color:var(--text3)">SD&#x2093;&#x2090;&#x161; = &#x2154; &#xD7; SD<sub>mfr</sub> &#xB7; meje = Mean &#xB1; 2&#xB7;SD &#xB7; kliknite SD za popravek</span></div>
       <div id="qcXmlPrepBody"></div>
     </div>
     <div class="mf" id="qcXmlPrepBtns">
@@ -1254,6 +1416,29 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
   </div>
 </div>
 
+<!-- MAINT BACK MODAL (naknadni vnos vzdrževanja za nazaj / mirovanje) -->
+<div class="mo" id="maintBackModal">
+  <div class="modal" style="max-width:520px">
+    <div class="mh"><h3>&#128340; Naknadni vnos vzdrževanja</h3><button class="mc" onclick="closeMo('maintBackModal')">&#10005;</button></div>
+    <div class="mb">
+      <div class="frow">
+        <div class="fg"><label>Inštrument</label><select id="mbInstr" onchange="_maintBackRenderSteps()"></select></div>
+        <div class="fg"><label>Vrsta</label><select id="mbType" onchange="_maintBackRenderSteps()"><option value="daily">Dnevno</option><option value="weekly">Tedensko</option><option value="monthly">Mesečno</option><option value="quarterly">3-mesečno/po potrebi</option></select></div>
+      </div>
+      <div class="frow">
+        <div class="fg"><label>Datum dejanja</label><input type="date" id="mbDate" onchange="_maintBackRenderSteps()"></div>
+        <div class="fg"><label>Način</label><select id="mbMode" onchange="_maintBackRenderSteps()"><option value="done">Opravljeno vzdrževanje</option><option value="idle">💤 Aparat v mirovanju</option></select></div>
+      </div>
+      <div id="mbLateWarn" style="display:none;background:rgba(180,83,9,.08);border:1px solid #b45309;border-radius:7px;padding:8px 12px;margin-bottom:10px;font-size:12px;color:#b45309">⏱️ <strong>Naknadni vnos</strong> — zabeleži se dejanski datum vnosa (danes) in razlog. Antidatiranje ni dovoljeno (IVDR/ALCOA+).</div>
+      <div id="mbStepsWrap" style="margin-bottom:10px"></div>
+      <div class="fg" id="mbReasonWrap" style="display:none"><label>Razlog za naknadni vnos <span style="color:var(--red)">*</span></label><textarea id="mbReason" placeholder="Npr. pozabljen vpis, vneseno naknadno..."></textarea></div>
+      <div class="fg"><label>Opomba / ugotovitve</label><textarea id="mbNote" placeholder="Neobvezno..."></textarea></div>
+      <div class="fg"><label>Matična številka operaterja</label><input type="tel" id="mbOp" maxlength="5" inputmode="numeric" placeholder="5-mestna" oninput="_maintBackOpName()"><div id="mbOpName" style="font-size:12px;font-weight:600;color:var(--abbott-teal);min-height:16px;margin-top:3px"></div></div>
+    </div>
+    <div class="mf"><button class="btn btn-g" onclick="closeMo('maintBackModal')">Prekliči</button><button class="btn btn-teal" onclick="saveMaintBack()">&#10003; Shrani</button></div>
+  </div>
+</div>
+
 <!-- SRV CLOSE MODAL (zaključek vnosa napake z matično) -->
 <div class="mo" id="srvCloseModal">
   <div class="modal" style="max-width:480px">
@@ -1267,6 +1452,42 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
       <div style="text-align:center;margin-top:10px"><button class="btn btn-g btn-sm" onclick="clearSrvPin()">Pobriši</button></div>
     </div>
     <div class="mf"><button class="btn btn-g" onclick="closeMo('srvCloseModal')">Prekliči</button><button class="btn btn-a" onclick="confirmSrvClose()">&#9989; Potrdi zaključek</button></div>
+  </div>
+</div>
+
+<!-- ALERT CENTER MODAL -->
+<div class="mo" id="alertModal">
+  <div class="modal" style="max-width:640px">
+    <div class="mh"><h3>&#128276; Opozorila</h3><button class="mc" onclick="closeMo('alertModal')">&#10005;</button></div>
+    <div class="mb">
+      <div id="alertModalBody" style="display:flex;flex-direction:column;gap:8px;max-height:60vh;overflow-y:auto"></div>
+    </div>
+    <div class="mf"><span class="muted" style="font-size:11px;margin-right:auto">Opozorila se izračunajo samodejno iz podatkov. „Utišaj" skrije opozorilo za 7 dni.</span><button class="btn btn-blue" onclick="closeMo('alertModal')">Zapri</button></div>
+  </div>
+</div>
+
+<!-- REKLAMACIJA ZAKLJUČI MODAL -->
+<div class="mo" id="reklCloseModal">
+  <div class="modal" style="max-width:480px">
+    <div class="mh"><h3>&#9989; Zaključi reklamacijo</h3><button class="mc" onclick="closeMo('reklCloseModal')">&#10005;</button></div>
+    <div class="mb">
+      <div id="reklCloseSummary" style="margin-bottom:12px;padding:10px;background:var(--bg2);border-radius:8px;font-size:13px"></div>
+      <div class="fg"><label>Rešitev *</label>
+        <select id="reklCloseResitev">
+          <option value="">— izberi —</option>
+          <option value="zamenjava">Zamenjava artikla</option>
+          <option value="dobropis">Dobropis / povračilo</option>
+          <option value="drugo">Drugo</option>
+        </select>
+      </div>
+      <div class="fg"><label>Opomba ob zaključku</label><textarea id="reklCloseOpomba" rows="2" placeholder="Npr. dobavitelj poslal nov lot, rok za dobropis 30 dni..."></textarea></div>
+      <div style="font-size:13px;font-weight:600;color:var(--abbott-blue);text-align:center;margin:12px 0 6px">Matična številka za potrditev</div>
+      <div class="pin-display"><div class="pin-dot" id="rpd0"></div><div class="pin-dot" id="rpd1"></div><div class="pin-dot" id="rpd2"></div><div class="pin-dot" id="rpd3"></div><div class="pin-dot" id="rpd4"></div></div>
+      <div id="reklPinName" style="text-align:center;font-size:13px;font-weight:600;color:var(--abbott-teal);min-height:20px;margin-bottom:10px"></div>
+      <div class="pin-grid" id="reklPinGrid"></div>
+      <div style="text-align:center;margin-top:10px"><button class="btn btn-g btn-sm" onclick="clearReklPin()">Pobriši</button></div>
+    </div>
+    <div class="mf"><button class="btn btn-g" onclick="closeMo('reklCloseModal')">Prekliči</button><button class="btn btn-a" onclick="confirmReklClose()">&#9989; Zaključi reklamacijo</button></div>
   </div>
 </div>
 
@@ -1289,12 +1510,12 @@ body.dark .hdr,body.dark .bottom-nav{background:#0d1829}
         </select>
       </div>
       <div id="meList" style="display:flex;flex-direction:column;gap:6px;max-height:46vh;overflow-y:auto"></div>
-      <div style="display:flex;gap:8px;margin-top:12px">
-        <input id="meNewText" placeholder="Novo opravilo..." style="flex:1">
-        <button class="btn btn-teal btn-sm" onclick="maintEditAdd()">+ Dodaj</button>
-      </div>
-      <div class="muted" style="font-size:11px;margin-top:8px">Spremembe veljajo za vse analizatorje izbrane vrste (c/i). Zapisani podpisi v dnevniku ostanejo nespremenjeni.</div>
     </div>
+    <div style="padding:10px 18px 0;display:flex;gap:8px;flex-shrink:0">
+      <input id="meNewText" placeholder="Novo opravilo..." style="flex:1">
+      <button class="btn btn-teal btn-sm" onclick="maintEditAdd()">+ Dodaj</button>
+    </div>
+    <div class="muted" style="font-size:11px;padding:6px 18px 0;flex-shrink:0">Spremembe veljajo za vse analizatorje izbrane vrste (c/i). Zapisani podpisi v dnevniku ostanejo nespremenjeni.</div>
     <div class="mf">
       <button class="btn btn-d btn-sm" onclick="maintEditRestore()">&#8634; Povrni privzeto</button>
       <button class="btn btn-blue" onclick="closeMo('maintEditModal');renderMaintContent()">Zapri</button>
@@ -1379,6 +1600,8 @@ function navMain(tab){
   if(tab==='narocila') navOrd(currentOrd||'prepare');
   if(tab==='servis') navSrv(currentSrv||'entry');
   if(tab==='deliveries') renderDeliveries();
+  if(tab==='reklamacije') navRekl(currentRekl||'vpis');
+  try{renderAlertUI();}catch(e){}
 }
 
 /* ============ QC SUB-NAVIGATION ============ */
@@ -1487,16 +1710,55 @@ function renderZaloga(){
     if(da===null) return 1;if(db===null) return -1;return da-db;
   });
   const body=$i('zalogaBody');
-  if(!items.length){body.innerHTML='<tr><td colspan="6" class="empty">Ni artiklov. Sinhronizirajte z Zebro (OneDrive) ali uvozite pregledBK_db.</td></tr>';return;}
+  if(!items.length){body.innerHTML='<tr><td colspan="6" class="empty">Ni artiklov. Sinhronizirajte z Zebro (OneDrive) ali uvozite pregledBK_db.</td></tr>';renderPoraba();renderPrejeto();return;}
   body.innerHTML=items.map((it,idx)=>{
     const dl=daysLeft(it.expiry);
+    const recCnt=(DB_PREGLED.received||[]).filter(r=>r.gtin===it.gtin&&r.lot===it.lot&&r.status==='active').length;
     return '<tr class="'+expiryClass(dl)+'" onclick="showItemDetail('+DB_PREGLED.inventory.indexOf(it)+')" style="cursor:pointer">'+
       '<td><strong>'+(it.name||'&ndash;')+'</strong><div class="gtin">'+(it.gtin||'')+'</div></td>'+
       '<td><span class="lot-n">'+(it.lot||'&ndash;')+'</span></td>'+
       '<td>'+fmtExp(it.expiry)+'<br>'+expiryBadge(dl)+'</td>'+
-      '<td><strong>'+(it.qty||0)+'</strong></td>'+
+      '<td style="font-family:var(--mono);font-weight:700;color:var(--accent)">'+recCnt+'</td>'+
+      '<td style="font-family:var(--mono);font-weight:700;color:'+((it.qty||0)>0?'var(--green)':'var(--text3)')+'">'+(it.qty||0)+'</td>'+
       '<td><span class="badge '+(TYPE_BADGE[it.type]||'b-gray')+'">'+(TYPE_LABELS[it.type]||it.type||'&ndash;')+'</span></td>'+
-      '<td style="font-size:11px" class="muted">'+(it.received?new Date(it.received).toLocaleDateString('sl-SI'):'&ndash;')+'</td>'+
+    '</tr>';
+  }).join('');
+  renderPoraba();renderPrejeto();
+}
+
+/* Poraba (read-only): porabljeni artikli iz zaprtih sej (DB_PREGLED.consumed) */
+function renderPoraba(){
+  const tb=$i('consumedBody');if(!tb)return;
+  const items=(DB_PREGLED.consumed||[]).filter(c=>!c.restoredAt);
+  if(!items.length){tb.innerHTML='<tr><td colspan="4" class="empty">Ni porabljenih artiklov.</td></tr>';return;}
+  tb.innerHTML=items.slice().reverse().map(c=>{
+    const ca=c.consumedAt||'';
+    return '<tr>'+
+      '<td><strong>'+(c.name||'&ndash;')+'</strong><div class="muted" style="font-size:9px">'+(TYPE_LABELS[c.type]||c.type||'')+'</div></td>'+
+      '<td><span class="lot-n">'+(c.lot||'&ndash;')+'</span></td>'+
+      '<td style="font-size:10px;white-space:nowrap">'+(ca?ca.slice(0,16).replace('T',' '):'&ndash;')+'</td>'+
+      '<td style="font-family:var(--mono);font-weight:700">'+(c.qty||1)+'</td>'+
+    '</tr>';
+  }).join('');
+}
+
+/* Prejeto (read-only): podrobnosti prejetih kosov (DB_PREGLED.received) */
+function renderPrejeto(){
+  const tb=$i('receivedBody');if(!tb)return;
+  const items=(DB_PREGLED.received||[]).filter(r=>r.status==='active');
+  if(!items.length){tb.innerHTML='<tr><td colspan="6" class="empty">Ni prejetih artiklov.</td></tr>';return;}
+  items.sort((a,b)=>(b.receivedAt||'').localeCompare(a.receivedAt||''));
+  tb.innerHTML=items.map(r=>{
+    const dl=daysLeft(r.expiry);
+    const rfidShort=r.rfidEpc?r.rfidEpc.slice(0,8)+'…':'&ndash;';
+    const srcLine=[r.supplier,r.delivery].filter(x=>x).join(' · ');
+    return '<tr>'+
+      '<td><strong style="font-size:11px">'+(r.name||'&ndash;')+'</strong><div class="gtin">'+(r.gtin||'')+'</div>'+(srcLine?'<div class="muted" style="font-size:9px">'+srcLine+'</div>':'')+'</td>'+
+      '<td><span class="lot-n">'+(r.lot||'&ndash;')+'</span></td>'+
+      '<td style="font-size:10px;white-space:nowrap" class="'+expiryClass(dl)+'">'+fmtExp(r.expiry)+'</td>'+
+      '<td><span class="lot-n">'+(r.serial||'&ndash;')+'</span></td>'+
+      '<td style="font-size:9px;font-family:var(--mono);color:var(--text3)" title="'+(r.rfidEpc||'')+'">'+rfidShort+'</td>'+
+      '<td style="font-size:10px;color:var(--text3);white-space:nowrap">'+(r.receivedAt?r.receivedAt.slice(0,16).replace('T',' '):'&ndash;')+'</td>'+
     '</tr>';
   }).join('');
 }
@@ -1745,7 +2007,139 @@ const BUILTIN_GTINS = [
   {gtin:'05391523440752',name:'Multichem U',type:'control',manufacturer:'Technopath',analyser:'Alinity c',note:'Urin'},
   {gtin:'05055273217025',name:'HIL (Randox)',type:'control',manufacturer:'Randox',analyser:'Alinity c',note:'Hemoliza/Ikterija/Lipemija'},
   {gtin:'05055273203783',name:'HUM ASY L2 (Randox)',type:'control',manufacturer:'Randox',analyser:'Alinity i',note:''},
-  {gtin:'05055273203608',name:'HUM ASY L3 (Randox)',type:'control',manufacturer:'Randox',analyser:'Alinity i',note:''}
+  {gtin:'05055273203608',name:'HUM ASY L3 (Randox)',type:'control',manufacturer:'Randox',analyser:'Alinity i',note:''},
+  {gtin:'00380740151133',name:'BAFFLE, WASH CUP',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740152789',name:'LEVEL SENSOR, DILUTED WASH BUFFER',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740136420',name:'MAINTENANCE SOL10x68,4ML',type:'reagent-bio',manufacturer:'Abbott',analyser:'Alinity c',note:'Topla veriga'},
+  {gtin:'00380740155711',name:'A-ALT2 3120TA',type:'reagent-bio',manufacturer:'Abbott',analyser:'Alinity c',note:'Hladna veriga'},
+  {gtin:'00380740158064',name:'A-AST2 3120TA',type:'reagent-bio',manufacturer:'Abbott',analyser:'Alinity c',note:'Hladna veriga'},
+  {gtin:'00380740167585',name:'TTL BILIRUBIN2 3600T',type:'reagent-bio',manufacturer:'Abbott',analyser:'Alinity c',note:'Hladna veriga'},
+  {gtin:'00380740135577',name:'DIRECT BILIRUBIN 1440T',type:'reagent-bio',manufacturer:'Abbott',analyser:'Alinity c',note:'Hladna veriga'},
+  {gtin:'00380740155650',name:'PHOSPHORUS2 2800t',type:'reagent-bio',manufacturer:'Abbott',analyser:'Alinity c',note:'Hladna veriga'},
+  {gtin:'00380740155315',name:'GGT2 KIT 2100T',type:'reagent-bio',manufacturer:'Abbott',analyser:'Alinity c',note:'Hladna veriga'},
+  {gtin:'00380740135454',name:'GLUCOSE 11000T',type:'reagent-bio',manufacturer:'Abbott',analyser:'Alinity c',note:'Hladna veriga'},
+  {gtin:'00380740129996',name:'ULTRA HDL 3500T',type:'reagent-bio',manufacturer:'Abbott',analyser:'Alinity c',note:'Hladna veriga'},
+  {gtin:'00380740158125',name:'CHOLESTEROL2 RGT 3200T',type:'reagent-bio',manufacturer:'Abbott',analyser:'Alinity c',note:'Hladna veriga'},
+  {gtin:'00380740155339',name:'LDH2 2000T',type:'reagent-bio',manufacturer:'Abbott',analyser:'Alinity c',note:'Hladna veriga'},
+  {gtin:'00380740129972',name:'DIRECT LDL 580T',type:'reagent-bio',manufacturer:'Abbott',analyser:'Alinity c',note:'Hladna veriga'},
+  {gtin:'00380740180713',name:'LIPASE2 RGT',type:'reagent-bio',manufacturer:'Abbott',analyser:'Alinity c',note:'Hladna veriga'},
+  {gtin:'00380740176532',name:'MAGNESIUM RGT 3600T',type:'reagent-bio',manufacturer:'Abbott',analyser:'Alinity c',note:'Hladna veriga'},
+  {gtin:'00380740158071',name:'TRIG2 KIT 1400T',type:'reagent-bio',manufacturer:'Abbott',analyser:'Alinity c',note:'Hladna veriga'},
+  {gtin:'00380740158743',name:'URIC ACID2 RGT 2000T',type:'reagent-bio',manufacturer:'Abbott',analyser:'Alinity c',note:'Hladna veriga'},
+  {gtin:'00380740168285',name:'IRON2 900T',type:'reagent-bio',manufacturer:'Abbott',analyser:'Alinity c',note:'Hladna veriga'},
+  {gtin:'00380740121679',name:'UREA NITROGEN 13000T',type:'reagent-bio',manufacturer:'Abbott',analyser:'Alinity c',note:'Hladna veriga'},
+  {gtin:'00380740158286',name:'ALK PHOS2 5900T',type:'reagent-bio',manufacturer:'Abbott',analyser:'Alinity c',note:'Hladna veriga'},
+  {gtin:'00380740155612',name:'AMYLASE2 KIT 640T',type:'reagent-bio',manufacturer:'Abbott',analyser:'Alinity c',note:'Hladna veriga'},
+  {gtin:'00380740121594',name:'CARBON DIOXIDE 3000T',type:'reagent-bio',manufacturer:'Abbott',analyser:'Alinity c',note:'Hladna veriga'},
+  {gtin:'00380740132590',name:'CREATINE KINASE 1200T',type:'reagent-bio',manufacturer:'Abbott',analyser:'Alinity c',note:'Hladna veriga'},
+  {gtin:'00380740130107',name:'CRP VARIO 3500T',type:'reagent-bio',manufacturer:'Abbott',analyser:'Alinity c',note:'Hladna veriga'},
+  {gtin:'00380740136178',name:'CREATININE ENZYM 3600T',type:'reagent-bio',manufacturer:'Abbott',analyser:'Alinity c',note:'Hladna veriga'},
+  {gtin:'00380740121891',name:'C UIBC 300T',type:'reagent-bio',manufacturer:'Abbott',analyser:'Alinity c',note:'Hladna veriga'},
+  {gtin:'00380740135539',name:'BILIRUBIN CAL',type:'calibrator',manufacturer:'Abbott',analyser:'Alinity c',note:'Hladna veriga'},
+  {gtin:'00380740121686',name:'ICT SAMPLE DILUENT',type:'reagent-bio',manufacturer:'Abbott',analyser:'Alinity c',note:'Topla veriga'},
+  {gtin:'00380740137892',name:'ACID WASH',type:'reagent-bio',manufacturer:'Abbott',analyser:'Alinity c',note:'Topla veriga'},
+  {gtin:'00380740137908',name:'ALKALINE WASH',type:'reagent-bio',manufacturer:'Abbott',analyser:'Alinity c',note:'Topla veriga'},
+  {gtin:'00380740130220',name:'DETERGENT A 10X113ML',type:'reagent-bio',manufacturer:'Abbott',analyser:'Alinity c',note:'Topla veriga'},
+  {gtin:'00380740165710',name:'DETERGENT B 10x113ML',type:'reagent-bio',manufacturer:'Abbott',analyser:'Alinity c',note:'Topla veriga'},
+  {gtin:'00380740131685',name:'ACID PROBE WASH 10x113ML',type:'reagent-bio',manufacturer:'Abbott',analyser:'Alinity c',note:'Topla veriga'},
+  {gtin:'04030539077279',name:'FIZIOL RAZT 0.9% IZP BRAUN 1000mL',type:'reagent-bio',manufacturer:'Abbott',analyser:'Alinity c',note:'Topla veriga'},
+  {gtin:'00380740137922',name:'ICT MODULE',type:'reagent-bio',manufacturer:'Abbott',analyser:'Alinity c',note:'Topla veriga'},
+  {gtin:'00380740135409',name:'CALCIUM 15000T',type:'reagent-bio',manufacturer:'Abbott',analyser:'Alinity c',note:'Topla veriga'},
+  {gtin:'00380740155278',name:'TOTAL PROT2 KIT 3120T',type:'reagent-bio',manufacturer:'Abbott',analyser:'Alinity c',note:'Topla veriga'},
+  {gtin:'00380740136512',name:'REFERENCE SOLUTION',type:'reagent-bio',manufacturer:'Abbott',analyser:'Alinity c',note:'Topla veriga'},
+  {gtin:'00380740135317',name:'URINE/CSF PROT 2500T',type:'reagent-bio',manufacturer:'Abbott',analyser:'Alinity c',note:'Topla veriga'},
+  {gtin:'00380740155353',name:'ALBUMIN BCG2 3120t',type:'reagent-bio',manufacturer:'Abbott',analyser:'Alinity c',note:'Topla veriga'},
+  {gtin:'00380740158460',name:'ALNTY C RGT CARTRIDGE CLR',type:'reagent-bio',manufacturer:'Abbott',analyser:'Alinity c',note:'Topla veriga'},
+  {gtin:'00380740213350',name:'GLP RCPS SML',type:'consumable',manufacturer:'Abbott',analyser:'',note:'GLP'},
+  {gtin:'00380740213367',name:'GLP RCPS LRG',type:'consumable',manufacturer:'Abbott',analyser:'',note:'GLP'},
+  {gtin:'00380740186722',name:'GLP DCPPER DSPSBLE BAGS',type:'consumable',manufacturer:'Abbott',analyser:'',note:'GLP'},
+  {gtin:'07630032623422',name:'GLP PIP TIPS',type:'consumable',manufacturer:'Abbott',analyser:'',note:'GLP'},
+  {gtin:'00380740197575',name:'GLP SEC TUB PUSH',type:'consumable',manufacturer:'Abbott',analyser:'',note:'GLP'},
+  {gtin:'00380740186876',name:'GLP ALIQT LABEL',type:'consumable',manufacturer:'Abbott',analyser:'',note:'GLP'},
+  {gtin:'00380740186883',name:'GLP ALQT DISP BAG',type:'consumable',manufacturer:'Abbott',analyser:'',note:'GLP'},
+  {gtin:'00380740196721',name:'GLP CONT CLK-LID',type:'consumable',manufacturer:'Abbott',analyser:'',note:'GLP'},
+  {gtin:'00380740196714',name:'GLP DISP CONT 30L',type:'consumable',manufacturer:'Abbott',analyser:'',note:'GLP'},
+  {gtin:'00380740131487',name:'FERRITIN 1200T',type:'reagent-imuno',manufacturer:'Abbott',analyser:'Alinity i',note:'Hladna veriga'},
+  {gtin:'00380740121501',name:'TOTAL B-HCG 200T',type:'reagent-imuno',manufacturer:'Abbott',analyser:'Alinity i',note:'Hladna veriga'},
+  {gtin:'00380740174903',name:'STAT MYOGLOBIN 200T',type:'reagent-imuno',manufacturer:'Abbott',analyser:'Alinity i',note:'Hladna veriga'},
+  {gtin:'05055845400435',name:'NT PROBNP 200T',type:'reagent-imuno',manufacturer:'Abbott',analyser:'Alinity i',note:'Hladna veriga'},
+  {gtin:'00380740160647',name:'TROPONIN 1200T',type:'reagent-imuno',manufacturer:'Abbott',analyser:'Alinity i',note:'Hladna veriga'},
+  {gtin:'00380740153984',name:'BRAHMS PCT 1000T',type:'reagent-imuno',manufacturer:'Abbott',analyser:'Alinity i',note:'Hladna veriga'},
+  {gtin:'00380740136529',name:'PROBE CONDITIONER',type:'reagent-imuno',manufacturer:'Abbott',analyser:'Alinity i',note:'Hladna veriga'},
+  {gtin:'00380740175214',name:'STAT CK MB 200T',type:'reagent-imuno',manufacturer:'Abbott',analyser:'Alinity i',note:'Hladna veriga'},
+  {gtin:'00380740194291',name:'UCH-L1 RGT 4W1920 200T',type:'reagent-imuno',manufacturer:'Abbott',analyser:'Alinity i',note:'Hladna veriga'},
+  {gtin:'00380740194277',name:'GFAP RGT 41720 200T',type:'reagent-imuno',manufacturer:'Abbott',analyser:'Alinity i',note:'Hladna veriga'},
+  {gtin:'00380740131678',name:'MULTI-ASSAY MAN DIL',type:'reagent-imuno',manufacturer:'Abbott',analyser:'Alinity i',note:'Topla veriga'},
+  {gtin:'00380740121143',name:'CONC WASH BUFFER 2X2L',type:'reagent-imuno',manufacturer:'Abbott',analyser:'Alinity i',note:'Topla veriga'},
+  {gtin:'00380740157173',name:'PRE-TRIGGER 4X975ML',type:'reagent-imuno',manufacturer:'Abbott',analyser:'Alinity i',note:'Topla veriga'},
+  {gtin:'00380740157166',name:'TRIGGER 4X975ML',type:'reagent-imuno',manufacturer:'Abbott',analyser:'Alinity i',note:'Topla veriga'},
+  {gtin:'00380740129026',name:'REACTION VESSELS',type:'reagent-imuno',manufacturer:'Abbott',analyser:'Alinity i',note:'Topla veriga'},
+  {gtin:'00380740132705',name:'REAGENT REPLACEMENT CAPS',type:'reagent-imuno',manufacturer:'Abbott',analyser:'Alinity i',note:'Topla veriga'},
+  {gtin:'00380740132699',name:'CAL CONTROL REPLACEMENT CAPS',type:'calibrator',manufacturer:'Abbott',analyser:'Alinity i',note:'Topla veriga'},
+  {gtin:'00380740156824',name:'ALNTY I MAIN CLEAN CART 2x',type:'reagent-imuno',manufacturer:'Abbott',analyser:'Alinity i',note:'Topla veriga'},
+  {gtin:'00380740137991',name:'1 ML SYRINGE',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740188146',name:'CHARGELANE SLAVE',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740137618',name:'CUVETTE DRY TIP',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740137564',name:'CUVETTE SEGMENT',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740156831',name:'DIAGNOSTICS KIT',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740137823',name:'EXTERNAL WASTE PUMP',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740137755',name:'FILTER PROCESSING CENTER',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740155551',name:'FIREWALL',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740137854',name:'HAND HELD BARCODE SCANNER',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740138424',name:'HIGH CONCENTRATION WASTE BOTTLE',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740137946',name:'ICT CHECK VALVE',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740138042',name:'ICT PROBE',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740188719',name:'LEVEL SENSOR, BULK SOLUTION',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740187279',name:'MAINTENANCE CLEANING CARTRIDGE',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740192648',name:'MIXER',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740137434',name:'MONITOR',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740175573',name:'ONBOARD VIAL RACK',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740137441',name:'PIPETTOR PROBE',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740150488',name:'PROBE TUBING WASH ZONE',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740137694',name:'PROBE TUBING WASTE ASPIRATE',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740137571',name:'REAGENT PROBE',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740137632',name:'REAGENT PROBE SCREW',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740137588',name:'REAGENT PROBE TUBING',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740138028',name:'REAGENT SYRINGE O-RING',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740193218',name:'REAGENT SYRINGE SEAL TIP #1',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740137984',name:'REAGENT SYRINGE SEAL TIP #2',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740138011',name:'SAMPLE AND WASH SOLUTION SYRINGE O-RING',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740193201',name:'SAMPLE AND WASH SOLUTION SYRINGE SEAL TIP #1',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740137960',name:'SAMPLE AND WASH SOLUTION SYRINGE SEAL TIP #2',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740137601',name:'SAMPLE PROBE',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740137625',name:'SAMPLE PROBE SCREW',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740138714',name:'SAMPLE PROBE TUBING',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740137847',name:'SAMPLE WASH SOLUTION HOLDER',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740112363',name:'SECONDARY TUBES (SCREW)',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740117528',name:'SECTION 20 HL',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740112417',name:'SECTION 20 HL HOOD',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740112400',name:'SECTION 80 HOOD',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740137878',name:'SH BARCODE TOOL',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740138004',name:'SOURCE LAMP',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740175566',name:'VIAL RACK',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740137939',name:'WASH SOLUTION CHECK VALVE',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740137885',name:'WASH ZONE PROBES',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740093174',name:'RFID TAG ROLL (2,200 TAGS)',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740117511',name:'GLP RASPBERRY PI 4B',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740112554',name:'GLP ACCESS PT L',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740112585',name:'GLP CAR III USEAL',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740139386',name:'GLP CHARGE LANE M',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740112479',name:'GLP CROSS SWITCH',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740113209',name:'GLP GRPFIN KT SLM',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740112561',name:'GLP ACCESS PT R',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740112547',name:'GLP ACCESS PT C',type:'consumable',manufacturer:'Abbott',analyser:'',note:'Potrošni material'},
+  {gtin:'00380740135522',name:'GENTAMICIN 200T',type:'reagent-bio',manufacturer:'Abbott',analyser:'Alinity c',note:'Specialne preiskave'},
+  {gtin:'00380740135348',name:'VANCOMYCIN 400T',type:'reagent-bio',manufacturer:'Abbott',analyser:'Alinity c',note:'Specialne preiskave'},
+  {gtin:'00380740135324',name:'DIGOXIN 800T',type:'reagent-bio',manufacturer:'Abbott',analyser:'Alinity c',note:'Specialne preiskave'},
+  {gtin:'00380740154127',name:'THEOPHYLLINE 200T',type:'reagent-bio',manufacturer:'Abbott',analyser:'Alinity c',note:'Specialne preiskave'},
+  {gtin:'00380740158408',name:'LACTIC ACID2 400T',type:'reagent-bio',manufacturer:'Abbott',analyser:'Alinity c',note:'Specialne preiskave'},
+  {gtin:'00380740135386',name:'ETHANOL 200T',type:'reagent-bio',manufacturer:'Abbott',analyser:'Alinity c',note:'Specialne preiskave'},
+  {gtin:'00380740190781',name:'MICROALBUMIN 640T',type:'reagent-bio',manufacturer:'Abbott',analyser:'Alinity c',note:'Specialne preiskave'},
+  {gtin:'00380740214142',name:'DIRECT BILIRUBIN 1440T',type:'reagent-bio',manufacturer:'Abbott',analyser:'Alinity c',note:'Hladna veriga'},
+  {gtin:'00380740154028',name:'METHOTREXATE CAL',type:'calibrator',manufacturer:'Abbott Diagnostics',analyser:'Alinity i',note:''},
+  {gtin:'00380740154035',name:'METHOTREXATE CTL',type:'control',manufacturer:'Abbott Diagnostics',analyser:'Alinity i',note:''},
+  {gtin:'00380740154257',name:'METHOTREXATE XR CTL',type:'control',manufacturer:'Abbott Diagnostics',analyser:'Alinity i',note:''},
+  {gtin:'00380740154042',name:'METHOTREXATE 200T',type:'reagent-imuno',manufacturer:'Abbott',analyser:'Alinity i',note:'Hladna veriga'},,
 ];
 var _editGtinIdx=null;
 function calcGtinCheck(base13){
@@ -2068,6 +2462,15 @@ function defaultQcMaterials(){return [
   {name:'Pool QC',type:'pool',levels:1,lot:'',gtins:[],assays:[]},
 ];}
 
+/* IVDR / ISO 15189 — identifikacija pripomočka (in-house, čl. 5(5) Uredbe (EU) 2017/746) */
+const IVDR_INFO={
+  deviceName:'BIO Alinity',
+  legalManufacturer:'UKC Ljubljana — 24-urni laboratorij',
+  intendedUse:'Programska podpora notranji kontroli kakovosti (QC) in vodenju zaloge reagentov/kontrol na analizatorjih Abbott Alinity. Za profesionalno uporabo s strani usposobljenega laboratorijskega osebja.',
+  inHouse:'In-house pripomoček, izdelan in uporabljen znotraj zdravstvene ustanove (čl. 5(5) Uredbe (EU) 2017/746). Ni namenjen prodaji ali dajanju na trg.',
+  udiDi:'INT-SI-KCLJ-BIOALINITY',
+  contact:'Oddelek za laboratorijsko diagnostiko, UKC Ljubljana'
+};
 let S = { assays:[], qcMaterials:[], operators:[], entries:[], currentAssayTab:'biochem',
   editingAssayIdx:null, editingQcIdx:null, editingOpIdx:null, wiz:{}, pinValue:'',
   ljRules:{'1_2s':true,'1_3s':true,'2_2s':true,'R_4s':true,'4_1s':true,'10_x':true},
@@ -2079,6 +2482,9 @@ function initState(){
   if(!S.serviceLog)S.serviceLog=[];
   if(!S.deliveries)S.deliveries=[];
   if(!S.qcReviews)S.qcReviews=[];
+  if(!S.reklamacije)S.reklamacije=[];
+  if(!S.alertMute)S.alertMute={};
+  if(!S.auditLog)S.auditLog=[];
   if(!S.notifications)S.notifications=[];
   if(!S.reports)S.reports=[];
   if(!S.pendingReports)S.pendingReports=[];
@@ -2097,29 +2503,57 @@ function initState(){
   if(!S.qcAssayMap)S.qcAssayMap={};
   if(!S.qcUnitMap)S.qcUnitMap={};
   if(!S.qcOverrides)S.qcOverrides={};
+  if(!S.qcPanels)S.qcPanels=[];
   if(!S.operators.length) S.operators=DEFAULT_OPERATORS;
 }
 /* Idempotentna nadgradnja QC materialov na shemo z GTIN povezavo + ločenima GFAP/UCHL + Multichem U/Myo.
    Ne briše uporabniških dodatkov; ne dira S.entries (zgodovinski qcName ostane). */
 function migrateQcMaterials(){
-  if(S.qcMatSchema>=2)return;
   const byName=n=>S.qcMaterials.find(q=>q.name===n);
-  S.qcMaterials.forEach(q=>{if(!Array.isArray(q.gtins))q.gtins=[];});
-  const sPlus=byName('Multichem S Plus');if(sPlus){sPlus.levels=3;sPlus.gtins=[QC_GTINS.sPlusL1,QC_GTINS.sPlusL2,QC_GTINS.sPlusL3];}
-  const ia=byName('Multichem IA');if(ia&&!ia.gtins.length)ia.gtins=[QC_GTINS.ia];
-  const pct=byName('Abbott PCT single QC');if(pct&&!pct.gtins.length)pct.gtins=[QC_GTINS.pct];
-  /* razdeli kombinirani GFAP/UCHL na ločena materiala */
-  const combo=byName('Abbott GFAP/UCHL single QC');
-  if(combo){const i=S.qcMaterials.indexOf(combo);
-    const repl=[{name:'GFAP single QC',type:'single',levels:2,lot:combo.lot||'',gtins:[QC_GTINS.gfap],assays:['GFAP']},
-                {name:'UCH-L1 single QC',type:'single',levels:2,lot:'',gtins:[QC_GTINS.uchl],assays:['UCHL']}];
-    S.qcMaterials.splice(i,1,...repl);}
-  else{const g=byName('GFAP single QC');if(g&&!g.gtins.length)g.gtins=[QC_GTINS.gfap];const u=byName('UCH-L1 single QC');if(u&&!u.gtins.length)u.gtins=[QC_GTINS.uchl];}
-  if(!byName('Multichem U'))S.qcMaterials.push({name:'Multichem U',type:'biochem',levels:2,lot:'',gtins:[QC_GTINS.mU],assays:['U-Albumin','U/CSF Proteini']});
-  if(!byName('Myo single QC'))S.qcMaterials.push({name:'Myo single QC',type:'single',levels:2,lot:'',gtins:[],assays:['Mioglobin']});
-  S.qcMatSchema=2;save();
+  if(S.qcMatSchema<2){
+    S.qcMaterials.forEach(q=>{if(!Array.isArray(q.gtins))q.gtins=[];});
+    const sPlus=byName('Multichem S Plus');if(sPlus){sPlus.levels=3;sPlus.gtins=[QC_GTINS.sPlusL1,QC_GTINS.sPlusL2,QC_GTINS.sPlusL3];}
+    const ia=byName('Multichem IA');if(ia&&!ia.gtins.length)ia.gtins=[QC_GTINS.ia];
+    const pct=byName('Abbott PCT single QC');if(pct&&!pct.gtins.length)pct.gtins=[QC_GTINS.pct];
+    const combo=byName('Abbott GFAP/UCHL single QC');
+    if(combo){const i=S.qcMaterials.indexOf(combo);
+      const repl=[{name:'GFAP single QC',type:'single',levels:2,lot:combo.lot||'',gtins:[QC_GTINS.gfap],assays:['GFAP']},
+                  {name:'UCH-L1 single QC',type:'single',levels:2,lot:'',gtins:[QC_GTINS.uchl],assays:['UCHL']}];
+      S.qcMaterials.splice(i,1,...repl);}
+    else{const g=byName('GFAP single QC');if(g&&!g.gtins.length)g.gtins=[QC_GTINS.gfap];const u=byName('UCH-L1 single QC');if(u&&!u.gtins.length)u.gtins=[QC_GTINS.uchl];}
+    if(!byName('Multichem U'))S.qcMaterials.push({name:'Multichem U',type:'biochem',levels:2,lot:'',gtins:[QC_GTINS.mU],assays:['U-Albumin','U/CSF Proteini']});
+    if(!byName('Myo single QC'))S.qcMaterials.push({name:'Myo single QC',type:'single',levels:2,lot:'',gtins:[],assays:['Mioglobin']});
+    S.qcMatSchema=2;save();
+  }
+  if(S.qcMatSchema<3){
+    /* prisilno obnovi GTINe na vseh napravah (tablica + PC) */
+    S.qcMaterials.forEach(q=>{if(!Array.isArray(q.gtins))q.gtins=[];});
+    const _g=(name,gtins)=>{const q=byName(name);if(q)q.gtins=gtins;};
+    _g('Multichem S Plus',[QC_GTINS.sPlusL1,QC_GTINS.sPlusL2,QC_GTINS.sPlusL3]);
+    _g('Multichem IA',[QC_GTINS.ia]);
+    _g('Multichem U',[QC_GTINS.mU]);
+    _g('Abbott PCT single QC',[QC_GTINS.pct]);
+    _g('GFAP single QC',[QC_GTINS.gfap]);
+    _g('UCH-L1 single QC',[QC_GTINS.uchl]);
+    S.qcMatSchema=3;save();
+  }
 }
 function save(){localStorage.setItem('qclab_v2',JSON.stringify(S));}
+
+/* ===== REVIZIJSKA SLED (IVDR / ISO 15189 — ALCOA+) =====
+   Append-only dnevnik vseh sprememb. Nikoli se ne ureja ali briše.
+   Attributable (operatorId) · Legible (summary) · Contemporaneous (ts) ·
+   Original/Accurate (before/after). Sinhronizira se kot del S (qclab_v2). */
+function _audit(action,entity,entityId,summary,before,after,operatorId){
+  if(!S.auditLog)S.auditLog=[];
+  var build=0;try{build=JSON.parse(AndroidBridge.getDeviceInfo()).appBuild||0;}catch(e){}
+  S.auditLog.push({id:Date.now().toString()+'_'+Math.random().toString(36).slice(2,6),
+    ts:new Date().toISOString(),action:action,entity:entity,entityId:entityId||'',
+    summary:summary||'',before:before||null,after:after||null,
+    operatorId:operatorId||'system',appBuild:build});
+}
+/* človeško berljivo ime izvajalca dejanja za revizijsko sled */
+function _auditWho(opId){if(!opId||opId==='system')return 'skrbnik (naprava)';var op=S.operators.find(function(o){return o.id===opId;});return op?op.first+' '+op.last+' ('+opId+')':opId;}
 
 function sdLabel(sd){if(sd==='ok'||!sd)return 'OK';return sd.replace('-3sd','−3SD').replace('-2sd','−2SD').replace('+3sd','+3SD').replace('+2sd','+2SD');}
 function sdBadge(sd){if(!sd||sd==='ok')return '<span class="badge badge-ok">OK</span>';if(sd.includes('3'))return '<span class="badge badge-3sd">'+sdLabel(sd)+'</span>';return '<span class="badge badge-2sd">'+sdLabel(sd)+'</span>';}
@@ -2135,6 +2569,7 @@ function buildInstrMap(){
 }
 function renderDashboard(){
   _updateNotifBadge();
+  try{renderAlertUI();}catch(e){}
   const today=new Date().toDateString();
   const weekAgo=new Date();weekAgo.setDate(weekAgo.getDate()-7);
   $i('stat-today').textContent=S.entries.filter(e=>new Date(e.datetime).toDateString()===today).length;
@@ -2160,7 +2595,10 @@ function populateEntryQcMaterials(){
   const list=$i('qcMatCheckList');if(!list)return;
   const qcs=instr?compatibleQcs(instr.type):S.qcMaterials;
   list.innerHTML=qcs.map(q=>{const ri=S.qcMaterials.indexOf(q);const curLot=qcCurrentLot(q);
-    return '<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;cursor:pointer;background:var(--bg2)"><input type="checkbox" value="'+ri+'" data-qcname="'+q.name+'" data-lot="'+(curLot||'')+'" data-levels="'+(q.levels||2)+'" class="qc-mat-cb" style="width:17px;height:17px;accent-color:var(--abbott-teal)"><span style="flex:1"><span style="font-weight:600;font-size:13px">'+q.name+'</span>'+(curLot?'<span style="font-size:11px;color:var(--text3);margin-left:8px">Lot: '+curLot+pregledLotHint(q)+'</span>':pregledLotHint(q))+'</span><span style="font-size:11px;color:var(--text3)">'+(q.levels||2)+' nivo(i)</span></label>';
+    const st=qcStockLots(q)[0];const exp=st?st.expiry:'';const dl=st?st.daysLeft:null;
+    const isExp=dl!=null&&dl<0;const isNear=dl!=null&&dl>=0&&dl<=14;
+    const flag=isExp?'<span class="badge b-exp" style="margin-left:8px">POTEKEL — blokirano '+fmtExp(exp)+'</span>':(isNear?'<span class="badge b-14" style="margin-left:8px">Poteče čez '+dl+' dni</span>':'');
+    return '<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid '+(isExp?'var(--red)':'var(--border)')+';border-radius:8px;cursor:'+(isExp?'not-allowed':'pointer')+';background:'+(isExp?'rgba(220,38,38,.06)':'var(--bg2)')+';opacity:'+(isExp?'.7':'1')+'"><input type="checkbox" value="'+ri+'" data-qcname="'+q.name+'" data-lot="'+(curLot||'')+'" data-levels="'+(q.levels||2)+'" data-expiry="'+(exp||'')+'" data-daysleft="'+(dl==null?'':dl)+'" '+(isExp?'disabled ':'')+'class="qc-mat-cb" style="width:17px;height:17px;accent-color:var(--abbott-teal)"><span style="flex:1"><span style="font-weight:600;font-size:13px">'+q.name+'</span>'+flag+(curLot?'<span style="font-size:11px;color:var(--text3);margin-left:8px">Lot: '+curLot+pregledLotHint(q)+'</span>':pregledLotHint(q))+'</span><span style="font-size:11px;color:var(--text3)">'+(q.levels||2)+' nivo(i)</span></label>';
   }).join('');
 }
 /* Povezava QC material → zaloga po GTIN: vrne postavke v zalogi (FEFO, najprej najkrajši rok) */
@@ -2188,14 +2626,21 @@ function pregledLotHint(q){
   return '';
 }
 function selectAllQcMats(val){document.querySelectorAll('.qc-mat-cb').forEach(cb=>cb.checked=val);}
+function toggleAllQcMats(){const cbs=[...document.querySelectorAll('.qc-mat-cb')];const allOn=cbs.every(cb=>cb.checked);cbs.forEach(cb=>cb.checked=!allOn);}
 
-function initWizard(){S.wiz={};S.pinValue='';showWStep(0);clearPin();populateEntryQcMaterials();const now=new Date();now.setMinutes(now.getMinutes()-now.getTimezoneOffset());$i('entryDateTime').value=now.toISOString().slice(0,16);}
+function initWizard(){S.wiz={};S.pinValue='';showWStep(0);clearPin();populateEntryQcMaterials();const now=new Date();now.setMinutes(now.getMinutes()-now.getTimezoneOffset());$i('entryDateTime').value=now.toISOString().slice(0,16);qcDateCheck();}
+function qcDateCheck(){const v=$i('entryDateTime').value;const today=new Date().toISOString().slice(0,10);const late=v&&v.slice(0,10)<today;const w=$i('qcLateWarn');if(w)w.style.display=late?'block':'none';if(!late){const r=$i('qcLateReason');if(r)r.value='';} }
 function showWStep(n){document.querySelectorAll('.wizard-step').forEach((s,i)=>s.classList.toggle('active',i===n));document.querySelectorAll('.wizard-dot').forEach((d,i)=>{d.classList.remove('active','done');if(i<n)d.classList.add('done');else if(i===n)d.classList.add('active');});}
 function wizardNext(from){
   if(from===0){
     const instrId=$i('entryInstr').value;if(!instrId){notify('Izberite inštrument','warning');return;}
     const cbs=[...document.querySelectorAll('.qc-mat-cb:checked')];if(!cbs.length){notify('Izberite vsaj en QC material','warning');return;}
-    S.wiz={instrId,datetime:$i('entryDateTime').value,instrType:INSTRUMENTS.find(i=>i.id===instrId).type,selectedQcs:cbs.map(cb=>({idx:parseInt(cb.value),name:cb.dataset.qcname,lot:cb.dataset.lot,levels:parseInt(cb.dataset.levels)||2}))};
+    const dtVal=$i('entryDateTime').value;
+    const today=new Date().toISOString().slice(0,10);
+    const isLate=dtVal&&dtVal.slice(0,10)<today;
+    let lateReason='';
+    if(isLate){lateReason=($i('qcLateReason').value||'').trim();if(!lateReason){notify('Vpišite razlog za naknadni vnos','warning');return;}}
+    S.wiz={instrId,datetime:dtVal,instrType:INSTRUMENTS.find(i=>i.id===instrId).type,selectedQcs:cbs.map(cb=>({idx:parseInt(cb.value),name:cb.dataset.qcname,lot:cb.dataset.lot,levels:parseInt(cb.dataset.levels)||2,expiry:cb.dataset.expiry||'',daysLeft:(cb.dataset.daysleft===''||cb.dataset.daysleft==null?null:parseInt(cb.dataset.daysleft))})),lateReason:isLate?lateReason:''};
     buildLevelPills();showWStep(1);
   }else if(from===1){
     const qcLevels={};S.wiz.selectedQcs.forEach(qc=>{qcLevels[qc.idx]=[...document.querySelectorAll('.lp-pill[data-qc="'+qc.idx+'"].selected-pill')].map(p=>p.dataset.level);});
@@ -2217,11 +2662,13 @@ function buildAssayPick(){
     const assayNames=qcObj?.assays?.length?qcObj.assays:S.assays.filter(a=>(qcObj?.type==='biochem'&&a.type==='biochem')||(qcObj?.type==='immuno'&&a.type==='immuno')||qcObj?.type==='pool'||qcObj?.type==='single').map(a=>a.name);
     const levels=S.wiz.qcLevels[qc.idx]||[];
     return levels.map(lvl=>{const key=qc.idx+'_'+lvl;
-      return '<div class="entry-block"><div class="entry-block-header"><span>'+qc.name+' &ndash; Nivo '+lvl.replace('L','')+'</span><button class="btn btn-g btn-sm" onclick="selectAllAssays(\''+key+'\',true)">&#10004; Vse</button></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;max-height:240px;overflow-y:auto">'+assayNames.map(an=>'<label class="assay-pick-item"><input type="checkbox" class="ap-cb" value="'+an+'" data-qcidx="'+qc.idx+'" data-level="'+lvl+'" onchange="this.closest(\'.assay-pick-item\').classList.toggle(\'picked\',this.checked)"><span style="font-size:12px;font-weight:500">'+an+'</span></label>').join('')+'</div></div>';
+      return '<div class="entry-block"><div class="entry-block-header"><span>'+qc.name+' &ndash; Nivo '+lvl.replace('L','')+'</span><button class="btn btn-g btn-sm" onclick="toggleAllAssays(\''+key+'\')">&#10004; Vse</button></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;max-height:240px;overflow-y:auto">'+assayNames.map(an=>'<label class="assay-pick-item"><input type="checkbox" class="ap-cb" value="'+an+'" data-qcidx="'+qc.idx+'" data-level="'+lvl+'" onchange="this.closest(\'.assay-pick-item\').classList.toggle(\'picked\',this.checked)"><span style="font-size:12px;font-weight:500">'+an+'</span></label>').join('')+'</div></div>';
     }).join('');
   }).join('');
+  renderPanelBtns();
 }
 function selectAllAssays(key,val){const [qi,lvl]=key.split('_L');document.querySelectorAll('.ap-cb[data-qcidx="'+qi+'"][data-level="L'+lvl+'"]').forEach(cb=>{cb.checked=val;cb.closest('.assay-pick-item').classList.toggle('picked',val);});}
+function toggleAllAssays(key){const [qi,lvl]=key.split('_L');const cbs=[...document.querySelectorAll('.ap-cb[data-qcidx="'+qi+'"][data-level="L'+lvl+'"]')];const allOn=cbs.every(cb=>cb.checked);cbs.forEach(cb=>{cb.checked=!allOn;cb.closest('.assay-pick-item').classList.toggle('picked',!allOn);});}
 /* NOVO: izbira izpadlih kontrol — checkbox seznam vseh izbranih preiskav */
 function buildFailedPick(){
   const wrap=$i('failedPickWrap');
@@ -2258,11 +2705,22 @@ function updatePinDisplay(){for(let i=0;i<5;i++)$i('pd'+i).classList.toggle('fil
 function saveEntry(){
   if(S.pinValue.length<5){notify('Vpišite vseh 5 mest','warning');return;}
   const op=S.operators.find(o=>o.id===S.pinValue);if(!op){notify('Operater ni registriran','error');return;}
+  /* IVDR sledljivost lotov: trda blokada poteklega lota (daysLeft<0) */
+  const expired=(S.wiz.selectedQcs||[]).find(qc=>qc.daysLeft!=null&&qc.daysLeft<0);
+  if(expired){notify('Lot '+(expired.lot||'?')+' ('+expired.name+') je potekel '+fmtExp(expired.expiry)+' — vnos QC ni dovoljen','error');return;}
   const baseId=Date.now().toString();
+  const nowIso=new Date().toISOString();
+  const today=nowIso.slice(0,10);
+  const forDate=(S.wiz.datetime||nowIso).slice(0,10);
+  const isLate=forDate<today;
   S.wiz.selectedQcs.forEach((qc,i)=>{
     const levels=S.wiz.qcLevels[qc.idx]||[];if(!levels.length)return;
     const results=[];levels.forEach(lvl=>{const picked=(S.wiz.pickedByQcLvl||{})[qc.idx+'_'+lvl]||[];picked.forEach(an=>{const skey=qc.idx+'_'+lvl+'_'+an;const sd=(S.wiz.sdMap||{})[skey]||'ok';const note=(S.wiz.notes||{})[skey]||'';results.push({assay:an,level:lvl,sd,note});});});
-    S.entries.push({id:baseId+'_'+i,datetime:S.wiz.datetime||new Date().toISOString(),instrId:S.wiz.instrId,qcName:qc.name,qcIdx:qc.idx,lot:qc.lot,levels,results,operatorId:S.pinValue,sessionId:baseId});
+    const ent={id:baseId+'_'+i,datetime:S.wiz.datetime||nowIso,forDate,enteredAt:nowIso,instrId:S.wiz.instrId,qcName:qc.name,qcIdx:qc.idx,lot:qc.lot,lotExpiry:qc.expiry||'',daysLeftAtEntry:(qc.daysLeft==null?null:qc.daysLeft),levels,results,operatorId:S.pinValue,sessionId:baseId};
+    if(isLate){ent.late=true;ent.lateReason=S.wiz.lateReason||'';}
+    S.entries.push(ent);
+    const nf=results.filter(r=>r.sd&&r.sd!=='ok').length;
+    _audit('create','entry',ent.id,'QC vnos '+ent.instrId+' · '+ent.qcName+(ent.lot?' · lot '+ent.lot:'')+' · '+results.length+' preiskav'+(nf?' ('+nf+' izpad)':' (vse OK)')+(isLate?' · NAKNADNI VNOS: '+(S.wiz.lateReason||''):''),null,null,S.pinValue);
   });
   save();notify('QC vnosi shranjeni! ✓','success');initWizard();navQc('dashboard');
 }
@@ -2300,7 +2758,7 @@ function renderQcSignoff(){
   if(!revs.length){tb.innerHTML='<tr><td colspan="6" class="empty">Ni pregledov.</td></tr>';return;}
   tb.innerHTML=revs.map(r=>'<tr><td style="font-size:12px">'+(r.datetime||'').slice(0,16).replace('T',' ')+'</td><td><span class="badge badge-blue">'+r.instrId+'</span></td><td style="font-size:12px">'+(r.fromDate||'')+' &ndash; '+(r.toDate||'')+'</td><td>'+getOpName(r.reviewerId)+'</td><td style="font-size:12px;max-width:220px">'+(r.actions?_repEsc(r.actions):'<span class="muted">&ndash;</span>')+'</td><td style="white-space:nowrap"><button class="btn btn-g btn-sm" onclick="openQcReviewEdit(\''+r.id+'\')" style="margin-right:4px">&#9998;</button><button class="btn btn-d btn-sm" onclick="deleteQcReview(\''+r.id+'\')">&#128465;</button></td></tr>').join('');
 }
-function deleteQcReview(id){if(!confirm('Izbrisati ta pregled?'))return;S.qcReviews=(S.qcReviews||[]).filter(r=>r.id!==id);save();renderQcSignoff();notify('Pregled izbrisan');}
+function deleteQcReview(id){if(!confirm('Izbrisati ta pregled?'))return;const rec=(S.qcReviews||[]).find(r=>r.id===id);S.qcReviews=(S.qcReviews||[]).filter(r=>r.id!==id);if(rec)_audit('delete','qcreview',id,'Izbrisan pregled QC '+rec.instrId+' ('+(rec.fromDate||'')+'–'+(rec.toDate||'')+')',rec,null,'system');save();renderQcSignoff();notify('Pregled izbrisan');}
 function openQcReviewEdit(id){
   const rev=(S.qcReviews||[]).find(r=>r.id===id);if(!rev)return;
   qcReviewState={instrId:rev.instrId,editId:id};qcRevPin='';
@@ -2336,14 +2794,16 @@ function saveQcReview(){
   // UREDI obstoječi pregled
   if(qcReviewState.editId){
     const idx=S.qcReviews.findIndex(r=>r.id===qcReviewState.editId);
-    if(idx>=0)Object.assign(S.qcReviews[idx],{actions,reviewerId:qcRevPin,editedAt:new Date().toISOString()});
+    if(idx>=0){const before={actions:S.qcReviews[idx].actions,reviewerId:S.qcReviews[idx].reviewerId};Object.assign(S.qcReviews[idx],{actions,reviewerId:qcRevPin,editedAt:new Date().toISOString()});_audit('update','qcreview',S.qcReviews[idx].id,'Urejen pregled QC '+S.qcReviews[idx].instrId+' ('+(S.qcReviews[idx].fromDate||'')+'–'+(S.qcReviews[idx].toDate||'')+')',before,{actions,reviewerId:qcRevPin},qcRevPin);}
     save();closeMo('qcReviewModal');renderQcSignoff();notify('Pregled posodobljen ✓','success');
     try{if(typeof AndroidBridge!=='undefined'&&AndroidBridge.msIsSignedIn&&AndroidBridge.msIsSignedIn())msUpload('qclab_v2',JSON.stringify(S));}catch(e){}
     return;
   }
   // NOV pregled
   const instrId=qcReviewState.instrId;const today=new Date().toISOString().slice(0,10);const from=_qcReviewFrom(instrId);
-  S.qcReviews.push({id:Date.now().toString(),datetime:new Date().toISOString(),instrId,fromDate:from,toDate:today,reviewerId:qcRevPin,actions,note:''});
+  const rid=Date.now().toString();
+  S.qcReviews.push({id:rid,datetime:new Date().toISOString(),instrId,fromDate:from,toDate:today,reviewerId:qcRevPin,actions,note:''});
+  _audit('create','qcreview',rid,'Pregled QC '+instrId+' ('+from+'–'+today+')'+(actions?' · ukrepi: '+actions:' · brez ukrepov'),null,null,qcRevPin);
   if(actions){if(!S.notifications)S.notifications=[];S.notifications.push({id:(Date.now()+1).toString(),datetime:new Date().toISOString(),type:'qcreview',message:actions,authorId:qcRevPin,instrId,resolved:false});_updateNotifBadge();}
   save();closeMo('qcReviewModal');renderQcSignoff();notify('Pregled QC zabeležen ✓','success');
   _syncNotifLog();
@@ -2358,6 +2818,125 @@ function _qcReviewsForMonth(instrId,year,month){
   const pref=year+'-'+String(month).padStart(2,'0');
   return (S.qcReviews||[]).filter(r=>r.instrId===instrId&&(r.toDate||'').slice(0,7)===pref).sort((a,b)=>(a.toDate||'').localeCompare(b.toDate||''));
 }
+
+/* ===== OPOZORILNI CENTER (pravila, brez AI) ===== */
+function _alertMuted(key){
+  const until=(S.alertMute||{})[key];
+  return !!until&&until>=new Date().toISOString().slice(0,10);
+}
+function muteAlert(key,days){
+  const d=new Date();d.setDate(d.getDate()+(days||7));
+  S.alertMute[key]=d.toISOString().slice(0,10);
+  save();renderAlertUI();
+}
+function computeAlerts(){
+  const A=[];const now=new Date();const hh=now.getHours();const dow=now.getDay();const dom=now.getDate();
+  const push=(key,sev,icon,title,detail,nav)=>{if(!_alertMuted(key))A.push({key,sev,icon,title,detail,nav});};
+  /* 1-3: manjkajoče vzdrževanje po obdobjih */
+  try{
+    INSTRUMENTS.forEach(ins=>{
+      if(hh>=10&&!_maintCurRec(ins.id,'daily')){
+        push('maint_daily_'+ins.id,hh>=14?'crit':'warn','🔧','Dnevno vzdrževanje manjka: '+ins.id,'Danes še ni zabeleženo dnevno vzdrževanje (niti mirovanje).',"navMain('qc');navQc('maintenance')");
+      }
+      if(dow>=4&&!_maintCurRec(ins.id,'weekly')){
+        push('maint_weekly_'+ins.id,'warn','🔧','Tedensko vzdrževanje manjka: '+ins.id,'Ta teden še ni zabeleženo tedensko vzdrževanje.',"navMain('qc');navQc('maintenance')");
+      }
+      if(dom>=20&&!_maintCurRec(ins.id,'monthly')){
+        push('maint_monthly_'+ins.id,dom>=27?'crit':'warn','🔧','Mesečno vzdrževanje manjka: '+ins.id,'Ta mesec še ni zabeleženo mesečno vzdrževanje.',"navMain('qc');navQc('maintenance')");
+      }
+      /* 4: periodično (3-mesečno) sledi */
+      const qs=(S.maintenanceLog||[]).filter(m=>m.instrId===ins.id&&m.type==='quarterly').sort((a,b)=>(b.datetime||'').localeCompare(a.datetime||''));
+      if(qs.length){
+        const dLast=Math.round((now-new Date(qs[0].datetime))/86400000);
+        if(dLast>80)push('maint_quart_'+ins.id,'info','🗓️','Periodično vzdrževanje sledi: '+ins.id,'Zadnje 3-mesečno vzdrževanje pred '+dLast+' dnevi.',"navMain('qc');navQc('maintenance')");
+      }
+    });
+  }catch(e){}
+  /* 5: roki iz zaloge */
+  try{
+    let nExp=0,n14=0;
+    (DB_PREGLED.inventory||[]).forEach(it=>{const dl=daysLeft(it.expiry);if(dl==null)return;if(dl<0)nExp+=(it.qty||1);else if(dl<=14)n14+=(it.qty||1);});
+    if(nExp>0)push('roki_exp','crit','⏰','Potekli artikli na zalogi: '+nExp+' kos','Preveri zavihek Roki in umakni potekle artikle.',"navMain('roki')");
+    if(n14>0)push('roki_14','warn','⏰','Artikli s potekom <14 dni: '+n14+' kos','Preveri zavihek Roki in pripravi nadomestila.',"navMain('roki')");
+  }catch(e){}
+  /* 6-10: QC materiali */
+  try{
+    (S.qcMaterials||[]).forEach((q,qi)=>{
+      if(!(q.gtins||[]).length)return;
+      const stock=qcStockLots(q);
+      const distinct=qcStockLotsDistinct(q);
+      /* 6: nizka zaloga */
+      const totQty=stock.reduce((s,it)=>s+(it.qty||1),0);
+      const minQ=(q.minQty!=null?q.minQty:2);
+      if(totQty<=minQ)push('qc_stock_'+qi,'warn','📦','Zaloga pada: '+q.name,'Na zalogi še '+totQty+' kos (min: '+minQ+'). Pripravi naročilo.',"navMain('narocila')");
+      /* tekoči lot */
+      const cur=distinct[0];
+      if(cur){
+        /* 9: tekoči lot izteka */
+        if(cur.daysLeft!=null&&cur.daysLeft>=0&&cur.daysLeft<=14)
+          push('qc_curexp_'+qi,'warn','🧪','QC lot izteka: '+q.name,'Lot '+cur.lot+' poteče čez '+cur.daysLeft+' dni — preveri svežino in pripravi nov lot.',"navMain('qc');navQc('qcmaterials')");
+        /* 8: tekoči lot brez uradnih vrednosti */
+        if(!qcFindValues(cur.lot))
+          push('qc_noval_cur_'+qi,'warn','📊','Ni uradnih vrednosti: '+q.name,'Za lot '+cur.lot+' ni uvoženih Abbott vrednosti (XML).',"navMain('qc');navQc('qcmaterials')");
+        /* 10: dovolj podatkov za lastne vrednosti */
+        const nEnt=_lotEntries(q.name,cur.lot).length;
+        const hasOvr=!!(S.qcOverrides&&S.qcOverrides[qcBaseLot(cur.lot)])||!!(S.qcOverrides&&S.qcOverrides[cur.lot]);
+        if(nEnt>=20&&!hasOvr)
+          push('qc_ownval_'+qi,'info','📈','Lastne vrednosti: '+q.name,'Na lotu '+cur.lot+' je že '+nEnt+' vnosov — razmisli o postavitvi lastnih Mean/SD.',"navMain('qc');navQc('qcmaterials')");
+      }
+      /* 7: naslednji lot brez validacije */
+      const next=distinct[1];
+      if(next){
+        const used=_lotEntries(q.name,next.lot).length>0;
+        const inHist=(q.lotHistory||[]).some(h=>qcBaseLot(h.lot||'')===qcBaseLot(next.lot));
+        if(!used&&!inHist)
+          push('qc_newlot_'+qi+'_'+qcBaseLot(next.lot),'warn','🆕','Nov lot čaka validacijo: '+q.name,'Lot '+next.lot+' je na zalogi — opravi lot-to-lot primerjavo/ovrednotenje pred uporabo.',"navMain('qc');navQc('qcmaterials')");
+        if(!qcFindValues(next.lot))
+          push('qc_noval_next_'+qi,'info','📊','Nov lot brez vrednosti: '+q.name,'Za prihajajoči lot '+next.lot+' še ni uvoženih Abbott vrednosti (XML).',"navMain('qc');navQc('qcmaterials')");
+      }
+    });
+  }catch(e){}
+  /* 11: ne-ovrednoteni loti v Pregled BK */
+  try{
+    const unchecked=(DB_PREGLED.lots||[]).filter(l=>l.checked===false).length;
+    if(unchecked>0)push('pbk_unchecked','info','🔍','Ne-ovrednoteni loti (Pregled BK): '+unchecked,'V Pregled BK je '+unchecked+' lotov brez ovrednotenja.',"navMain('loti')");
+  }catch(e){}
+  const sevOrd={crit:0,warn:1,info:2};
+  A.sort((a,b)=>sevOrd[a.sev]-sevOrd[b.sev]);
+  return A;
+}
+const ALERT_SEV={crit:{col:'var(--red)',lbl:'KRITIČNO'},warn:{col:'var(--orange)',lbl:'OPOZORILO'},info:{col:'var(--text3)',lbl:'INFO'}};
+function renderAlertUI(){
+  const alerts=computeAlerts();
+  /* badge v headerju: crit+warn */
+  const n=alerts.filter(a=>a.sev!=='info').length;
+  const b=$i('alertBadge');
+  if(b){if(n>0){b.textContent=n;b.style.display='';}else{b.style.display='none';}}
+  /* dashboard kartica: prvi 3 */
+  const dash=$i('dashAlerts');
+  if(dash){
+    if(!alerts.length){dash.innerHTML='';}
+    else{
+      const top=alerts.slice(0,3);
+      dash.innerHTML='<div class="card" style="margin-bottom:12px;border-left:4px solid '+ALERT_SEV[alerts[0].sev].col+'">'+
+        '<div class="card-title" style="display:flex;justify-content:space-between;align-items:center"><span>&#128276; Opozorila ('+alerts.length+')</span><button class="btn btn-g btn-sm" onclick="openAlertModal()">Prikaži vse</button></div>'+
+        top.map(a=>'<div style="display:flex;gap:8px;align-items:flex-start;padding:5px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="'+a.nav.replace(/"/g,'&quot;')+'"><span>'+a.icon+'</span><div><div style="font-size:13px;font-weight:600">'+a.title+'</div><div style="font-size:11px;color:var(--text3)">'+a.detail+'</div></div></div>').join('')+
+        '</div>';
+    }
+  }
+  /* modal (če je odprt) */
+  const mb=$i('alertModalBody');
+  if(mb&&$i('alertModal').classList.contains('open')){
+    mb.innerHTML=alerts.length?alerts.map(a=>'<div style="border:1px solid var(--border);border-left:4px solid '+ALERT_SEV[a.sev].col+';border-radius:8px;padding:10px">'+
+      '<div style="display:flex;gap:8px;align-items:flex-start"><span style="font-size:18px">'+a.icon+'</span><div style="flex:1"><div style="font-size:13px;font-weight:700">'+a.title+'</div><div style="font-size:12px;color:var(--text3);margin-top:2px">'+a.detail+'</div></div><span style="font-size:9px;font-weight:700;color:'+ALERT_SEV[a.sev].col+'">'+ALERT_SEV[a.sev].lbl+'</span></div>'+
+      '<div style="display:flex;gap:6px;margin-top:8px;justify-content:flex-end">'+
+      '<button class="btn btn-g btn-sm" onclick="muteAlert(\''+a.key+'\',7)">&#128263; Utišaj 7 dni</button>'+
+      '<button class="btn btn-blue btn-sm" onclick="closeMo(\'alertModal\');'+a.nav.replace(/"/g,'&quot;')+'">Odpri</button>'+
+      '</div></div>').join('')
+      :'<div class="empty" style="padding:24px;text-align:center">&#9989; Ni aktivnih opozoril.</div>';
+  }
+}
+function openAlertModal(){showMo('alertModal');renderAlertUI();}
 
 /* ===== OBVESTILA ===== */
 function _updateNotifBadge(){
@@ -2519,7 +3098,7 @@ function drawLJCanvas(canvasId,pts,title,level,statsContainerId,vlines,qcv){
   canvas._vlines=[];
   if(vlines&&vlines.length){vlines.forEach(vl=>{let x=null;for(let i=0;i<pts.length;i++){if(pts[i].dt>=vl.dt){x=i===0?xOf(0)-step*0.5:(xOf(i-1)+xOf(i))/2;break;}}if(x===null)x=xOf(pts.length-1)+step*0.5;x=Math.max(pad.l+2,Math.min(x,pad.l+cW-2));_drawVLine(ctx,x,pad.t,pad.t+cH,vl);canvas._vlines.push({...vl,x});});}
   ctx.beginPath();ctx.strokeStyle='rgba(0,48,135,0.25)';ctx.lineWidth=1.5;ctx.setLineDash([]);pts.forEach((p,i)=>{if(i===0)ctx.moveTo(xOf(i),sdToY(p.sdV));else ctx.lineTo(xOf(i),sdToY(p.sdV));});ctx.stroke();
-  pts.forEach((p,i)=>{const x=xOf(i),y=sdToY(p.sdV),abs=Math.abs(p.sdV);let color=abs>=3?'#dc2626':abs>=2?'#f59e0b':'#059669',ring=null;if(viol[i]){ring=viol[i].color;if(ring==='#dc2626')color='#dc2626';}if(ring){ctx.beginPath();ctx.arc(x,y,9,0,Math.PI*2);ctx.strokeStyle=ring;ctx.lineWidth=2.5;ctx.setLineDash([]);ctx.stroke();}ctx.beginPath();ctx.arc(x,y,5.5,0,Math.PI*2);ctx.fillStyle=color;ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.stroke();if(viol[i]){ctx.fillStyle=ring;ctx.font='bold 8px system-ui';ctx.textAlign='center';ctx.fillText(viol[i].rule,x,y-12);}if(p.note){ctx.fillStyle='#6366f1';ctx.font='9px system-ui';ctx.textAlign='center';ctx.fillText('📝',x+8,y-6);}ctx.save();ctx.translate(x,H-pad.b+10);ctx.rotate(-Math.PI/3.5);ctx.fillStyle='#6b7280';ctx.font='8px system-ui';ctx.textAlign='right';ctx.fillText(p.dt.toLocaleDateString('sl-SI',{day:'2-digit',month:'2-digit'}),0,0);ctx.restore();});
+  pts.forEach((p,i)=>{const x=xOf(i),y=sdToY(p.sdV),abs=Math.abs(p.sdV);let color=abs>=3?'#dc2626':abs>=2?'#f59e0b':'#059669',ring=null;if(viol[i]){ring=viol[i].color;if(ring==='#dc2626')color='#dc2626';}if(ring){ctx.beginPath();ctx.arc(x,y,10,0,Math.PI*2);ctx.strokeStyle=ring;ctx.lineWidth=2.5;ctx.setLineDash([]);ctx.stroke();}ctx.beginPath();ctx.arc(x,y,5.5,0,Math.PI*2);ctx.fillStyle=color;ctx.fill();ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.stroke();if(viol[i]){ctx.fillStyle=ring;ctx.font='bold 11px system-ui';ctx.textAlign='center';ctx.fillText(viol[i].rule,x,y-15);}if(p.note){ctx.fillStyle='#6366f1';ctx.font='9px system-ui';ctx.textAlign='center';ctx.fillText('📝',x+8,y-6);}ctx.save();ctx.translate(x,H-pad.b+10);ctx.rotate(-Math.PI/3.5);ctx.fillStyle='#6b7280';ctx.font='8px system-ui';ctx.textAlign='right';ctx.fillText(p.dt.toLocaleDateString('sl-SI',{day:'2-digit',month:'2-digit'}),0,0);ctx.restore();});
   canvas._pts=pts.map((p,i)=>({...p,x:xOf(i),y:sdToY(p.sdV)}));
   if(statsContainerId){const el=$i(statsContainerId);if(el){const n2=pts.length,cnt2sd=pts.filter(p=>Math.abs(p.sdV)>=2&&Math.abs(p.sdV)<3).length,cnt3sd=pts.filter(p=>Math.abs(p.sdV)>=3).length,cntOk=n2-cnt2sd-cnt3sd,violCount=Object.keys(viol).length;let qcvHtml='';if(qcv&&isFinite(qcv.mean)){qcvHtml='<span style="border-left:1px solid var(--border);padding-left:12px"><strong>Mean:</strong> '+_fmtConc(qcv.mean)+' '+(qcv.unit||'')+'</span><span><strong>SD:</strong> '+_fmtConc(qcv.sd)+' <span class="muted">(proizv. '+_fmtConc(qcv.sdMfr)+')</span></span><span class="muted">lot '+qcv.lot+'</span>';}el.innerHTML='<div style="display:flex;gap:12px;flex-wrap:wrap;font-size:12px;padding:8px 0;align-items:center"><span><strong>N:</strong> '+n2+'</span><span><strong>OK:</strong> <span style="color:var(--success)">'+cntOk+'</span></span><span><strong>±2SD:</strong> <span style="color:var(--warning)">'+cnt2sd+'</span></span><span><strong>±3SD:</strong> <span style="color:var(--danger)">'+cnt3sd+'</span></span><span><strong>Westgard:</strong> <span style="color:var(--danger)">'+violCount+'</span></span>'+qcvHtml+'</div>';}}
 }
@@ -2575,18 +3154,54 @@ function renderQcGtinPicker(sel){
   opts.sort((a,b)=>a.name.localeCompare(b.name));
   $i('qcGtinList').innerHTML=opts.length?opts.map(o=>'<label class="assay-check" style="display:flex;align-items:center;gap:8px"><input type="checkbox" class="qc-gtin-cb" value="'+o.gtin+'" '+(sel.includes(o.gtin)?'checked':'')+'> <span style="flex:1">'+o.name+(o.type?' <span style="font-size:10px;color:var(--text3)">'+(o.type==='control'?'kontrola':'kalibrator')+'</span>':'')+'</span><span style="font-size:10px;color:var(--text3)">'+o.gtin+'</span></label>').join(''):'<div class="muted" style="font-size:12px">Ni kontrol v zalogi (sinhronizirajte z Zebro).</div>';
 }
-function openQcModal(idx){S.editingQcIdx=idx??null;$i('qcModalTitle').textContent=idx!=null?'Uredi QC material':'Nov QC material';let sel=[],gsel=[];const inUse=$i('qcLotInUse');inUse.style.display='none';inUse.innerHTML='';if(idx!=null){const q=S.qcMaterials[idx];$i('qcName').value=q.name;$i('qcType').value=q.type;$i('qcLot').value=q.lot||'';$i('qcLevels').value=q.levels||2;sel=q.assays||[];gsel=q.gtins||[];const stock=qcStockLotsDistinct(q);if(stock.length){const lots=stock.map(s=>s.lot+' (rok '+fmtExp(s.expiry)+')').join(', ');inUse.innerHTML='🔗 Lot v uporabi (iz zaloge): <strong>'+lots+'</strong>';inUse.style.display='';$i('qcLotField').style.display='none';}else{$i('qcLotField').style.display='';}}else{$i('qcLotField').style.display='';$i('qcName').value='';$i('qcType').value='biochem';$i('qcLot').value='';$i('qcLevels').value=2;}$i('qcAssayList').innerHTML=S.assays.map(a=>'<label class="assay-check"><input type="checkbox" value="'+a.name+'" '+(sel.includes(a.name)?'checked':'')+'> '+a.name+' <span style="font-size:10px;color:var(--text3)">('+(a.type==='biochem'?'c':'i')+')</span></label>').join('');renderQcGtinPicker(gsel);showMo('qcModal');}
+function openQcModal(idx){S.editingQcIdx=idx??null;$i('qcModalTitle').textContent=idx!=null?'Uredi QC material':'Nov QC material';let sel=[],gsel=[];const inUse=$i('qcLotInUse');inUse.style.display='none';inUse.innerHTML='';if(idx!=null){const q=S.qcMaterials[idx];$i('qcName').value=q.name;$i('qcType').value=q.type;$i('qcLot').value=q.lot||'';$i('qcLevels').value=q.levels||2;$i('qcMinQty').value=(q.minQty!=null?q.minQty:'');sel=q.assays||[];gsel=q.gtins||[];const stock=qcStockLotsDistinct(q);if(stock.length){const lots=stock.map(s=>s.lot+' (rok '+fmtExp(s.expiry)+')').join(', ');inUse.innerHTML='🔗 Lot v uporabi (iz zaloge): <strong>'+lots+'</strong>';inUse.style.display='';$i('qcLotField').style.display='none';}else{$i('qcLotField').style.display='';}}else{$i('qcLotField').style.display='';$i('qcName').value='';$i('qcType').value='biochem';$i('qcLot').value='';$i('qcLevels').value=2;$i('qcMinQty').value='';}$i('qcAssayList').innerHTML=S.assays.map(a=>'<label class="assay-check"><input type="checkbox" value="'+a.name+'" '+(sel.includes(a.name)?'checked':'')+'> '+a.name+' <span style="font-size:10px;color:var(--text3)">('+(a.type==='biochem'?'c':'i')+')</span></label>').join('');renderQcGtinPicker(gsel);showMo('qcModal');}
 function deleteQcMat(i){if(!confirm('Izbriši?'))return;S.qcMaterials.splice(i,1);save();renderQcMats();notify('Material izbrisan');}
-function saveQcMaterial(){const name=$i('qcName').value.trim(),type=$i('qcType').value,lot=$i('qcLot').value.trim(),levels=parseInt($i('qcLevels').value);const assays=[...$i('qcAssayList').querySelectorAll('input:checked')].map(el=>el.value);const gtins=[...$i('qcGtinList').querySelectorAll('.qc-gtin-cb:checked')].map(el=>el.value);if(!name){notify('Vnesite naziv','warning');return;}const obj={name,type,lot,levels,gtins,assays};if(S.editingQcIdx!=null){const old=S.qcMaterials[S.editingQcIdx];if(old&&old.lotHistory)obj.lotHistory=old.lotHistory;S.qcMaterials[S.editingQcIdx]=obj;}else S.qcMaterials.push(obj);save();closeMo('qcModal');renderQcMats();notify('Material shranjen','success');}
+
+/* ===== QC PANELI PREISKAV ===== */
+let _editingPanelIdx=null;
+function openPanelModal(){_editingPanelIdx=null;_renderPanelAssayList([]);$i('panelName').value='';$i('panelEditTitle').textContent='Nov panel';renderPanelList();showMo('panelModal');}
+function renderPanelList(){
+  const ps=S.qcPanels||[];
+  $i('panelList').innerHTML=ps.length?ps.map((p,i)=>'<div style="display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--border)"><strong style="flex:1">'+p.name+'</strong><span style="font-size:11px;color:var(--text3);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+p.assays.join(', ')+'</span><button class="btn btn-outline btn-sm" onclick="editPanelEntry('+i+')">&#9998;</button><button class="btn btn-d btn-sm" onclick="deletePanelEntry('+i+')">&#128465;</button></div>').join(''):'<div class="muted" style="font-size:12px;padding:4px 0">Ni panelov. Dodajte prvega spodaj.</div>';
+}
+function _renderPanelAssayList(sel){
+  const all=[...new Set(S.assays.map(a=>a.name))];
+  $i('panelAssayList').innerHTML=all.map(n=>'<label class="assay-check"><input type="checkbox" class="panel-assay-cb" value="'+n+'" '+(sel.includes(n)?'checked':'')+'>'+n+'</label>').join('');
+}
+function editPanelEntry(i){_editingPanelIdx=i;const p=S.qcPanels[i];$i('panelName').value=p.name;$i('panelEditTitle').textContent='Uredi panel';_renderPanelAssayList(p.assays);}
+function cancelPanelEdit(){_editingPanelIdx=null;$i('panelName').value='';$i('panelEditTitle').textContent='Nov panel';_renderPanelAssayList([]);}
+function savePanelEntry(){
+  const name=$i('panelName').value.trim();if(!name){notify('Vnesite ime panela','warning');return;}
+  const assays=[...$i('panelAssayList').querySelectorAll('.panel-assay-cb:checked')].map(cb=>cb.value);
+  if(!assays.length){notify('Izberite vsaj eno preiskavo','warning');return;}
+  if(!S.qcPanels)S.qcPanels=[];
+  if(_editingPanelIdx!=null)S.qcPanels[_editingPanelIdx]={name,assays};else S.qcPanels.push({name,assays});
+  save();cancelPanelEdit();renderPanelList();notify('Panel shranjen','success');
+}
+function deletePanelEntry(i){if(!confirm('Izbriši panel?'))return;S.qcPanels.splice(i,1);save();renderPanelList();notify('Panel izbrisan');}
+function renderPanelBtns(){
+  const ps=S.qcPanels||[];const row=$i('panelBtnsRow');if(!row)return;
+  row.innerHTML=ps.map((p,i)=>'<button class="panel-btn" onclick="applyPanel('+i+')">'+p.name+'</button>').join('');
+  row.style.display=ps.length?'flex':'none';
+}
+function applyPanel(idx){
+  const p=(S.qcPanels||[])[idx];if(!p)return;
+  const set=new Set(p.assays);
+  const panelCbs=[...document.querySelectorAll('.ap-cb')].filter(cb=>set.has(cb.value));
+  const allOn=panelCbs.length>0&&panelCbs.every(cb=>cb.checked);
+  panelCbs.forEach(cb=>{cb.checked=!allOn;cb.closest('.assay-pick-item').classList.toggle('picked',!allOn);});
+  notify(allOn?(p.name+': odznačeno'):( p.name+': označene '+p.assays.length+' preiskave'),'ok');
+}
+function saveQcMaterial(){const name=$i('qcName').value.trim(),type=$i('qcType').value,lot=$i('qcLot').value.trim(),levels=parseInt($i('qcLevels').value);const assays=[...$i('qcAssayList').querySelectorAll('input:checked')].map(el=>el.value);const gtins=[...$i('qcGtinList').querySelectorAll('.qc-gtin-cb:checked')].map(el=>el.value);if(!name){notify('Vnesite naziv','warning');return;}const mq=parseInt($i('qcMinQty').value);const obj={name,type,lot,levels,gtins,assays};if(isFinite(mq)&&mq>=0)obj.minQty=mq;if(S.editingQcIdx!=null){const old=S.qcMaterials[S.editingQcIdx];if(old&&old.lotHistory)obj.lotHistory=old.lotHistory;S.qcMaterials[S.editingQcIdx]=obj;}else S.qcMaterials.push(obj);save();closeMo('qcModal');renderQcMats();notify('Material shranjen','success');}
 
 /* ===== OPERATORS ===== */
 function renderOperators(){const q=($i('opSearch')?.value||'').toLowerCase();const filtered=S.operators.filter(o=>(o.first+' '+o.last+' '+o.id).toLowerCase().includes(q));$i('operatorBody').innerHTML=filtered.map(o=>{const ri=S.operators.indexOf(o);return '<tr><td><span class="badge badge-blue">'+o.id+'</span></td><td>'+o.first+'</td><td>'+o.last+'</td><td><button class="btn btn-outline btn-sm" onclick="openOperatorModal('+ri+')">✏️</button> <button class="btn btn-d btn-sm" onclick="deleteOperator('+ri+')">🗑️</button></td></tr>';}).join('')||'<tr><td colspan="4" class="empty">Ni rezultatov.</td></tr>';}
 function openOperatorModal(idx){S.editingOpIdx=idx??null;$i('operatorModalTitle').textContent=idx!=null?'Uredi operaterja':'Nov operater';if(idx!=null){const o=S.operators[idx];$i('opId').value=o.id;$i('opFirst').value=o.first;$i('opLast').value=o.last;}else{$i('opId').value='';$i('opFirst').value='';$i('opLast').value='';}showMo('operatorModal');}
-function deleteOperator(i){if(!confirm('Izbriši operaterja?'))return;S.operators.splice(i,1);save();renderOperators();_autoSyncOps();notify('Operater izbrisan');}
+function deleteOperator(i){if(!confirm('Izbriši operaterja?'))return;const o=S.operators[i];S.operators.splice(i,1);if(o)_audit('delete','operator',o.id,'Izbrisan operater '+o.first+' '+o.last+' ('+o.id+')',o,null,'system');save();renderOperators();_autoSyncOps();notify('Operater izbrisan');}
 /* Operaterji so vir resnice v tej aplikaciji; ob spremembi se tiho naložijo v OneDrive (DigiLab/operators.json), od koder jih Zebra (Pregled BK) samo prebere. */
 function _autoSyncOps(){try{if(_hasBridge()&&AndroidBridge.msIsSignedIn&&AndroidBridge.msIsSignedIn())AndroidBridge.msUpload('operators',JSON.stringify(S.operators));}catch(e){}}
 function msUploadOperators(){if(!_hasBridge()){notify('Samo na napravi','warn');return;}try{if(!(AndroidBridge.msIsSignedIn&&AndroidBridge.msIsSignedIn())){notify('Najprej se prijavite v OneDrive (Več → Sinhronizacija)','warn');return;}notify('Nalagam operaterje v OneDrive…','ok');AndroidBridge.msUpload('operators',JSON.stringify(S.operators));}catch(e){notify('Napaka nalaganja','err');}}
-function saveOperator(){const id=$i('opId').value.trim(),first=$i('opFirst').value.trim(),last=$i('opLast').value.trim();if(!id||id.length!==5||isNaN(id)){notify('ID mora biti točno 5 številk','warning');return;}if(!first||!last){notify('Vnesite ime in priimek','warning');return;}if(S.editingOpIdx!=null)S.operators[S.editingOpIdx]={id,first,last};else{if(S.operators.find(o=>o.id===id)){notify('ID že obstaja','error');return;}S.operators.push({id,first,last});}save();closeMo('operatorModal');renderOperators();_autoSyncOps();notify('Operater shranjen','success');}
+function saveOperator(){const id=$i('opId').value.trim(),first=$i('opFirst').value.trim(),last=$i('opLast').value.trim();if(!id||id.length!==5||isNaN(id)){notify('ID mora biti točno 5 številk','warning');return;}if(!first||!last){notify('Vnesite ime in priimek','warning');return;}if(S.editingOpIdx!=null){const before={id:S.operators[S.editingOpIdx].id,first:S.operators[S.editingOpIdx].first,last:S.operators[S.editingOpIdx].last};S.operators[S.editingOpIdx]={id,first,last};_audit('update','operator',id,'Urejen operater '+first+' '+last+' ('+id+')',before,{id,first,last},'system');}else{if(S.operators.find(o=>o.id===id)){notify('ID že obstaja','error');return;}S.operators.push({id,first,last});_audit('create','operator',id,'Dodan operater '+first+' '+last+' ('+id+')',null,{id,first,last},'system');}save();closeMo('operatorModal');renderOperators();_autoSyncOps();notify('Operater shranjen','success');}
 function exportOperators(){const blob=new Blob([JSON.stringify(S.operators,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='operaterji.json';a.click();notify('Operaterji izvoženi','success');}
 function importOperators(input){const f=input.files[0];if(!f)return;const r=new FileReader();r.onload=e=>{try{const arr=JSON.parse(e.target.result);if(Array.isArray(arr)){let added=0;arr.forEach(o=>{if(!o.id)return;const norm={id:o.id,first:o.first||o.name||'',last:o.last||o.surname||''};if(!S.operators.find(x=>x.id===norm.id)){S.operators.push(norm);added++;}});save();renderOperators();notify('Uvoženih '+added+' operaterjev','success');}}catch(err){notify('Napaka pri uvozu','error');}};r.readAsText(f);input.value='';}
 
@@ -2596,10 +3211,16 @@ function exportCSV(){const hdr=['Datum','Čas','Inštrument','QC Material','Lot'
 /* ===== LOT HISTORY ===== */
 let currentLotQcIdx=null;
 function openLotHistory(idx){currentLotQcIdx=idx;const qc=S.qcMaterials[idx];$i('lotModalTitle').textContent='Loti – '+qc.name;renderLotHistory(qc);const now=new Date();now.setMinutes(now.getMinutes()-now.getTimezoneOffset());$i('newLotDate').value=now.toISOString().slice(0,10);$i('newLotNum').value='';$i('newLotNote').value='';showMo('lotModal');}
-function renderLotHistory(qc){const lots=qc.lotHistory||[{lot:qc.lot||'–',date:'',type:'qc',note:'Začetni lot'}];const typeInfo={qc:{label:'🔴 QC lot',color:'#dc2626'},cal:{label:'🟠 Kalibrator',color:'#f97316'},note:{label:'📝 Opomba',color:'#8b5cf6'}};let lastQcIdx=-1;lots.forEach((l,i)=>{if((l.type||'qc')==='qc')lastQcIdx=i;});$i('lotHistoryBody').innerHTML='<div class="tbl-wrap"><table><thead><tr><th>Tip</th><th>Lot</th><th>Datum</th><th>Analizatorji</th><th>Opomba</th><th></th></tr></thead><tbody>'+lots.map((l,i)=>{const ti=typeInfo[l.type||'qc']||typeInfo.qc;const isActive=(l.type||'qc')==='qc'&&i===lastQcIdx;const analHtml=(l.type==='cal'&&l.analyzers&&l.analyzers.length)?l.analyzers.map(a=>'<span class="badge badge-blue" style="font-size:11px;margin-right:2px">'+a+'</span>').join(''):'<span class="muted" style="font-size:11px">—</span>';return '<tr><td><span style="font-size:12px;color:'+ti.color+';font-weight:600">'+ti.label+'</span></td><td><strong>'+(l.lot||'–')+'</strong>'+(isActive?'<span class="badge badge-ok" style="margin-left:6px">Aktiven</span>':'')+'</td><td style="font-size:12px">'+(l.date||'–')+'</td><td>'+analHtml+'</td><td style="font-size:12px" class="muted">'+(l.note||'')+'</td><td>'+(i>0?'<button class="btn btn-d btn-sm" onclick="deleteLot('+i+')">🗑️</button>':'<span style="font-size:10px" class="muted">Izhodiščni</span>')+'</td></tr>';}).join('')+'</tbody></table></div>';}
+/* rok lota: najprej iz uradnih vrednosti (qcFindValues), sicer iz zaloge po baznem lotu */
+function _lotExpiry(qc,lot){try{const v=qcFindValues(lot);if(v&&v.expiry)return v.expiry;}catch(e){}const d=qcStockLotsDistinct(qc).find(x=>qcBaseLot(x.lot)===qcBaseLot(lot));return d?d.expiry:'';}
+/* število QC vnosov, ki so uporabili ta (bazni) lot */
+function _lotEntries(qcName,lot){const b=qcBaseLot(lot);return (S.entries||[]).filter(e=>e.qcName===qcName&&qcBaseLot(e.lot)===b);}
+function renderLotHistory(qc){const lots=qc.lotHistory||[{lot:qc.lot||'–',date:'',type:'qc',note:'Začetni lot'}];const typeInfo={qc:{label:'🔴 QC lot',color:'#dc2626'},cal:{label:'🟠 Kalibrator',color:'#f97316'},note:{label:'📝 Opomba',color:'#8b5cf6'}};let lastQcIdx=-1;lots.forEach((l,i)=>{if((l.type||'qc')==='qc')lastQcIdx=i;});$i('lotHistoryBody').innerHTML='<div class="tbl-wrap"><table><thead><tr><th>Tip</th><th>Lot</th><th>Datum</th><th>Rok</th><th>Vnosi</th><th>Analizatorji</th><th>Opomba</th><th></th></tr></thead><tbody>'+lots.map((l,i)=>{const ti=typeInfo[l.type||'qc']||typeInfo.qc;const isActive=(l.type||'qc')==='qc'&&i===lastQcIdx;const analHtml=(l.type==='cal'&&l.analyzers&&l.analyzers.length)?l.analyzers.map(a=>'<span class="badge badge-blue" style="font-size:11px;margin-right:2px">'+a+'</span>').join(''):'<span class="muted" style="font-size:11px">—</span>';const isQc=(l.type||'qc')==='qc'&&l.lot&&l.lot!=='–';const exp=isQc?_lotExpiry(qc,l.lot):'';const dl=exp?daysLeft(exp):null;const rokHtml=isQc?(exp?fmtExp(exp)+' '+expiryBadge(dl):'<span class="muted" style="font-size:11px">—</span>'):'';const nE=isQc?_lotEntries(qc.name,l.lot).length:0;const vnosiHtml=isQc?(nE?'<button class="btn btn-a btn-sm" onclick="showLotEntries('+currentLotQcIdx+',\''+_repEsc(l.lot)+'\')">'+nE+'</button>':'<span class="muted" style="font-size:11px">0</span>'):'';return '<tr><td><span style="font-size:12px;color:'+ti.color+';font-weight:600">'+ti.label+'</span></td><td><strong>'+(l.lot||'–')+'</strong>'+(isActive?'<span class="badge badge-ok" style="margin-left:6px">Aktiven</span>':'')+'</td><td style="font-size:12px">'+(l.date||'–')+'</td><td style="font-size:12px;white-space:nowrap">'+rokHtml+'</td><td>'+vnosiHtml+'</td><td>'+analHtml+'</td><td style="font-size:12px" class="muted">'+(l.note||'')+'</td><td>'+(i>0?'<button class="btn btn-d btn-sm" onclick="deleteLot('+i+')">🗑️</button>':'<span style="font-size:10px" class="muted">Izhodiščni</span>')+'</td></tr>';}).join('')+'</tbody></table></div><div id="lotTraceBody" style="margin-top:8px"></div>';}
+/* sledljivost: seznam QC vnosov za izbrani lot */
+function showLotEntries(qcIdx,lot){const qc=S.qcMaterials[qcIdx];if(!qc)return;const ents=_lotEntries(qc.name,lot).sort((a,b)=>(b.datetime||'').localeCompare(a.datetime||''));const box=$i('lotTraceBody');if(!box)return;if(!ents.length){box.innerHTML='<div class="empty">Ni vnosov za lot '+_repEsc(lot)+'.</div>';return;}let h='<div style="font-weight:600;font-size:13px;margin-bottom:6px">Sledljivost — vnosi z lotom '+_repEsc(lot)+' ('+ents.length+')</div><div class="tbl-wrap"><table><thead><tr><th>Datum</th><th>Analizator</th><th>Operater</th><th>Izpadi</th></tr></thead><tbody>';ents.forEach(e=>{const nf=(e.results||[]).filter(r=>r.sd&&r.sd!=='ok').length;h+='<tr><td style="font-size:12px;white-space:nowrap">'+new Date(e.datetime).toLocaleString('sl-SI')+'</td><td><span class="badge badge-blue">'+_repEsc(e.instrId||'')+'</span></td><td style="font-size:12px">'+_repEsc(getOpName(e.operatorId))+'</td><td>'+(nf?'<span class="badge badge-2sd">'+nf+'</span>':'<span class="badge badge-ok">0</span>')+'</td></tr>';});h+='</tbody></table></div>';box.innerHTML=h;}
 function toggleLotTypeFields(){const type=$i('newLotType').value;const numWrap=$i('newLotNumWrap');const analWrap=$i('newLotAnalWrap');if(type==='note'){numWrap.style.display='none';analWrap.style.display='none';}else{numWrap.style.display='';$i('newLotNumLabel').textContent=type==='cal'?'Nova lot številka kalibratorja':'Nova lot številka QC kontrole';analWrap.style.display=type==='cal'?'':'none';if(type!=='cal')['calAL01','calAL02','calAL03','calAL04'].forEach(id=>{const el=$i(id);if(el)el.checked=false;});}}
-function addLot(){const type=$i('newLotType').value,lot=$i('newLotNum').value.trim(),date=$i('newLotDate').value,note=$i('newLotNote').value.trim();if(type!=='note'&&!lot){notify('Vpišite lot številko','warning');return;}if(!date){notify('Izberite datum','warning');return;}const qc=S.qcMaterials[currentLotQcIdx];if(!qc.lotHistory)qc.lotHistory=[{lot:qc.lot||'–',date:'',type:'qc',note:'Začetni lot'}];const entry={lot:lot||'–',date,type,note};if(type==='cal'){entry.analyzers=['AL01','AL02','AL03','AL04'].filter(id=>{const el=$i('cal'+id);return el&&el.checked;});}qc.lotHistory.push(entry);if(type==='qc'&&lot)qc.lot=lot;save();renderLotHistory(qc);renderQcMats();notify('Vnos zabeležen','success');$i('newLotNum').value='';$i('newLotNote').value='';['calAL01','calAL02','calAL03','calAL04'].forEach(id=>{const el=$i(id);if(el)el.checked=false;});}
-function deleteLot(i){if(!confirm('Izbriši lot?'))return;const qc=S.qcMaterials[currentLotQcIdx];if(qc.lotHistory)qc.lotHistory.splice(i,1);save();renderLotHistory(qc);notify('Lot izbrisan');}
+function addLot(){const type=$i('newLotType').value,lot=$i('newLotNum').value.trim(),date=$i('newLotDate').value,note=$i('newLotNote').value.trim();if(type!=='note'&&!lot){notify('Vpišite lot številko','warning');return;}if(!date){notify('Izberite datum','warning');return;}const qc=S.qcMaterials[currentLotQcIdx];if(!qc.lotHistory)qc.lotHistory=[{lot:qc.lot||'–',date:'',type:'qc',note:'Začetni lot'}];const entry={lot:lot||'–',date,type,note};if(type==='cal'){entry.analyzers=['AL01','AL02','AL03','AL04'].filter(id=>{const el=$i('cal'+id);return el&&el.checked;});}qc.lotHistory.push(entry);if(type==='qc'&&lot)qc.lot=lot;_audit('create','lot',qc.name+'/'+(lot||'–'),'Dodan lot ('+type+') '+(lot||'–')+' za '+qc.name+(date?' · '+date:''),null,entry,'system');save();renderLotHistory(qc);renderQcMats();notify('Vnos zabeležen','success');$i('newLotNum').value='';$i('newLotNote').value='';['calAL01','calAL02','calAL03','calAL04'].forEach(id=>{const el=$i(id);if(el)el.checked=false;});}
+function deleteLot(i){if(!confirm('Izbriši lot?'))return;const qc=S.qcMaterials[currentLotQcIdx];const rec=qc.lotHistory?qc.lotHistory[i]:null;if(qc.lotHistory)qc.lotHistory.splice(i,1);if(rec)_audit('delete','lot',qc.name+'/'+(rec.lot||'–'),'Izbrisan lot '+(rec.lot||'–')+' za '+qc.name,rec,null,'system');save();renderLotHistory(qc);notify('Lot izbrisan');}
 
 /* ===== QC VREDNOSTI (uradne Abbott vrednosti lotov: XML + PDF) ===== */
 /* Naš SD = 2/3 proizvajalčevega (Mean nespremenjen): naš ±3SD = proizvajalčev ±2SD (ožje meje). */
@@ -2652,6 +3273,7 @@ function storeQcValues(parsed,source,xmlRaw){
     fileVersion:parsed.fileVersion,fileDate:parsed.fileDate,assays:parsed.assays,
     assayCount,importedAt:new Date().toISOString(),source:source||'manual',
     xmlRaw:xmlRaw||prev.xmlRaw||'',pdfPath:prev.pdfPath};
+  _audit(prev.lot?'update':'create','qcvalue',parsed.lot,'Uvoz uradnih QC vrednosti '+(parsed.control||'')+' · lot '+parsed.lot+' · '+assayCount+' preiskav · vir '+(source||'manual')+(parsed.fileVersion?' · v'+parsed.fileVersion:''),prev.lot?{fileVersion:prev.fileVersion,assayCount:prev.assayCount}:null,{fileVersion:parsed.fileVersion,assayCount},'system');
   save();
   return {lot:parsed.lot,control:parsed.control,assays:assayCount};
 }
@@ -2668,7 +3290,8 @@ function resolveQcValue(q,assay,level){
   const umap=(S.qcUnitMap&&S.qcUnitMap[q.name])||{};
   const unit=umap[assay]||Object.keys(lv.units)[0];
   const u=lv.units[unit]||lv.units[Object.keys(lv.units)[0]];if(!u)return null;
-  return {mean:u.mean,sd:u.sd,sdMfr:u.sdMfr,low:u.low,high:u.high,unit:unit,lot:vals.lot,fileVersion:vals.fileVersion};
+  const eff=qcEffective(vals.lot,num,lvKey,unit,u.mean,(u.sdMfr!=null?u.sdMfr:u.sd));
+  return {mean:eff.mean,sd:eff.sd,sdMfr:u.sdMfr,low:eff.low,high:eff.high,unit:unit,lot:vals.lot,fileVersion:vals.fileVersion,own:eff.ownMean||eff.ownSd};
 }
 
 /* --- Generator analizatorskega XML z zoženimi mejami (naš SD = 2/3 proizv.) --- */
@@ -2677,10 +3300,14 @@ function _fmtLike(origStr,val){if(!isFinite(val))return origStr;return val.toFix
 /* efektivni SD/Low/High za (lot,num,lv,unit) — override ali 2/3 pretvorba */
 function qcEffective(lot,num,lv,unit,mean,sdMfr){
   const ov=(((S.qcOverrides&&S.qcOverrides[lot]||{})[num]||{})[lv]||{})[unit]||{};
-  const sd=isFinite(ov.sd)?ov.sd:sdMfr*2/3;
-  const low=isFinite(ov.low)?ov.low:(mean-2*sd);
-  const high=isFinite(ov.high)?ov.high:(mean+2*sd);
-  return {sd,low,high,overridden:isFinite(ov.sd)||isFinite(ov.low)||isFinite(ov.high)};
+  const lotF=((S.qcValues&&S.qcValues[lot])||{}).sdFactor;
+  const f=isFinite(lotF)?lotF:2/3;
+  const effMean=isFinite(ov.mean)?ov.mean:mean;
+  const sd=isFinite(ov.sd)?ov.sd:sdMfr*f;
+  const low=isFinite(ov.low)?ov.low:(effMean-2*sd);
+  const high=isFinite(ov.high)?ov.high:(effMean+2*sd);
+  return {mean:effMean,sd,low,high,ownMean:isFinite(ov.mean),ownSd:isFinite(ov.sd),
+    overridden:isFinite(ov.sd)||isFinite(ov.low)||isFinite(ov.high)||isFinite(ov.mean)};
 }
 function qcSetOverride(lot,num,lv,unit,field,val){
   if(!S.qcOverrides)S.qcOverrides={};
@@ -2690,28 +3317,45 @@ function qcSetOverride(lot,num,lv,unit,field,val){
   save();
 }
 function qcResetOverride(lot,num,lv,unit){const O=S.qcOverrides&&S.qcOverrides[lot];if(O&&O[num]&&O[num][lv])delete O[num][lv][unit];save();}
-/* zgradi analizatorski XML iz izvornega (xmlRaw): spremeni le SD/Low/High, vse ostalo nespremenjeno */
+/* Nabor 'naših' Abbott preiskav za material iz potrjene preslikave: {abbottNum: našaEnota|null}.
+   Vrne null, če material nima preslikave (klicatelj naj obdrži vse + opozori). */
+function qcUsedAssays(matName){
+  const amap=(matName&&S.qcAssayMap&&S.qcAssayMap[matName])||{};
+  if(!Object.keys(amap).length)return null;
+  const umap=(matName&&S.qcUnitMap&&S.qcUnitMap[matName])||{};
+  const out={};
+  Object.keys(amap).forEach(a=>{const num=amap[a];if(num)out[num]=umap[a]||null;});
+  return Object.keys(out).length?out:null;
+}
+/* trenutni material XML-pripravljalnika */
+function _qcXmlMatName(){return qcXmlPrepIdx!=null&&S.qcMaterials[qcXmlPrepIdx]?S.qcMaterials[qcXmlPrepIdx].name:null;}
+/* aktivni filter naših preiskav (ali null = obdrži vse) */
+function _qcXmlUsedFilter(){if(!_qcXmlOnlyUsed)return null;return qcUsedAssays(_qcXmlMatName());}
+/* zgradi analizatorski XML iz izvornega (xmlRaw): spremeni le SD/Low/High; če je filter aktiven, obdrži le naše preiskave/enote */
 function buildAdjustedQcXml(lot){
   const v=S.qcValues&&S.qcValues[lot];if(!v||!v.xmlRaw)throw new Error('Ni izvornega XML za lot '+lot+' (najprej uvozite uradni XML)');
   const doc=new DOMParser().parseFromString(v.xmlRaw,'text/xml');
   if(doc.getElementsByTagName('parsererror').length)throw new Error('Izvorni XML neveljaven');
-  const assays=doc.getElementsByTagName('Assay');
-  for(let i=0;i<assays.length;i++){const a=assays[i];const num=a.getAttribute('Number');
-    const units=a.getElementsByTagName('DataUnit');
-    for(let j=0;j<units.length;j++){const du=units[j];const unit=du.getAttribute('Unit');
-      const cls=du.getElementsByTagName('ControlLevel');
-      for(let k=0;k<cls.length;k++){const cl=cls[k];const lv=cl.getAttribute('Name');
+  const used=_qcXmlUsedFilter();
+  const assays=Array.from(doc.getElementsByTagName('Assay'));
+  assays.forEach(a=>{const num=a.getAttribute('Number');
+    if(used&&!(num in used)){if(a.parentNode)a.parentNode.removeChild(a);return;}
+    const wantUnit=used?used[num]:null;
+    Array.from(a.getElementsByTagName('DataUnit')).forEach(du=>{const unit=du.getAttribute('Unit');
+      if(used&&wantUnit&&unit!==wantUnit){if(du.parentNode)du.parentNode.removeChild(du);return;}
+      Array.from(du.getElementsByTagName('ControlLevel')).forEach(cl=>{const lv=cl.getAttribute('Name');
         const meanS=cl.getAttribute('Mean'),sdS=cl.getAttribute('StandardDeviation');
         const lowS=cl.getAttribute('LowRangeValue'),highS=cl.getAttribute('HighRangeValue');
         const mean=parseFloat(meanS),sdMfr=parseFloat(sdS);
-        if(!isFinite(mean)||!isFinite(sdMfr))continue;
+        if(!isFinite(mean)||!isFinite(sdMfr))return;
         const e=qcEffective(lot,num,lv,unit,mean,sdMfr);
+        if(meanS!=null)cl.setAttribute('Mean',_fmtLike(meanS,e.mean));
         if(sdS!=null)cl.setAttribute('StandardDeviation',_fmtLike(sdS,e.sd));
         if(lowS!=null)cl.setAttribute('LowRangeValue',_fmtLike(lowS,e.low));
         if(highS!=null)cl.setAttribute('HighRangeValue',_fmtLike(highS,e.high));
-      }
-    }
-  }
+      });
+    });
+  });
   return new XMLSerializer().serializeToString(doc);
 }
 function _qcSlug(s){return String(s||'').replace(/[^A-Za-z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0,40);}
@@ -2830,7 +3474,7 @@ function onQcXmlFetched(lot,xmlText,msg){
 }
 
 /* ===== QC XML PRIPRAVLJALNIK (analizatorski XML + PDF potrditev) ===== */
-let qcXmlPrepIdx=null,_qcXmlLot=null;
+let qcXmlPrepIdx=null,_qcXmlLot=null,_qcXmlOnlyUsed=true;
 
 function openQcXmlPrepModal(idx){
   qcXmlPrepIdx=idx;
@@ -2846,24 +3490,50 @@ function openQcXmlPrepModal(idx){
     $i('qcXmlPrepBtns').style.display='none';
   }else{
     $i('qcXmlPrepBtns').style.display='';
+    const f=isFinite(vals.sdFactor)?vals.sdFactor:2/3;
+    $i('qcXmlF13').checked=Math.abs(f-1/3)<0.01;
+    $i('qcXmlF23').checked=!$i('qcXmlF13').checked;
+    if($i('qcXmlOnlyUsed'))$i('qcXmlOnlyUsed').checked=_qcXmlOnlyUsed;
+    _qcXmlUpdateFactorHint(f);
     _renderQcXmlTable(lot,vals);
   }
   closeMo('qcValModal');
   showMo('qcXmlPrepModal');
 }
 
+function _qcXmlUpdateFactorHint(f){
+  const fr=Math.abs(f-1/3)<0.01?'&#x2153;':Math.abs(f-2/3)<0.01?'&#x2154;':(Math.round(f*100)+'%');
+  const h=$i('qcXmlFactorHint');if(h)h.innerHTML='SD<sub>naš</sub> = '+fr+' &times; SD<sub>mfr</sub> &middot; meje = Mean &plusmn; 2&middot;SD &middot; kliknite SD za popravek';
+}
+function _qcXmlSetFactor(f){
+  if(!_qcXmlLot||!S.qcValues||!S.qcValues[_qcXmlLot])return;
+  S.qcValues[_qcXmlLot].sdFactor=f;
+  save();
+  _qcXmlUpdateFactorHint(f);
+  _renderQcXmlTable(_qcXmlLot,S.qcValues[_qcXmlLot]);
+}
+function _qcXmlToggleOnlyUsed(on){
+  _qcXmlOnlyUsed=!!on;
+  if(_qcXmlLot&&S.qcValues&&S.qcValues[_qcXmlLot])_renderQcXmlTable(_qcXmlLot,S.qcValues[_qcXmlLot]);
+}
 function _qcCellId(num,lv,unit){return [num,lv,unit].map(s=>String(s||'').replace(/[^a-zA-Z0-9]/g,'_')).join('_');}
 
 function _renderQcXmlTable(lot,vals){
   const doc=new DOMParser().parseFromString(vals.xmlRaw,'text/xml');
   if(doc.getElementsByTagName('parsererror').length){$i('qcXmlPrepBody').innerHTML='<div style="color:var(--red)">Neveljaven XML.</div>';return;}
+  const used=_qcXmlUsedFilter();
+  const noMap=_qcXmlOnlyUsed&&qcUsedAssays(_qcXmlMatName())===null;
   const assays=doc.getElementsByTagName('Assay');
-  const allLevels=[],rows=[];
+  const allLevels=[],rows=[];let totalAssays=0;
   for(let i=0;i<assays.length;i++){
     const a=assays[i];const num=a.getAttribute('Number');const name=a.getAttribute('Name')||num;
+    totalAssays++;
+    if(used&&!(num in used))continue;
+    const wantUnit=used?used[num]:null;
     const unitEls=a.getElementsByTagName('DataUnit');
     for(let j=0;j<unitEls.length;j++){
       const du=unitEls[j];const unit=du.getAttribute('Unit');
+      if(used&&wantUnit&&unit!==wantUnit)continue;
       const lvData={};
       const cls=du.getElementsByTagName('ControlLevel');
       for(let k=0;k<cls.length;k++){
@@ -2873,7 +3543,7 @@ function _renderQcXmlTable(lot,vals){
         if(!isFinite(mean)||!isFinite(sdMfr))continue;
         if(!allLevels.includes(lv))allLevels.push(lv);
         const e=qcEffective(lot,num,lv,unit,mean,sdMfr);
-        lvData[lv]={mean,sdMfr,sd:e.sd,low:e.low,high:e.high,meanS,sdS};
+        lvData[lv]={mean,sdMfr,sd:e.sd,low:e.low,high:e.high,meanS,sdS,effMean:e.mean,mOv:e.ownMean,sOv:e.ownSd};
       }
       if(Object.keys(lvData).length)rows.push({num,name,unit,lvData});
     }
@@ -2892,22 +3562,32 @@ function _renderQcXmlTable(lot,vals){
     allLevels.forEach(lv=>{
       const d=r.lvData[lv];
       if(!d){body+='<td colspan="3" style="color:var(--text3);text-align:center">—</td>';return;}
-      const isOv=isFinite((((((S.qcOverrides||{})[lot]||{})[r.num]||{})[lv]||{})[r.unit]||{}).sd);
       const cellId='qxlh_'+_qcCellId(r.num,lv,r.unit);
-      body+='<td style="font-family:var(--mono);font-size:11px;color:var(--text3)">'+_repEsc(_fmtLike(d.meanS,d.mean))+'</td>';
+      body+='<td><input type="number" step="any" class="qcxml-mean" '+
+        'data-num="'+_repEsc(r.num)+'" data-lv="'+_repEsc(lv)+'" data-unit="'+_repEsc(r.unit)+'" '+
+        'data-meanmfr="'+d.mean+'" data-means="'+_repEsc(d.meanS)+'" data-lot="'+_repEsc(lot)+'" '+
+        'value="'+_repEsc(_fmtLike(d.meanS,d.effMean))+'" '+
+        'style="width:74px;font-family:var(--mono);font-size:11px;border:1px solid '+(d.mOv?'var(--purple)':'var(--border)')+';border-radius:4px;padding:3px 5px;background:'+(d.mOv?'var(--pbg)':'var(--bg)')+';color:var(--text)" '+
+        'oninput="_qcXmlMeanLive(this)" onchange="_qcXmlMeanSave(this)"></td>';
       body+='<td><input type="number" step="any" class="qcxml-sd" '+
         'data-num="'+_repEsc(r.num)+'" data-lv="'+_repEsc(lv)+'" data-unit="'+_repEsc(r.unit)+'" '+
         'data-mean="'+d.mean+'" data-sdmfr="'+d.sdMfr+'" data-sds="'+_repEsc(d.sdS)+'" data-lot="'+_repEsc(lot)+'" '+
         'value="'+_repEsc(_fmtLike(d.sdS,d.sd))+'" '+
-        'style="width:82px;font-family:var(--mono);font-size:11px;border:1px solid '+(isOv?'var(--purple)':'var(--border)')+';border-radius:4px;padding:3px 5px;background:'+(isOv?'var(--pbg)':'var(--bg)')+';color:var(--text)" '+
+        'style="width:82px;font-family:var(--mono);font-size:11px;border:1px solid '+(d.sOv?'var(--purple)':'var(--border)')+';border-radius:4px;padding:3px 5px;background:'+(d.sOv?'var(--pbg)':'var(--bg)')+';color:var(--text)" '+
         'oninput="_qcXmlSdLive(this)" onchange="_qcXmlSdSave(this)"></td>';
       body+='<td style="font-family:var(--mono);font-size:11px" id="'+cellId+'">'+_repEsc(_fmtLike(d.sdS,d.low)+' – '+_fmtLike(d.sdS,d.high))+'</td>';
     });
     body+='<td style="padding:2px"><button class="btn btn-g" style="padding:3px 8px;font-size:11px;min-height:0" '+
-      'onclick="_qcXmlResetRow(\''+_repEsc(r.num)+'\',\''+_repEsc(r.unit)+'\',\''+_repEsc(lot)+'\')" title="Ponastavi vrstico na ⅔">↺</button></td>';
+      'onclick="_qcXmlResetRow(\''+_repEsc(r.num)+'\',\''+_repEsc(r.unit)+'\',\''+_repEsc(lot)+'\')" title="Ponastavi na proizvajalca (Mean + ⅓/⅔×SD)">↺</button></td>';
     body+='</tr>';
   });
-  $i('qcXmlPrepBody').innerHTML='<style>.qcxml-hidden{display:none!important}</style>'+
+  let banner='';
+  if(noMap){
+    banner='<div style="background:var(--obg,rgba(217,119,6,.12));border:1px solid var(--orange);border-radius:6px;padding:7px 10px;margin-bottom:8px;font-size:12px;color:var(--orange)">⚠ Material nima potrjene preslikave — prikazane so <b>vse</b> preiskave. Povežite jih v »QC vrednosti«, da v XML/PDF ostanejo le preiskave, ki jih izvajate.</div>';
+  }else if(used){
+    banner='<div style="background:rgba(15,110,86,.10);border:1px solid var(--accent2);border-radius:6px;padding:7px 10px;margin-bottom:8px;font-size:12px;color:var(--accent2)">✓ Prikazane <b>'+rows.length+'</b> naših preiskav (od '+totalAssays+' v kontroli) — v enoti, ki jo uporabljamo.</div>';
+  }
+  $i('qcXmlPrepBody').innerHTML='<style>.qcxml-hidden{display:none!important}</style>'+banner+
     '<div class="tbl-wrap"><table style="font-size:12px;border-collapse:collapse;width:100%">'+
     '<thead style="position:sticky;top:0;z-index:2">'+hdr+'</thead><tbody>'+body+'</tbody></table></div>';
 }
@@ -2919,14 +3599,36 @@ function qcXmlFilterChanged(){
   });
 }
 
+/* trenutni Mean za celico (lastni vnos ali proizvajalčev) */
+function _qcXmlCellMean(num,lv,unit){
+  const m=document.querySelector('.qcxml-mean[data-num="'+num+'"][data-lv="'+lv+'"][data-unit="'+unit+'"]');
+  if(m){const v=parseFloat(m.value);if(isFinite(v))return v;const mf=parseFloat(m.dataset.meanmfr);if(isFinite(mf))return mf;}
+  const s=document.querySelector('.qcxml-sd[data-num="'+num+'"][data-lv="'+lv+'"][data-unit="'+unit+'"]');
+  return s?parseFloat(s.dataset.mean):NaN;
+}
+/* preračunaj prikaz Low – High iz trenutnih Mean in SD vnosov v celici */
+function _qcXmlRecalcLowHigh(num,lv,unit){
+  const sd=document.querySelector('.qcxml-sd[data-num="'+num+'"][data-lv="'+lv+'"][data-unit="'+unit+'"]');
+  if(!sd)return;
+  const newSd=parseFloat(sd.value),mean=_qcXmlCellMean(num,lv,unit);
+  const fmt=sd.dataset.sds||sd.dataset.sdmfr||'0.00';
+  const cell=$i('qxlh_'+_qcCellId(num,lv,unit));
+  if(cell&&isFinite(newSd)&&isFinite(mean))cell.textContent=_fmtLike(fmt,mean-2*newSd)+' – '+_fmtLike(fmt,mean+2*newSd);
+}
 function _qcXmlSdLive(inp){
-  const newSd=parseFloat(inp.value),mean=parseFloat(inp.dataset.mean),sdMfr=parseFloat(inp.dataset.sdmfr);
-  if(!isFinite(newSd)||!isFinite(mean))return;
+  const newSd=parseFloat(inp.value),sdMfr=parseFloat(inp.dataset.sdmfr);
   const fmt=inp.dataset.sds||inp.dataset.sdmfr||'0.00';
-  const low=mean-2*newSd,high=mean+2*newSd;
-  const cell=$i('qxlh_'+_qcCellId(inp.dataset.num,inp.dataset.lv,inp.dataset.unit));
-  if(cell)cell.textContent=_fmtLike(fmt,low)+' – '+_fmtLike(fmt,high);
-  const isDefault=isFinite(sdMfr)&&Math.abs(newSd-sdMfr*2/3)<Math.pow(10,-_decimals(fmt)-1);
+  _qcXmlRecalcLowHigh(inp.dataset.num,inp.dataset.lv,inp.dataset.unit);
+  const lotFl=((S.qcValues&&S.qcValues[inp.dataset.lot])||{}).sdFactor;const fl=isFinite(lotFl)?lotFl:2/3;
+  const isDefault=isFinite(sdMfr)&&isFinite(newSd)&&Math.abs(newSd-sdMfr*fl)<Math.pow(10,-_decimals(fmt)-1);
+  inp.style.borderColor=isDefault?'':'var(--purple)';
+  inp.style.background=isDefault?'':'var(--pbg)';
+}
+function _qcXmlMeanLive(inp){
+  const newMean=parseFloat(inp.value),meanMfr=parseFloat(inp.dataset.meanmfr);
+  const fmt=inp.dataset.means||'0.00';
+  _qcXmlRecalcLowHigh(inp.dataset.num,inp.dataset.lv,inp.dataset.unit);
+  const isDefault=isFinite(meanMfr)&&isFinite(newMean)&&Math.abs(newMean-meanMfr)<Math.pow(10,-_decimals(fmt)-1);
   inp.style.borderColor=isDefault?'':'var(--purple)';
   inp.style.background=isDefault?'':'var(--pbg)';
 }
@@ -2935,27 +3637,52 @@ function _qcXmlSdSave(inp){
   const lot=inp.dataset.lot,num=inp.dataset.num,lv=inp.dataset.lv,unit=inp.dataset.unit;
   const sdMfr=parseFloat(inp.dataset.sdmfr),newSd=parseFloat(inp.value);
   const fmt=inp.dataset.sds||inp.dataset.sdmfr||'0.00';
-  if(isFinite(newSd)&&isFinite(sdMfr)&&Math.abs(newSd-sdMfr*2/3)>Math.pow(10,-_decimals(fmt)-1)){
+  const lotFsv=((S.qcValues&&S.qcValues[lot])||{}).sdFactor;const fsv=isFinite(lotFsv)?lotFsv:2/3;
+  const prev=((((((S.qcOverrides||{})[lot]||{})[num]||{})[lv]||{})[unit]||{}).sd);
+  if(isFinite(newSd)&&isFinite(sdMfr)&&Math.abs(newSd-sdMfr*fsv)>Math.pow(10,-_decimals(fmt)-1)){
     qcSetOverride(lot,num,lv,unit,'sd',newSd);
+    _audit('update','qcOverride',lot+'/'+num+'/L'+lv,'Lastni SD: lot '+lot+' · preiskava '+num+' · nivo '+lv+' = '+_fmtLike(fmt,newSd),isFinite(prev)?{sd:prev}:{sd:sdMfr*fsv},{sd:newSd},null);
   }else{
-    qcResetOverride(lot,num,lv,unit);
+    qcSetOverride(lot,num,lv,unit,'sd','');
     inp.style.borderColor='';inp.style.background='';
-    if(isFinite(sdMfr)){const d=sdMfr*2/3;inp.value=_fmtLike(fmt,d);}
+    if(isFinite(sdMfr)){inp.value=_fmtLike(fmt,sdMfr*fsv);}
+    if(isFinite(prev))_audit('update','qcOverride',lot+'/'+num+'/L'+lv,'Ponastavljen SD na proizvajalca: lot '+lot+' · preiskava '+num+' · nivo '+lv,{sd:prev},{sd:sdMfr*fsv},null);
   }
+}
+function _qcXmlMeanSave(inp){
+  const lot=inp.dataset.lot,num=inp.dataset.num,lv=inp.dataset.lv,unit=inp.dataset.unit;
+  const meanMfr=parseFloat(inp.dataset.meanmfr),newMean=parseFloat(inp.value);
+  const fmt=inp.dataset.means||'0.00';
+  const prev=((((((S.qcOverrides||{})[lot]||{})[num]||{})[lv]||{})[unit]||{}).mean);
+  if(isFinite(newMean)&&isFinite(meanMfr)&&Math.abs(newMean-meanMfr)>Math.pow(10,-_decimals(fmt)-1)){
+    qcSetOverride(lot,num,lv,unit,'mean',newMean);
+    _audit('update','qcOverride',lot+'/'+num+'/L'+lv,'Lastni Mean: lot '+lot+' · preiskava '+num+' · nivo '+lv+' = '+_fmtLike(fmt,newMean),isFinite(prev)?{mean:prev}:{mean:meanMfr},{mean:newMean},null);
+  }else{
+    qcSetOverride(lot,num,lv,unit,'mean','');
+    inp.style.borderColor='';inp.style.background='';
+    if(isFinite(meanMfr)){inp.value=_fmtLike(fmt,meanMfr);}
+    if(isFinite(prev))_audit('update','qcOverride',lot+'/'+num+'/L'+lv,'Ponastavljen Mean na proizvajalca: lot '+lot+' · preiskava '+num+' · nivo '+lv,{mean:prev},{mean:meanMfr},null);
+  }
+  _qcXmlRecalcLowHigh(num,lv,unit);
 }
 
 function _qcXmlResetRow(num,unit,lot){
   ['1','2','3'].forEach(lv=>qcResetOverride(lot,num,lv,unit));
+  const lotFr=((S.qcValues&&S.qcValues[lot])||{}).sdFactor;const fr=isFinite(lotFr)?lotFr:2/3;
+  document.querySelectorAll('.qcxml-mean[data-num="'+num+'"][data-unit="'+unit+'"]').forEach(inp=>{
+    const meanMfr=parseFloat(inp.dataset.meanmfr);const fmt=inp.dataset.means||'0.00';
+    if(isFinite(meanMfr))inp.value=_fmtLike(fmt,meanMfr);
+    inp.style.borderColor='';inp.style.background='';
+  });
   document.querySelectorAll('.qcxml-sd[data-num="'+num+'"][data-unit="'+unit+'"]').forEach(inp=>{
-    const sdMfr=parseFloat(inp.dataset.sdmfr),mean=parseFloat(inp.dataset.mean);
+    const sdMfr=parseFloat(inp.dataset.sdmfr);
     const fmt=inp.dataset.sds||inp.dataset.sdmfr||'0.00';
     if(!isFinite(sdMfr))return;
-    const sd=sdMfr*2/3;inp.value=_fmtLike(fmt,sd);
+    inp.value=_fmtLike(fmt,sdMfr*fr);
     inp.style.borderColor='';inp.style.background='';
-    const cell=$i('qxlh_'+_qcCellId(num,inp.dataset.lv,unit));
-    if(cell&&isFinite(mean))cell.textContent=_fmtLike(fmt,mean-2*sd)+' – '+_fmtLike(fmt,mean+2*sd);
+    _qcXmlRecalcLowHigh(num,inp.dataset.lv,unit);
   });
-  notify('Vrstica ponastavljena na ⅔ (≠ override)','ok');
+  notify('Vrstica ponastavljena na proizvajalca','ok');
 }
 
 function exportQcXml(lot){
@@ -2987,14 +3714,19 @@ function buildQcXmlReportHtml(lot,matNameOvr){
   const q=qcXmlPrepIdx!=null?S.qcMaterials[qcXmlPrepIdx]:null;
   const matName=matNameOvr||(q?q.name:(v.control||lot));
   const today=_qcToday();
+  const used=_qcXmlOnlyUsed?qcUsedAssays(matName):null;
   const doc=new DOMParser().parseFromString(v.xmlRaw,'text/xml');
   const assays=doc.getElementsByTagName('Assay');
-  let body='';
+  let body='',keptRows=0,totalAssays=0;
   for(let i=0;i<assays.length;i++){
     const a=assays[i];const num=a.getAttribute('Number');const name=a.getAttribute('Name')||num;
+    totalAssays++;
+    if(used&&!(num in used))continue;
+    const wantUnit=used?used[num]:null;
     const unitEls=a.getElementsByTagName('DataUnit');
     for(let j=0;j<unitEls.length;j++){
       const du=unitEls[j];const unit=du.getAttribute('Unit');
+      if(used&&wantUnit&&unit!==wantUnit)continue;
       const cls=du.getElementsByTagName('ControlLevel');
       const lvs=[];
       for(let k=0;k<cls.length;k++){
@@ -3003,21 +3735,33 @@ function buildQcXmlReportHtml(lot,matNameOvr){
         const mean=parseFloat(meanS),sdMfr=parseFloat(sdS);
         if(!isFinite(mean)||!isFinite(sdMfr))continue;
         const e=qcEffective(lot,num,lv,unit,mean,sdMfr);
-        const isOv=isFinite((((((S.qcOverrides||{})[lot]||{})[num]||{})[lv]||{})[unit]||{}).sd);
-        lvs.push({lv,m:_fmtLike(meanS,mean),sd:_fmtLike(sdS,e.sd),low:_fmtLike(sdS,e.low),high:_fmtLike(sdS,e.high),ov:isOv});
+        lvs.push({lv,m:_fmtLike(meanS,e.mean),sd:_fmtLike(sdS,e.sd),low:_fmtLike(sdS,e.low),high:_fmtLike(sdS,e.high),ov:e.ownSd,mOv:e.ownMean});
       }
       if(!lvs.length)continue;
-      body+='<tr><td>'+_repEsc(name)+'</td><td>'+_repEsc(unit)+'</td>';
-      lvs.forEach(lc=>{body+='<td>'+_repEsc(lc.m)+'</td><td'+(lc.ov?' class="ov"':'')+'>'+_repEsc(lc.sd)+'</td><td>'+_repEsc(lc.low)+' – '+_repEsc(lc.high)+'</td>';});
-      for(let p=lvs.length;p<3;p++)body+='<td colspan="3" style="color:#bbb;text-align:center">—</td>';
+      keptRows++;
+      const numPad=String(num).padStart(4,'0');
+      body+='<tr><td>'+_repEsc(name)+'</td><td style="font-family:Courier New,monospace;font-size:7.5pt;color:#555;text-align:center">'+numPad+'</td><td>'+_repEsc(unit)+'</td>';
+      const byLv={};lvs.forEach(lc=>byLv[lc.lv]=lc);
+      ['1','2','3'].forEach(L=>{
+        const lc=byLv[L];
+        if(lc){
+          const mCls=lc.mOv?' class="ov"':'',sCls=lc.ov?' class="ov"':'';
+          body+='<td'+mCls+'>'+_repEsc(lc.m)+'</td><td'+sCls+'>'+_repEsc(lc.sd)+'</td><td>'+_repEsc(lc.low)+' – '+_repEsc(lc.high)+'</td>';
+        }else body+='<td colspan="3" style="color:#bbb;text-align:center">—</td>';
+      });
       body+='</tr>';
     }
   }
+  const lotFpdf=((S.qcValues&&S.qcValues[lot])||{}).sdFactor;
+  const fpdf=isFinite(lotFpdf)?lotFpdf:2/3;
+  const fracStr=Math.abs(fpdf-1/3)<0.01?'&#x2153;':Math.abs(fpdf-2/3)<0.01?'&#x2154;':(Math.round(fpdf*100)+'%');
+  const expStr=v.expiry?(' &nbsp;|&nbsp; Rok: '+_repEsc(v.expiry)):'';
+  const cntStr=used?(keptRows+' od '+totalAssays+' preiskav (naše)'):(keptRows+' preiskav');
   return'<!DOCTYPE html><html><head><meta charset="UTF-8">'+
   '<title>QC XML — '+_repEsc(matName)+' — '+_repEsc(lot)+'</title>'+
   '<style>*{box-sizing:border-box;margin:0;padding:0}'+
   'body{font-family:Arial,Helvetica,sans-serif;font-size:9pt;color:#111;background:#fff}'+
-  'h1{font-size:13pt;font-weight:bold;margin-bottom:3px;color:#002060}'+
+  'h1{font-size:13pt;font-weight:bold;margin-bottom:2px;color:#002060}'+
   '.sub{font-size:8pt;color:#555;margin-bottom:10px}'+
   'table{border-collapse:collapse;width:100%}'+
   'th{background:#dde6f0;border:1px solid #999;padding:3px 5px;font-size:8pt;text-align:center;white-space:nowrap}'+
@@ -3025,15 +3769,44 @@ function buildQcXmlReportHtml(lot,matNameOvr){
   'td:first-child,td:nth-child(2){text-align:left;font-family:Arial,sans-serif}'+
   '.g{background:#eef3fb;text-align:center!important;font-weight:bold}'+
   '.ov{font-weight:bold;color:#5b21b6}'+
-  '.foot{margin-top:8px;font-size:7pt;color:#666;border-top:1px solid #ddd;padding-top:5px}'+
+  '.foot{margin-top:6px;font-size:7pt;color:#666;border-top:1px solid #ddd;padding-top:4px}'+
+  '.sig{margin-top:14px;border:1.5px solid #002060;border-radius:4px;padding:10px 14px}'+
+  '.sig h2{font-size:10pt;color:#002060;margin-bottom:8px;border-bottom:1px solid #c8d8ee;padding-bottom:4px}'+
+  '.sig p{font-size:8pt;color:#333;margin-bottom:10px}'+
+  '.sig-row{display:flex;gap:20px;margin-bottom:8px}'+
+  '.sig-field{flex:1;font-size:8pt}'+
+  '.sig-label{color:#555;font-size:7.5pt;margin-bottom:2px}'+
+  '.sig-line{border-bottom:1px solid #555;min-height:18px;margin-top:2px}'+
+  '.sig-note{font-size:7pt;color:#888;margin-top:8px;font-style:italic}'+
   '@page{size:A4 landscape;margin:10mm}</style></head><body>'+
   '<h1>QC XML — '+_repEsc(matName)+' — Lot '+_repEsc(lot)+'</h1>'+
-  '<div class="sub">SD<sub>naš</sub> = ⅔ × SD<sub>mfr</sub> | meje = Mean ± 2×SD | datum: '+today+' | '+Object.keys(v.assays||{}).length+' preiskav | <b>krepko SD</b> = lastna vrednost laboratorija</div>'+
-  '<table><thead><tr><th rowspan="2">Preiskava</th><th rowspan="2">Enota</th>'+
+  '<div class="sub">SD<sub>naš</sub> = '+fracStr+' &times; SD<sub>mfr</sub> &nbsp;|&nbsp; meje = Mean &plusmn; 2&times;SD &nbsp;|&nbsp; datum: '+today+expStr+' &nbsp;|&nbsp; '+cntStr+' &nbsp;|&nbsp; <b style="color:#5b21b6">krepko Mean/SD</b> = lastna vrednost laboratorija</div>'+
+  '<table><thead><tr><th rowspan="2">Preiskava</th><th rowspan="2" style="font-size:7pt">Assay#</th><th rowspan="2">Enota</th>'+
   '<th colspan="3" class="g">Nivo 1</th><th colspan="3" class="g">Nivo 2</th><th colspan="3" class="g">Nivo 3</th></tr>'+
   '<tr><th>Mean</th><th>SD</th><th>Low – High</th><th>Mean</th><th>SD</th><th>Low – High</th><th>Mean</th><th>SD</th><th>Low – High</th></tr>'+
   '</thead><tbody>'+body+'</tbody></table>'+
-  '<div class="foot">Pripravljeno: '+today+' &nbsp;|&nbsp; Kontrola: '+_repEsc(matName)+' &nbsp;|&nbsp; Lot: '+_repEsc(lot)+'</div>'+
+  '<div style="margin-top:6px;font-size:7pt;color:#555;border:1px solid #ddd;border-radius:3px;padding:5px 8px;background:#f8f9fc">'+
+  '<b>Legenda:</b> '+
+  '<b>Assay#</b> = Abbott interna koda preiskave (4-mestna, za identifikacijo v Alinity) &nbsp;|&nbsp; '+
+  '<b>Enota</b> = merska enota, ki jo uporabljamo v laboratoriju &nbsp;|&nbsp; '+
+  '<b>Mean</b> = ciljno povprečje (proizvajalec) &nbsp;|&nbsp; '+
+  '<b>SD</b> = naša standardna deviacija ('+fracStr+' &times; SD<sub>mfr</sub>)'+
+  (Math.abs(fpdf-1/3)<0.01?' &rarr; naš &plusmn;3SD = proi&shy;zvajalčev &plusmn;1SD':'&rarr; naš &plusmn;3SD = proi&shy;zvajalčev &plusmn;2SD')+
+  ' &nbsp;|&nbsp; <b>Low&nbsp;&ndash;&nbsp;High</b> = kontrolne meje (Mean &plusmn; 2&times;SD) &nbsp;|&nbsp; '+
+  '<b>Nivo 1/2/3</b> = nizek/normalen/visok kontrolni material &nbsp;|&nbsp; '+
+  '<b style="color:#5b21b6">krepko Mean ali SD</b> = lastna vrednost laboratorija (lastni Mean &plusmn; 2&times;lastni SD)'+
+  '</div>'+
+  '<div class="foot">'+_repEsc(IVDR_INFO.udiDi)+' &nbsp;|&nbsp; Pripravljeno: '+today+' &nbsp;|&nbsp; Kontrola: '+_repEsc(matName)+' &nbsp;|&nbsp; Lot: '+_repEsc(lot)+'</div>'+
+  '<div class="sig"><h2>&#10003; Pregled in potrditev specialista</h2>'+
+  '<p>Pregledal/a vrednosti QC kontrole ('+_repEsc(matName)+', lot '+_repEsc(lot)+') in potrdil/a, da so vrednosti Mean, SD in meje sprejemljive za vpeljavo v rutinsko delo.</p>'+
+  '<div class="sig-row">'+
+  '<div class="sig-field"><div class="sig-label">Datum pregleda</div><div class="sig-line"></div></div>'+
+  '<div class="sig-field" style="flex:2"><div class="sig-label">Ime in priimek specialista</div><div class="sig-line"></div></div>'+
+  '<div class="sig-field" style="flex:2"><div class="sig-label">Podpis</div><div class="sig-line"></div></div>'+
+  '</div>'+
+  '<div class="sig-row"><div class="sig-field" style="flex:1"><div class="sig-label">Opomba / ugotovitve</div><div class="sig-line"></div></div></div>'+
+  '<div class="sig-note">Dokument shraniti v mapo dokumentacije oddelka (ISO 15189 &sect; 7.3 / IVDR &#x010D;l. 5(5)c).</div>'+
+  '</div>'+
   '</body></html>';
 }
 
@@ -3161,20 +3934,24 @@ function renderMaintContent(){
   wrap.innerHTML=INSTRUMENTS.map(instr=>{
     const steps=getMaintSteps(type,instr.type);const key=instr.id+'_'+type;const checked=maintState.checked[key]||{};const ti=MAINT_TYPES[type];
     const todayRec=_maintCurRec(instr.id,type);
-    const confirmed={};if(todayRec)todayRec.steps.forEach(s=>{if(s.done)confirmed[s.id]=true;});
+    const isIdle=!!(todayRec&&todayRec.idle);
+    const confirmed={};if(todayRec&&!isIdle)todayRec.steps.forEach(s=>{if(s.done)confirmed[s.id]=true;});
     const doneCount=steps.filter(s=>confirmed[s.id]||(!confirmed[s.id]&&!!checked[s.id])).length;
     const allDone=steps.length>0&&doneCount===steps.length;
     const hasNewChecks=steps.some(s=>!confirmed[s.id]&&!!checked[s.id]);
     const newCount=steps.filter(s=>!confirmed[s.id]&&!!checked[s.id]).length;
     const instrLabel=instr.type==='l'?'Abbott linija':'Alinity '+instr.type.toUpperCase();
-    let bottomHtml='<div style="margin-top:12px;text-align:right">';
+    let bottomHtml='<div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end;align-items:center">';
+    if(!isIdle&&!allDone&&steps.length>0)bottomHtml+='<button class="btn btn-outline btn-sm" style="border-color:#b45309;color:#b45309" onclick="openMaintIdle(\''+instr.id+'\',\''+type+'\')">💤 Mirovanje</button>';
     if(hasNewChecks)bottomHtml+='<button class="btn '+(allDone?'btn-teal':'btn-outline')+' btn-sm" onclick="openMaintSign(\''+instr.id+'\',\''+type+'\')">'+(allDone?'✅ Potrdi in podpiši':'⚠️ Potrdi ('+newCount+' novih)')+'</button>';
+    else if(isIdle)bottomHtml+='<span class="badge" style="background:rgba(180,83,9,.12);color:#b45309;font-size:12px;padding:6px 12px">💤 V mirovanju '+_maintPeriodWord(type)+'</span>';
     else if(allDone)bottomHtml+='<span class="badge badge-ok" style="font-size:12px;padding:6px 12px">✅ Vse potrjeno '+_maintPeriodWord(type)+'</span>';
     else bottomHtml+='<button class="btn btn-g btn-sm" disabled>⚠️ Potrdi</button>';
     bottomHtml+='</div>';
-    return '<div class="card" style="border-left:4px solid '+(allDone?'var(--success)':ti.color)+'">'
-      +'<div class="card-title"><span>'+ti.icon+' '+instr.id+' &ndash; '+instr.name+'</span><span style="font-size:12px;font-weight:400;color:'+(allDone?'var(--success)':'var(--text3)')+'">'+(allDone?'✅ Vse opravljeno':doneCount+' / '+steps.length+' korakov')+'</span></div>'
-      +(todayRec?'<div style="background:var(--gbg);border:1px solid var(--green);border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:12px;color:var(--accent2)">✅ '+doneCount+'/'+steps.length+' potrjeno '+_maintPeriodWord(type)+' &ndash; zadnjič '+new Date(todayRec.datetime).toLocaleDateString('sl-SI',{day:'2-digit',month:'2-digit'})+' ob '+new Date(todayRec.datetime).toLocaleTimeString('sl-SI',{hour:'2-digit',minute:'2-digit'})+' ('+getOpName(todayRec.operatorId)+')</div>':'')
+    const headBorder=isIdle?'#b45309':(allDone?'var(--success)':ti.color);
+    return '<div class="card" style="border-left:4px solid '+headBorder+'">'
+      +'<div class="card-title"><span>'+ti.icon+' '+instr.id+' &ndash; '+instr.name+'</span><span style="font-size:12px;font-weight:400;color:'+(isIdle?'#b45309':(allDone?'var(--success)':'var(--text3)'))+'">'+(isIdle?'💤 V mirovanju':(allDone?'✅ Vse opravljeno':doneCount+' / '+steps.length+' korakov'))+'</span></div>'
+      +(isIdle?'<div style="background:rgba(180,83,9,.07);border:1px solid #b45309;border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:12px;color:#b45309">💤 Aparat '+_maintPeriodWord(type)+' v mirovanju (ni obratoval) &ndash; '+new Date(todayRec.datetime).toLocaleDateString('sl-SI',{day:'2-digit',month:'2-digit'})+' ('+getOpName(todayRec.operatorId)+')'+(todayRec.late?' · naknadni vnos':'')+'</div>':(todayRec?'<div style="background:var(--gbg);border:1px solid var(--green);border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:12px;color:var(--accent2)">✅ '+doneCount+'/'+steps.length+' potrjeno '+_maintPeriodWord(type)+' &ndash; zadnjič '+new Date(todayRec.datetime).toLocaleDateString('sl-SI',{day:'2-digit',month:'2-digit'})+' ob '+new Date(todayRec.datetime).toLocaleTimeString('sl-SI',{hour:'2-digit',minute:'2-digit'})+' ('+getOpName(todayRec.operatorId)+')'+(todayRec.late?' · naknadni vnos':'')+'</div>':''))
       +(steps.length===0?'<div class="muted" style="font-size:13px;padding:8px">Koraki bodo dodani za '+ti.label.toLowerCase()+' – '+instrLabel+'.</div>'
         :'<div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:10px"><button class="btn btn-g btn-sm" onclick="checkAllMaint(\''+instr.id+'\',\''+type+'\',true)">✔ Vse</button><button class="btn btn-g btn-sm" onclick="checkAllMaint(\''+instr.id+'\',\''+type+'\',false)">☐ Počisti</button></div>'
         +steps.map(step=>{
@@ -3193,7 +3970,69 @@ function buildMaintPinGrid(){const keys=[1,2,3,4,5,6,7,8,9,'',0,'⌫'];$i('maint
 function maintPinPress(k){if(k===''||k==='undefined')return;if(k==='⌫')maintPinVal=maintPinVal.slice(0,-1);else if(maintPinVal.length<5)maintPinVal+=k;updateMaintPinDisplay();}
 function clearMaintPin(){maintPinVal='';updateMaintPinDisplay();}
 function updateMaintPinDisplay(){for(let i=0;i<5;i++)$i('mpd'+i)?.classList.toggle('filled',i<maintPinVal.length);const op=S.operators.find(o=>o.id===maintPinVal);$i('maintPinName').textContent=op?'✓ '+op.first+' '+op.last:(maintPinVal.length===5?'⚠ Operater ni najden':'');}
-function saveMaintenance(){if(maintPinVal.length<5){notify('Vpišite matično številko','warning');return;}const op=S.operators.find(o=>o.id===maintPinVal);if(!op){notify('Operater ni registriran','error');return;}const {instrId,type}=maintState.pendingSign;const instr=INSTRUMENTS.find(i=>i.id===instrId);const steps=getMaintSteps(type,instr.type);const key=instrId+'_'+type;const checked=maintState.checked[key]||{};const note=$i('maintSignNote').value.trim();if(!S.maintenanceLog)S.maintenanceLog=[];const _pk=_maintPeriodKey(type,new Date().toISOString().slice(0,10));const existIdx=S.maintenanceLog.findIndex(m=>m.instrId===instrId&&m.type===type&&_maintPeriodKey(type,(m.datetime||'').slice(0,10))===_pk);if(existIdx>=0){const ex=S.maintenanceLog[existIdx];ex.steps.forEach(s=>{if(checked[s.id])s.done=true;});ex.doneCount=ex.steps.filter(s=>s.done).length;ex.datetime=new Date().toISOString();if(note)ex.note=ex.note?ex.note+' / '+note:note;ex.operatorId=maintPinVal;}else{S.maintenanceLog.push({id:Date.now().toString(),datetime:new Date().toISOString(),instrId,integration:instr.integration,type,steps:steps.map(s=>({id:s.id,text:s.text,done:!!checked[s.id]})),doneCount:steps.filter(s=>checked[s.id]).length,totalSteps:steps.length,note,operatorId:maintPinVal});}save();closeMo('maintSignModal');maintState.checked[key]={};renderMaintContent();notify('Vzdrževanje potrjeno! ✓','success');}
+/* ---- naknadni vnos vzdrževanja za nazaj / mirovanje ---- */
+function openMaintBack(){const today=new Date().toISOString().slice(0,10);$i('mbInstr').innerHTML=INSTRUMENTS.map(i=>'<option value="'+i.id+'">'+i.id+' &ndash; '+i.name+'</option>').join('');$i('mbType').value=maintState.type==='triannual'?'quarterly':maintState.type;$i('mbDate').max=today;$i('mbDate').value=today;$i('mbMode').value='done';$i('mbNote').value='';$i('mbReason').value='';$i('mbOp').value='';$i('mbOpName').textContent='';_maintBackRenderSteps();showMo('maintBackModal');}
+function _maintBackRenderSteps(){
+  const instrId=$i('mbInstr').value,type=$i('mbType').value,date=$i('mbDate').value,mode=$i('mbMode').value;
+  const today=new Date().toISOString().slice(0,10);const late=date&&date<today;
+  $i('mbLateWarn').style.display=late?'block':'none';
+  $i('mbReasonWrap').style.display=late?'block':'none';
+  const instr=INSTRUMENTS.find(i=>i.id===instrId);
+  const wrap=$i('mbStepsWrap');
+  if(mode==='idle'){wrap.innerHTML='<div style="background:rgba(180,83,9,.06);border:1px solid #b45309;border-radius:7px;padding:10px 12px;font-size:13px;color:#b45309">💤 Aparat je bil na izbrani datum v mirovanju (ni obratoval). Koraki se ne beležijo.</div>';return;}
+  const steps=getMaintSteps(type,instr?instr.type:'c');
+  if(!steps.length){wrap.innerHTML='<div class="muted" style="font-size:13px;padding:8px">Ni opravil za to vrsto/inštrument.</div>';return;}
+  wrap.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><label style="font-size:12px;font-weight:600;color:var(--text3)">Opravljeni koraki</label><button class="btn btn-g btn-sm" type="button" onclick="document.querySelectorAll(\'.mb-step\').forEach(c=>c.checked=true)">✔ Vse</button></div>'+steps.map(s=>'<label style="display:flex;align-items:flex-start;gap:9px;padding:6px 8px;border-radius:6px;background:var(--bg2);border:1px solid var(--border);margin-bottom:4px;cursor:pointer"><input type="checkbox" class="mb-step" value="'+s.id+'" style="width:16px;height:16px;margin-top:1px;accent-color:var(--success)"><span style="font-size:13px">'+_repEsc(s.text)+'</span></label>').join('');
+}
+function _maintBackOpName(){const v=$i('mbOp').value.replace(/\D/g,'').slice(0,5);$i('mbOp').value=v;const op=S.operators.find(o=>o.id===v);$i('mbOpName').textContent=op?'✓ '+op.first+' '+op.last:(v.length===5?'⚠ Operater ni najden':'');}
+function saveMaintBack(){
+  const instrId=$i('mbInstr').value,type=$i('mbType').value,date=$i('mbDate').value,mode=$i('mbMode').value;
+  const opId=$i('mbOp').value.replace(/\D/g,'').slice(0,5);
+  const today=new Date().toISOString().slice(0,10);const late=date&&date<today;
+  if(!date){notify('Izberite datum','warning');return;}
+  if(date>today){notify('Datum ne sme biti v prihodnosti','error');return;}
+  const op=S.operators.find(o=>o.id===opId);if(!op){notify('Vpišite veljavno matično številko operaterja','error');return;}
+  const reason=$i('mbReason').value.trim();
+  if(late&&!reason){notify('Pri naknadnem vnosu je razlog obvezen','warning');return;}
+  const idle=mode==='idle';
+  const checked={};if(!idle)document.querySelectorAll('.mb-step:checked').forEach(c=>{checked[c.value]=true;});
+  if(!idle&&!Object.keys(checked).length){notify('Označite vsaj en korak (ali izberite mirovanje)','warning');return;}
+  _commitMaint({instrId,type,forDate:date,checked,idle,note:$i('mbNote').value.trim(),operatorId:opId,lateReason:reason});
+  closeMo('maintBackModal');renderMaintContent();notify(idle?'Mirovanje zabeleženo 💤':'Naknadni vnos shranjen ✓','success');
+}
+/* poišče zapis za isto obdobje glede na efektivni datum (forDate, sicer datetime) */
+function _maintFindIdx(instrId,type,forDate){const pk=_maintPeriodKey(type,forDate);return (S.maintenanceLog||[]).findIndex(m=>m.instrId===instrId&&m.type===type&&_maintPeriodKey(type,(m.forDate||(m.datetime||'').slice(0,10)))===pk);}
+/* jedrni zapis vzdrževanja — IVDR/ALCOA+: ločeno hrani datum dejanja (forDate→datetime) in realni čas vnosa (enteredAt); naknadni vnos označi (late) + razlog */
+function _commitMaint(o){
+  const instr=INSTRUMENTS.find(i=>i.id===o.instrId);if(!instr)return;
+  const steps=getMaintSteps(o.type,instr.type);
+  if(!S.maintenanceLog)S.maintenanceLog=[];
+  const today=new Date().toISOString().slice(0,10);
+  const late=o.forDate<today;
+  const nowIso=new Date().toISOString();
+  const effIso=(o.forDate===today)?nowIso:(o.forDate+'T12:00:00.000Z');
+  const ti=MAINT_TYPES[o.type]||{label:o.type};
+  const idx=_maintFindIdx(o.instrId,o.type,o.forDate);
+  let rec;
+  if(idx>=0){
+    rec=S.maintenanceLog[idx];const before={doneCount:rec.doneCount,idle:!!rec.idle};
+    if(o.idle){rec.idle=true;rec.steps=steps.map(s=>({id:s.id,text:s.text,done:false}));rec.doneCount=0;}
+    else{rec.idle=false;if(!rec.steps||!rec.steps.length)rec.steps=steps.map(s=>({id:s.id,text:s.text,done:false}));rec.steps.forEach(s=>{if(o.checked[s.id])s.done=true;});rec.doneCount=rec.steps.filter(s=>s.done).length;}
+    rec.datetime=effIso;rec.enteredAt=nowIso;rec.forDate=o.forDate;rec.operatorId=o.operatorId;rec.totalSteps=steps.length;
+    if(late){rec.late=true;if(o.lateReason)rec.lateReason=o.lateReason;}
+    if(o.note)rec.note=rec.note?rec.note+' / '+o.note:o.note;
+    _audit('update','maintenance',o.instrId+'/'+o.type+'/'+o.forDate,'Vzdrževanje '+o.instrId+' · '+ti.label+' · '+o.forDate+(o.idle?' · MIROVANJE':' · '+rec.doneCount+'/'+steps.length+' korakov')+(late?' · NAKNADNI VNOS'+(o.lateReason?': '+o.lateReason:''):''),before,{doneCount:rec.doneCount,idle:!!rec.idle},o.operatorId);
+  }else{
+    rec={id:Date.now().toString(),datetime:effIso,enteredAt:nowIso,forDate:o.forDate,instrId:o.instrId,integration:instr.integration,type:o.type,idle:!!o.idle,steps:steps.map(s=>({id:s.id,text:s.text,done:o.idle?false:!!o.checked[s.id]})),doneCount:o.idle?0:steps.filter(s=>o.checked[s.id]).length,totalSteps:steps.length,note:o.note||'',operatorId:o.operatorId};
+    if(late){rec.late=true;rec.lateReason=o.lateReason||'';}
+    S.maintenanceLog.push(rec);
+    _audit('create','maintenance',o.instrId+'/'+o.type+'/'+o.forDate,'Vzdrževanje '+o.instrId+' · '+ti.label+' · '+o.forDate+(o.idle?' · MIROVANJE':' · '+rec.doneCount+'/'+steps.length+' korakov')+(late?' · NAKNADNI VNOS'+(o.lateReason?': '+o.lateReason:''):''),null,null,o.operatorId);
+  }
+  save();return rec;
+}
+function saveMaintenance(){if(maintPinVal.length<5){notify('Vpišite matično številko','warning');return;}const op=S.operators.find(o=>o.id===maintPinVal);if(!op){notify('Operater ni registriran','error');return;}const {instrId,type,idle}=maintState.pendingSign;const key=instrId+'_'+type;const checked=maintState.checked[key]||{};const note=$i('maintSignNote').value.trim();_commitMaint({instrId,type,forDate:new Date().toISOString().slice(0,10),checked,idle:!!idle,note,operatorId:maintPinVal});closeMo('maintSignModal');maintState.checked[key]={};renderMaintContent();notify(idle?'Mirovanje zabeleženo 💤':'Vzdrževanje potrjeno! ✓','success');}
+/* označi aparat v mirovanju za tekoče obdobje (sočasno) — preko istega PIN modala */
+function openMaintIdle(instrId,type){const instr=INSTRUMENTS.find(i=>i.id===instrId);const ti=MAINT_TYPES[type];const pw=_maintPeriodWord(type);maintState.pendingSign={instrId,type,idle:true};maintPinVal='';$i('maintSignTitle').textContent='Mirovanje – '+instrId;$i('maintSignSummary').innerHTML='<div style="background:rgba(180,83,9,.07);border:1px solid var(--orange,#b45309);border-radius:8px;padding:10px 14px"><div style="font-weight:600;font-size:14px;color:#b45309;margin-bottom:4px">💤 Aparat v mirovanju</div><div style="font-size:13px">'+ti.icon+' '+ti.label+' – '+instrId+'<br>Beležite, da aparat <strong>'+pw+'</strong> ni obratoval, zato vzdrževanje ni bilo potrebno.</div></div>';$i('maintSignNote').value='';updateMaintPinDisplay();buildMaintPinGrid();showMo('maintSignModal');}
 function getOpName(id){const op=S.operators.find(o=>o.id===id);return op?op.first+' '+op.last:id;}
 /* ---- urejevalnik opravil vzdrževanja ---- */
 function openMaintEdit(){$i('meType').value=maintState.type==='triannual'?'quarterly':maintState.type;renderMaintEdit();showMo('maintEditModal');}
@@ -3239,13 +4078,12 @@ function _opParafa(opId){const op=S.operators.find(o=>o.id===opId);return op?(((
 const KCLJ_LOGO='data:image/png;base64,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';
 const REPORT_CSS=`
 *{box-sizing:border-box}
-@page{size:842pt 561pt;margin:0}
-body{font-family:'Segoe UI',Arial,sans-serif;color:#000;margin:0;padding:34px 44px;font-size:8px}
-.rtitle{text-align:center;font-weight:700;font-size:13px;margin:0 0 6px;text-transform:uppercase}
-.rhead{display:flex;align-items:center;gap:10px}
-.rhead .rtitle{flex:1;text-align:left;margin:0}
+@page{size:A4 landscape;margin:0}
+body{font-family:'Segoe UI',Arial,sans-serif;color:#000;margin:0;padding:54px 44px 28px;font-size:8px}
+.rtitle{font-weight:700;font-size:13px;margin:0;text-transform:uppercase}
+.rhead{position:fixed;top:0;left:44px;right:44px;background:#fff;display:flex;align-items:center;gap:10px;padding:8px 0 5px;border-bottom:1px solid #000;z-index:1}
+.rhead .rtitle{flex:1;text-align:left}
 .rhead img{height:34px;width:auto}
-.rhead-line{border-bottom:1px solid #000;margin:4px 0 8px}
 .rhdr{margin-bottom:6px}
 table.meta{border-collapse:collapse;width:100%;font-size:10px}
 table.meta td{padding:2px 5px;border:1px solid #000}
@@ -3256,32 +4094,36 @@ table.meta .k{font-weight:700;background:#eee;white-space:nowrap}
 .grid td.lbl,.grid th.lbl{text-align:left;font-size:7.5px;width:118px}
 .grid.daily th:not(.lbl),.grid.daily td:not(.lbl){width:17px}
 .grid.datum td:not(.lbl),.grid.datum th:not(.lbl){width:60px}
-.grid .day{font-weight:700;width:16px;background:#f3f3f3}
-.grid .sub{text-align:left;font-size:6.5px;width:52px;background:#fafafa}
+.grid .day{font-weight:700;width:16px;background:#f3f3f3;vertical-align:middle}
+.grid .sub{text-align:left;font-size:7px;width:70px;background:#fafafa;vertical-align:top;padding:2px 3px}
+.grid.nc td:not(.sub):not(.day){vertical-align:top;overflow:visible;font-size:7.5px;padding:2px 3px}
+.grid.nc .ok{font-weight:700;color:#1a6fc4}
 .grid .db td{border-bottom:2px solid #000}
 .sechd{font-weight:700;font-size:9px;margin:6px 0 2px;text-transform:uppercase}
 .gap{height:4px}
-.legend{font-size:8px;margin-top:6px;font-style:italic}
+.legend{font-size:7.5px;margin-top:6px;font-style:italic}
 .rfoot{margin-top:8px;font-size:8px;color:#333;border-top:1px solid #999;padding-top:3px;text-align:center}
-.rfoot2{margin-top:10px;border-top:.8px solid #000;padding-top:3px}
+.rfoot2{position:fixed;bottom:0;left:44px;right:44px;background:#fff;border-top:.8px solid #000;padding-top:3px;padding-bottom:3px}
 .rfoot2 .row{display:flex;font-size:7px;color:#000}
 .rfoot2 .row .l{flex:1;text-align:left}
 .rfoot2 .row .c{margin:0 12px;white-space:nowrap}
 .rfoot2 .row .r{flex:1;text-align:right}
+.pg::before{content:'str. ' counter(page) ' / ' counter(pages)}
 thead{display:table-header-group}
 tr{page-break-inside:avoid}
 tbody.day-grp{page-break-inside:avoid;break-inside:avoid-page}
 `;
 
 function _reportDoc(title,inner){
-  var head='<div class="rhead"><div class="rtitle">'+title+'</div><img src="'+KCLJ_LOGO+'" alt="UKC"></div><div class="rhead-line"></div>';
+  var head='<div class="rhead"><div class="rtitle">'+title+'</div><img src="'+KCLJ_LOGO+'" alt="UKC"></div>';
   return '<!DOCTYPE html><html lang="sl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>'+REPORT_CSS+'</style></head><body>'+head+inner+'</body></html>';
 }
 function _reportFoot(everzija,klas,ob){
   return '<div class="rfoot2"><div class="row"><span class="l">e - verzija '+everzija+'</span>'
     +'<span class="c">klas. znak izpolnjenega obrazca: '+klas+'</span>'
     +'<span class="c">OB KIKKB '+ob+'</span>'
-    +'<span class="r">str. 1</span></div></div>';
+    +'<span class="r pg"></span></div>'
+    +'<div class="row" style="margin-top:1px"><span class="l" style="font-size:6px;color:#666">Pripomoček (in-house, čl. 5(5) IVDR): '+IVDR_INFO.udiDi+'</span><span class="r"></span></div></div>';
 }
 
 /* ---- VZDRŽEVANJE (OB KIKKB 213/64) ---- */
@@ -3308,7 +4150,7 @@ function _maintDailyTable(instrId,instrType,year,month){
     body+='</tr>';
   });
   body+='<tr><td class="lbl">Podpis/parafa</td>';
-  for(var d2=1;d2<=dim;d2++){var rec=(byDay[d2]||[])[0];body+='<td>'+(rec?_opParafa(rec.operatorId):'')+'</td>';}
+  for(var d2=1;d2<=dim;d2++){var rec=(byDay[d2]||[])[0];body+='<td>'+(rec?(rec.idle?'M':_opParafa(rec.operatorId))+(rec.late?'*':''):'')+'</td>';}
   body+='</tr>';
   return '<div class="sechd">Dnevno vzdrževanje</div><table class="grid daily"><thead>'+head+'</thead><tbody>'+body+'</tbody></table>';
 }
@@ -3324,19 +4166,21 @@ function _maintWeeklyTable(instrId,instrType,year,month){
   steps.forEach(function(st){
     body+='<tr><td class="lbl">'+_repEsc(st.text)+'</td>'+[1,2,3,4].map(function(w){var done=(byWeek[w]||[]).some(function(r){return _stepDoneIn(r,st.id);});return '<td>'+(done?'✓':'')+'</td>';}).join('')+'</tr>';
   });
-  body+='<tr><td class="lbl">Podpis/parafa</td>'+[1,2,3,4].map(function(w){var rec=(byWeek[w]||[])[0];return '<td>'+(rec?_opParafa(rec.operatorId):'')+'</td>';}).join('')+'</tr>';
+  body+='<tr><td class="lbl">Podpis/parafa</td>'+[1,2,3,4].map(function(w){var rec=(byWeek[w]||[])[0];return '<td>'+(rec?(rec.idle?'M':_opParafa(rec.operatorId))+(rec.late?'*':''):'')+'</td>';}).join('')+'</tr>';
   return '<div class="sechd">Tedensko vzdrževanje</div><table class="grid weekly"><thead>'+head+'</thead><tbody>'+body+'</tbody></table>';
 }
 
 function _maintDatumTable(instrId,instrType,year,month,type,heading){
   var steps=getMaintSteps(type,instrType);if(!steps.length)return '';
   var recs=_maintRecordsFor(instrId,type,year,month);
+  var idleRec=recs.find(function(r){return r.idle;});
   var body='';
   steps.forEach(function(st){
     var rec=recs.find(function(r){return _stepDoneIn(r,st.id);});
+    if(!rec&&idleRec)rec=idleRec;
     var dt=rec?new Date(rec.datetime):null;
     var datum=dt?(_rp2(dt.getDate())+'.'+_rp2(dt.getMonth()+1)+'.'+dt.getFullYear()):'';
-    var par=rec?_opParafa(rec.operatorId):'';
+    var par=rec?((rec.idle?'M':_opParafa(rec.operatorId))+(rec.late?'*':'')):'';
     body+='<tr><td class="lbl">'+_repEsc(st.text)+'</td><td>'+datum+'</td><td>'+par+'</td></tr>';
   });
   return '<div class="sechd">'+_repEsc(heading)+'</div><table class="grid datum"><thead><tr><th class="lbl">'+_repEsc(heading)+'</th><th>DATUM</th><th>Parafa</th></tr></thead><tbody>'+body+'</tbody></table>';
@@ -3353,8 +4197,9 @@ function buildMaintReportHtml(instrId,year,month){
     _maintDatumTable(instr.id,instr.type,year,month,'monthly','Mesečno vzdrževanje'),
     _maintDatumTable(instr.id,instr.type,year,month,'quarterly','3-mesečno vzdrževanje oz. po potrebi')
   ].filter(Boolean).join('<div class="gap"></div>');
+  var legend='<div style="margin-top:6px;font-size:7px;color:#444">M = aparat v mirovanju (ni obratoval) &middot; * = naknadni vnos (glej revizijsko sled)</div>';
   var foot=_reportFoot('4.0','78431','213/64');
-  return _reportDoc('Evidenca periodičnega vzdrževanja opreme',head+secs+foot);
+  return _reportDoc('Evidenca periodičnega vzdrževanja opreme',head+secs+legend+foot);
 }
 
 /* ---- NESKLADJA NOTRANJE QC (OB KIKKB 216/64) ---- */
@@ -3366,9 +4211,9 @@ function buildQcNonconfHtml(instrId,year,month){
   var ents=(S.entries||[]).filter(function(e){if(e.instrId!==instrId)return false;var d=new Date(e.datetime);return d.getFullYear()===year&&(d.getMonth()+1)===month;});
   var NCOL=4;
   // stolpci = zaporedne seje vnosa znotraj dneva (1..4)
-  var head='<tr><th class="lbl" style="width:32px">Dan</th><th style="width:52px"></th>';
+  var head='<tr><th style="width:28px">Dan</th><th style="width:70px"></th>';
   for(var c=1;c<=NCOL;c++)head+='<th>'+c+'</th>';
-  head+='<th style="width:88px">Pregledano</th></tr>';
+  head+='<th style="width:100px">Pregledano</th></tr>';
   var body='';
   for(var d=1;d<=dim;d++){
     var dayEnts=ents.filter(function(e){return new Date(e.datetime).getDate()===d;});
@@ -3389,7 +4234,11 @@ function buildQcNonconfHtml(instrId,year,month){
         });
         if(e.operatorId)op=_repEsc(getOpName(e.operatorId));
       });
-      izpad.push(fails.join('<br>'));ukrep.push(Array.from(new Set(notes)).join('<br>'));podpis.push(op);
+      var hasSess=sEnts.length>0;
+      izpad.push(hasSess?(fails.length?fails.join('<br>'):'<span class="ok">OK</span>'):'');
+      ukrep.push(Array.from(new Set(notes)).join('<br>'));
+      var hasLate=sEnts.some(function(e){return e.late;});
+      podpis.push(hasSess?(op+(hasLate?'*':'')):'');
     }
     var rev=_qcReviewForDay(instrId,year,month,d);
     var pcell='';
@@ -3402,7 +4251,7 @@ function buildQcNonconfHtml(instrId,year,month){
   }
   var head2='<div class="rhdr"><table class="meta"><tr><td class="k">Oddelek:</td><td>'+oddelek+'</td><td class="k">Analizator:</td><td>Alinity '+_repEsc(instr.id)+'</td><td class="k">Mesec, Leto:</td><td>'+moName+'</td></tr></table></div>';
   var table='<table class="grid nc"><thead>'+head+'</thead>'+body+'</table>';
-  var legend='<div class="legend">Vzrok neskladja in ukrepi — Legenda: A – Ponovitev kontrole; B – Preventivna kalibracija; C – Menjava reagenta; D – Servis</div>';
+  var legend='<div class="legend">Vzrok neskladja in ukrepi — Legenda: A – Ponovitev kontrole; B – Preventivna kalibracija; C – Menjava reagenta; D – Servis &middot; * = naknadni vnos (glej revizijsko sled)</div>';
   // Pregledi QC (podpis + ukrepi) v tem mesecu
   var revs=_qcReviewsForMonth(instrId,year,month);
   var revSec='';
@@ -3926,6 +4775,214 @@ function exportSrvStatsCSV(){
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='Statistika_servisov_'+new Date().toISOString().slice(0,10)+'.csv';a.click();
   notify('CSV izvožen','success');
 }
+/* ============================================================
+   REKLAMACIJE — beleženje in vračanje artiklov ob reklamaciji
+   ============================================================ */
+let currentRekl='vpis';let _reklPin='';let _reklCloseId=null;let _reklEditId=null;
+
+function navRekl(page){
+  currentRekl=page;
+  document.querySelectorAll('.rekl-page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('#reklSubnav .tab').forEach(t=>t.classList.remove('active'));
+  $i('rekl-'+page).classList.add('active');
+  document.querySelector('#reklSubnav .tab[data-rekl="'+page+'"]')?.classList.add('active');
+  if(page==='odprte')renderReklOdprte();
+  if(page==='zakljucene')renderReklZakljucene();
+  if(page==='statistika')renderReklStatistika();
+  if(page==='vpis'&&!_reklEditId)reklResetForm();
+}
+
+function reklDobaviteljChange(){
+  const v=$i('rfDobavitelj').value;
+  $i('rfDobaviteljWrap').style.display=v==='_drugo'?'block':'none';
+}
+
+function reklResetForm(){
+  _reklEditId=null;
+  ['rfArtikel','rfLot','rfKolicina','rfKontakt','rfOpis','rfOpomba','rfDobaviteljFree'].forEach(id=>{const el=$i(id);if(el)el.value='';});
+  $i('rfDobavitelj').value='';$i('rfRazlog').value='';
+  $i('rfDobaviteljWrap').style.display='none';
+  $i('reklFormTitle').textContent='Vpis reklamacije';
+  $i('reklCancelEdit').style.display='none';
+}
+
+function saveRekl(){
+  const artikel=($i('rfArtikel').value||'').trim();
+  const lot=($i('rfLot').value||'').trim();
+  const dobSel=$i('rfDobavitelj').value;
+  const dobavitelj=dobSel==='_drugo'?($i('rfDobaviteljFree').value||'').trim():dobSel;
+  const razlog=$i('rfRazlog').value;
+  const opis=($i('rfOpis').value||'').trim();
+  if(!artikel){notify('Vpišite naziv artikla','warning');return;}
+  if(!lot){notify('Vpišite lot/serijsko številko','warning');return;}
+  if(!dobavitelj){notify('Izberite dobavitelja','warning');return;}
+  if(!razlog){notify('Izberite razlog reklamacije','warning');return;}
+  if(!opis){notify('Opišite napako','warning');return;}
+  const nowIso=new Date().toISOString();
+  const rec={
+    artikel,lot,
+    kolicina:($i('rfKolicina').value||'').trim(),
+    dobavitelj,
+    kontakt:($i('rfKontakt').value||'').trim(),
+    razlog,opis,
+    opomba:($i('rfOpomba').value||'').trim(),
+    status:'odprta',poslanAt:'',poslanBy:'',
+    resitev:null,resenoAt:'',resenoBy:''
+  };
+  if(!S.reklamacije)S.reklamacije=[];
+  if(_reklEditId){
+    const idx=S.reklamacije.findIndex(r=>r.id===_reklEditId);
+    if(idx>=0){const before={...S.reklamacije[idx]};Object.assign(S.reklamacije[idx],rec,{updatedAt:nowIso});_audit('update','reklamacija',_reklEditId,'Reklamacija posodobljena: '+artikel+' lot '+lot,before,S.reklamacije[idx],'system');}
+    notify('Reklamacija posodobljena ✓','success');
+  } else {
+    const id=nowIso.replace(/\D/g,'').slice(0,13);
+    Object.assign(rec,{id,createdAt:nowIso,updatedAt:nowIso});
+    S.reklamacije.push(rec);
+    _audit('create','reklamacija',id,'Nova reklamacija: '+artikel+' lot '+lot+' ('+dobavitelj+') — '+razlog,null,rec,'system');
+    notify('Reklamacija shranjena ✓','success');
+  }
+  save();reklResetForm();navRekl('odprte');
+}
+
+function editRekl(id){
+  const r=(S.reklamacije||[]).find(x=>x.id===id);if(!r)return;
+  _reklEditId=id;
+  $i('rfArtikel').value=r.artikel||'';
+  $i('rfLot').value=r.lot||'';
+  $i('rfKolicina').value=r.kolicina||'';
+  $i('rfKontakt').value=r.kontakt||'';
+  $i('rfOpis').value=r.opis||'';
+  $i('rfOpomba').value=r.opomba||'';
+  const knownDob=['Abbott Diagnostics','Salus d.o.o.','BioMérieux','Roche Diagnostics','Beckman Coulter','Siemens Healthineers'];
+  if(knownDob.includes(r.dobavitelj)){$i('rfDobavitelj').value=r.dobavitelj;$i('rfDobaviteljWrap').style.display='none';}
+  else{$i('rfDobavitelj').value='_drugo';$i('rfDobaviteljFree').value=r.dobavitelj||'';$i('rfDobaviteljWrap').style.display='block';}
+  $i('rfRazlog').value=r.razlog||'';
+  $i('reklFormTitle').textContent='Uredi reklamacijo';
+  $i('reklCancelEdit').style.display='inline-flex';
+  navRekl('vpis');
+}
+
+function deleteRekl(id){
+  const r=(S.reklamacije||[]).find(x=>x.id===id);if(!r)return;
+  if(!confirm('Izbrišete reklamacijo: '+r.artikel+' lot '+r.lot+'?'))return;
+  S.reklamacije=S.reklamacije.filter(x=>x.id!==id);
+  _audit('delete','reklamacija',id,'Izbrisana reklamacija: '+r.artikel+' lot '+r.lot,r,null,'system');
+  save();renderReklOdprte();notify('Reklamacija izbrisana');
+}
+
+function reklOznaciPoslano(id){
+  const r=(S.reklamacije||[]).find(x=>x.id===id);if(!r)return;
+  const op=prompt('Matična številka operaterja (5 mest):');if(!op)return;
+  const opTrim=(op||'').trim();
+  if(opTrim.length!==5){notify('Matična mora imeti 5 mest','warning');return;}
+  if(!S.operators.find(o=>o.id===opTrim)){notify('Operater ni registriran','error');return;}
+  const before={...r};
+  r.status='poslana';r.poslanAt=new Date().toISOString();r.poslanBy=opTrim;r.updatedAt=new Date().toISOString();
+  _audit('update','reklamacija',id,'Reklamacija označena kot poslana dobavitelju: '+r.dobavitelj,before,{status:r.status,poslanAt:r.poslanAt},opTrim);
+  save();renderReklOdprte();notify('Reklamacija označena kot poslana ✓','success');
+}
+
+function openReklClose(id){
+  const r=(S.reklamacije||[]).find(x=>x.id===id);if(!r)return;
+  _reklCloseId=id;_reklPin='';
+  $i('reklCloseSummary').innerHTML='<b>'+_repEsc(r.artikel)+'</b> &middot; Lot: '+_repEsc(r.lot)+(r.kolicina?' &middot; Kol: '+_repEsc(r.kolicina):'')+'<br>Dobavitelj: '+_repEsc(r.dobavitelj)+'<br>Razlog: '+_repEsc(r.razlog);
+  $i('reklCloseResitev').value='';$i('reklCloseOpomba').value='';
+  updateReklPinDisplay();
+  const keys=[1,2,3,4,5,6,7,8,9,'',0,'⌫'];
+  $i('reklPinGrid').innerHTML=keys.map(k=>'<div class="pin-key" onclick="reklPinPress(\''+k+'\')">'+k+'</div>').join('');
+  showMo('reklCloseModal');
+}
+
+function reklPinPress(k){
+  if(k===''||k==='undefined')return;
+  if(k==='⌫')_reklPin=_reklPin.slice(0,-1);
+  else if(_reklPin.length<5)_reklPin+=k;
+  updateReklPinDisplay();
+}
+function clearReklPin(){_reklPin='';updateReklPinDisplay();}
+function updateReklPinDisplay(){
+  for(let i=0;i<5;i++)$i('rpd'+i).classList.toggle('filled',i<_reklPin.length);
+  const op=S.operators.find(o=>o.id===_reklPin);
+  $i('reklPinName').textContent=op?'✓ '+op.first+' '+op.last:(_reklPin.length===5?'⚠ Operater ni najden':'');
+}
+
+function confirmReklClose(){
+  if(_reklPin.length<5){notify('Vpišite vseh 5 mest matične','warning');return;}
+  const op=S.operators.find(o=>o.id===_reklPin);if(!op){notify('Operater ni registriran','error');return;}
+  const resitev=$i('reklCloseResitev').value;if(!resitev){notify('Izberite rešitev','warning');return;}
+  const r=(S.reklamacije||[]).find(x=>x.id===_reklCloseId);if(!r)return;
+  const before={...r};
+  r.status='resena';r.resitev=resitev;r.resenoAt=new Date().toISOString();r.resenoBy=_reklPin;
+  r.opomba=(r.opomba?r.opomba+'\n':'')+($i('reklCloseOpomba').value||'').trim();r.updatedAt=r.resenoAt;
+  const resitveTxt={zamenjava:'Zamenjava artikla',dobropis:'Dobropis/povračilo',drugo:'Drugo'}[resitev]||resitev;
+  _audit('update','reklamacija',r.id,'Reklamacija zaključena: '+resitveTxt+' | '+r.artikel+' lot '+r.lot,before,{status:r.status,resitev:r.resitev,resenoAt:r.resenoAt},_reklPin);
+  save();closeMo('reklCloseModal');navRekl('zakljucene');notify('Reklamacija zaključena ✓','success');
+}
+
+const REKL_STATUS={odprta:'<span class="badge badge-3sd">Odprta</span>',poslana:'<span class="badge badge-2sd">Poslana</span>',resena:'<span class="badge badge-ok">Rešena</span>'};
+const REKL_RESITEV={zamenjava:'<span class="badge badge-blue">Zamenjava</span>',dobropis:'<span class="badge badge-teal">Dobropis</span>',drugo:'<span class="badge badge-g">Drugo</span>'};
+
+function renderReklOdprte(){
+  const list=(S.reklamacije||[]).filter(r=>r.status!=='resena').sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+  const wrap=$i('reklOdprteBody');
+  if(!list.length){wrap.innerHTML='<div class="card empty" style="padding:24px;text-align:center;color:var(--text3)">Ni odprtih reklamacij.</div>';return;}
+  wrap.innerHTML=list.map(r=>{
+    const dt=new Date(r.createdAt);const dtStr=dt.toLocaleDateString('sl-SI')+' '+dt.toLocaleTimeString('sl-SI',{hour:'2-digit',minute:'2-digit'});
+    return '<div class="card" style="margin-bottom:10px">'+
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:6px">'+
+        '<div><b style="font-size:15px">'+_repEsc(r.artikel)+'</b> <span class="muted" style="font-size:12px">Lot: '+_repEsc(r.lot)+(r.kolicina?' &middot; '+_repEsc(r.kolicina):'')+'</span></div>'+
+        '<div style="display:flex;gap:6px;flex-wrap:wrap">'+REKL_STATUS[r.status]+'</div>'+
+      '</div>'+
+      '<div style="font-size:12px;color:var(--text3);margin:4px 0">'+_repEsc(r.dobavitelj)+(r.kontakt?' &middot; '+_repEsc(r.kontakt):'')+'</div>'+
+      '<div style="font-size:13px;margin:4px 0"><b>'+_repEsc(r.razlog)+'</b> — '+_repEsc(r.opis)+'</div>'+
+      (r.opomba?'<div style="font-size:12px;color:var(--text3)">'+_repEsc(r.opomba)+'</div>':'')+
+      '<div style="font-size:11px;color:var(--text3);margin-top:4px">Vpisano: '+dtStr+(r.poslanAt?' &middot; Poslano: '+new Date(r.poslanAt).toLocaleDateString('sl-SI'):'')+'</div>'+
+      '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">'+
+        '<button class="btn btn-g btn-sm" onclick="editRekl(\''+r.id+'\')">&#9999;&#65039; Uredi</button>'+
+        (r.status==='odprta'?'<button class="btn btn-teal btn-sm" onclick="reklOznaciPoslano(\''+r.id+'\')">&#128229; Označi kot poslano</button>':'')+
+        '<button class="btn btn-a btn-sm" onclick="openReklClose(\''+r.id+'\')">&#9989; Zaključi</button>'+
+        '<button class="btn btn-d btn-sm" onclick="deleteRekl(\''+r.id+'\')">&#128465;</button>'+
+      '</div></div>';
+  }).join('');
+}
+
+function renderReklZakljucene(){
+  const list=(S.reklamacije||[]).filter(r=>r.status==='resena').sort((a,b)=>b.resenoAt.localeCompare(a.resenoAt));
+  const tbody=$i('reklZakljBody');
+  if(!list.length){tbody.innerHTML='<tr><td colspan="8" class="empty">Ni zaključenih reklamacij.</td></tr>';return;}
+  tbody.innerHTML=list.map(r=>{
+    const dtC=new Date(r.createdAt).toLocaleDateString('sl-SI');
+    return '<tr><td style="font-size:12px">'+dtC+'</td><td>'+_repEsc(r.artikel)+'</td><td style="font-size:12px">'+_repEsc(r.lot)+'</td><td style="font-size:12px">'+_repEsc(r.dobavitelj)+'</td><td style="font-size:12px">'+_repEsc(r.razlog)+'</td><td>'+(REKL_RESITEV[r.resitev]||_repEsc(r.resitev||''))+'</td><td style="font-size:12px">'+_repEsc(getOpName(r.resenoBy))+'</td><td><button class="btn btn-d btn-sm" onclick="deleteRekl(\''+r.id+'\')">&#128465;</button></td></tr>';
+  }).join('');
+}
+
+function renderReklStatistika(){
+  const all=S.reklamacije||[];
+  const odprte=all.filter(r=>r.status==='odprta').length;
+  const poslane=all.filter(r=>r.status==='poslana').length;
+  const resene=all.filter(r=>r.status==='resena').length;
+  const mesec=new Date().toISOString().slice(0,7);
+  const taMesec=all.filter(r=>r.createdAt.slice(0,7)===mesec).length;
+  const byDob={};all.forEach(r=>{const k=r.dobavitelj||'—';if(!byDob[k])byDob[k]=0;byDob[k]++;});
+  const byRaz={};all.forEach(r=>{const k=r.razlog||'—';if(!byRaz[k])byRaz[k]=0;byRaz[k]++;});
+  let h='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">';
+  [{l:'Odprte',v:odprte,c:'#dc2626'},{l:'Poslane',v:poslane,c:'#d97706'},{l:'Rešene',v:resene,c:'#16a34a'},{l:'Ta mesec',v:taMesec,c:'var(--abbott-blue)'}].forEach(s=>{
+    h+='<div class="card" style="text-align:center;padding:12px"><div style="font-size:24px;font-weight:700;color:'+s.c+'">'+s.v+'</div><div style="font-size:11px;color:var(--text3)">'+s.l+'</div></div>';
+  });
+  h+='</div>';
+  if(Object.keys(byDob).length){
+    h+='<div class="card" style="margin-bottom:10px"><div class="card-title">Po dobavitelju</div><div class="tbl-wrap"><table><thead><tr><th>Dobavitelj</th><th>Reklamacij</th></tr></thead><tbody>';
+    Object.entries(byDob).sort((a,b)=>b[1]-a[1]).forEach(([k,v])=>{h+='<tr><td>'+_repEsc(k)+'</td><td>'+v+'</td></tr>';});
+    h+='</tbody></table></div></div>';
+  }
+  if(Object.keys(byRaz).length){
+    h+='<div class="card"><div class="card-title">Po razlogu</div><div class="tbl-wrap"><table><thead><tr><th>Razlog</th><th>Reklamacij</th></tr></thead><tbody>';
+    Object.entries(byRaz).sort((a,b)=>b[1]-a[1]).forEach(([k,v])=>{h+='<tr><td>'+_repEsc(k)+'</td><td>'+v+'</td></tr>';});
+    h+='</tbody></table></div></div>';
+  }
+  $i('reklStatBody').innerHTML=h||'<div class="empty" style="padding:24px;text-align:center">Ni podatkov.</div>';
+}
+
 function renderMaintReview(){const tf=$i('mrFilterType').value,ig=$i('mrFilterInteg').value,df=$i('mrFilterFrom').value,dt=$i('mrFilterTo').value;let logs=[...(S.maintenanceLog||[])];if(tf)logs=logs.filter(m=>m.type===tf);if(ig)logs=logs.filter(m=>m.integration===ig);if(df)logs=logs.filter(m=>m.datetime>=df);if(dt)logs=logs.filter(m=>m.datetime<=dt+'T23:59:59');logs.sort((a,b)=>b.datetime.localeCompare(a.datetime));const tl={daily:'Dnevno',weekly:'Tedensko',monthly:'Mesečno',quarterly:'3-mesečno',triannual:'3-mesečno'};const tbody=$i('maintReviewBody');if(!logs.length){tbody.innerHTML='<tr><td colspan="7" class="empty">Ni podatkov.</td></tr>';return;}tbody.innerHTML=logs.map(m=>{const allDone=m.doneCount===m.totalSteps;const dt2=new Date(m.datetime);return '<tr><td>'+dt2.toLocaleString('sl-SI')+'</td><td>'+(tl[m.type]||m.type)+'</td><td>'+m.integration+'</td><td><span class="badge badge-blue">'+m.instrId+'</span></td><td><span class="badge '+(allDone?'badge-ok':'badge-2sd')+'">'+m.doneCount+'/'+m.totalSteps+'</span></td><td>'+getOpName(m.operatorId)+'</td><td style="font-size:12px" class="muted">'+(m.note||'')+'</td></tr>';}).join('');}
 function exportMaintCSV(){const rows=[['Datum','Čas','Tip','Integracija','Analizator','Korak','Opravljeno','Operater','Opomba']];(S.maintenanceLog||[]).forEach(m=>{const dt=new Date(m.datetime);(m.steps||[]).forEach(s=>{rows.push([dt.toLocaleDateString('sl-SI'),dt.toLocaleTimeString('sl-SI'),m.type,m.integration,m.instrId,s.text,s.done?'DA':'NE',getOpName(m.operatorId),m.note||'']);});});const csv=rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='Vzdrzevanje_'+new Date().toISOString().slice(0,10)+'.csv';a.click();notify('CSV izvožen','success');}
 
@@ -3942,7 +4999,52 @@ function renderVec(){
   }catch(e){}}
   else {$i('aboutDevice').textContent='Naprava: brskalnik (test)';$i('aboutBuild').textContent='Build: – (brskalnik; verzija vidna na napravi)';}
   try{const qcSize=(localStorage.getItem('qclab_v2')||'').length;const pbSize=(localStorage.getItem('pregledBK_db')||'').length;$i('aboutStorage').textContent='Pomnilnik: qclab_v2 '+(qcSize/1024).toFixed(1)+' KB, pregledBK_db '+(pbSize/1024).toFixed(1)+' KB';}catch(e){}
+  /* IVDR identifikacija pripomočka */
+  try{
+    $i('aboutMfr').textContent=IVDR_INFO.legalManufacturer;
+    let ver=$i('aboutVersion').textContent||'';let build='';try{build=JSON.parse(AndroidBridge.getDeviceInfo()).appBuild||'';}catch(e){}
+    $i('aboutUdi').textContent=IVDR_INFO.udiDi+' · '+ver+(build?' (build '+build+')':'');
+    $i('aboutIntended').textContent=IVDR_INFO.intendedUse;
+    $i('aboutContact').textContent=IVDR_INFO.contact;
+    $i('aboutInhouse').innerHTML='&#127973; '+IVDR_INFO.inHouse;
+  }catch(e){}
+  renderAuditLog();
   const oc=$i('vecOpCount');if(oc)oc.textContent='Registriranih: '+(S.operators||[]).length;
+}
+/* ===== REVIZIJSKA SLED — prikaz + izvoz ===== */
+const _AU_ACT={create:{l:'Ustvarjeno',c:'badge-ok'},update:{l:'Urejeno',c:'badge-2sd'},delete:{l:'Izbrisano',c:'badge-3sd'}};
+const _AU_ENT={entry:'QC vnos',qcreview:'Pregled QC',operator:'Operater',lot:'Lot',qcvalue:'Uradne vrednosti'};
+function _auditFiltered(){
+  const fe=$i('auFilterEntity')?$i('auFilterEntity').value:'';const df=$i('auFilterFrom')?$i('auFilterFrom').value:'';const dt=$i('auFilterTo')?$i('auFilterTo').value:'';
+  let logs=[...(S.auditLog||[])];
+  if(fe)logs=logs.filter(a=>a.entity===fe);
+  if(df)logs=logs.filter(a=>(a.ts||'')>=df);
+  if(dt)logs=logs.filter(a=>(a.ts||'')<=dt+'T23:59:59');
+  logs.sort((a,b)=>(b.ts||'').localeCompare(a.ts||''));
+  return logs;
+}
+function renderAuditLog(){
+  const body=$i('auditLogBody');if(!body)return;
+  const logs=_auditFiltered();
+  if(!logs.length){body.innerHTML='<div class="empty">Ni zapisov v revizijski sledi.</div>';return;}
+  let h='<div class="tbl-wrap"><table><thead><tr><th>Čas</th><th>Dejanje</th><th>Entiteta</th><th>Opis</th><th>Izvajalec</th></tr></thead><tbody>';
+  logs.slice(0,500).forEach(a=>{const act=_AU_ACT[a.action]||{l:a.action,c:'badge-blue'};
+    h+='<tr><td style="font-size:12px;white-space:nowrap">'+(a.ts||'').slice(0,16).replace('T',' ')+'</td>'+
+       '<td><span class="badge '+act.c+'">'+act.l+'</span></td>'+
+       '<td style="font-size:12px">'+(_AU_ENT[a.entity]||a.entity)+'</td>'+
+       '<td style="font-size:12px;max-width:280px">'+_repEsc(a.summary)+'</td>'+
+       '<td style="font-size:12px">'+_repEsc(_auditWho(a.operatorId))+'</td></tr>';
+  });
+  h+='</tbody></table></div>';
+  if(logs.length>500)h+='<div class="muted" style="font-size:11px;margin-top:6px">Prikazanih zadnjih 500 od '+logs.length+' zapisov. Za celoto izvozite CSV.</div>';
+  body.innerHTML=h;
+}
+function exportAuditCSV(){
+  const logs=_auditFiltered();
+  const rows=[['Čas','Dejanje','Entiteta','EntityId','Opis','Izvajalec ID','Izvajalec','Build']];
+  logs.forEach(a=>rows.push([(a.ts||'').replace('T',' ').slice(0,19),(_AU_ACT[a.action]?_AU_ACT[a.action].l:a.action),(_AU_ENT[a.entity]||a.entity),a.entityId||'',a.summary||'',a.operatorId||'',_auditWho(a.operatorId),a.appBuild||'']));
+  const csv=rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');
+  const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='Revizijska_sled_'+new Date().toISOString().slice(0,10)+'.csv';a.click();notify('Revizijska sled izvožena','success');
 }
 function toggleDark(){document.body.classList.toggle('dark',$i('darkToggle').checked);localStorage.setItem('bioAlinity_dark',$i('darkToggle').checked?'1':'0');}
 
