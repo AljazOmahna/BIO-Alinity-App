@@ -466,7 +466,7 @@ body.dark .notif{background:rgba(13,25,50,.95)}
     <button class="btn btn-g btn-sm" style="flex:1;border-color:#00a3ad;color:#00a3ad" onclick="importNarocGtins(false)">&#128218; Preveri naročilnico</button>
     <button class="btn btn-sm" style="flex:1;background:#00a3ad;color:#fff" onclick="importNarocGtins(true)">&#10133; Uvozi naročilnico</button>
   </div>
-  <div style="font-size:11px;color:var(--text3);margin-bottom:8px">&#128161; GTIN baza je skupna z Zebro (pregledBK_db). Spremembe so vidne na obeh napravah po sinhronizaciji.</div>
+  <div style="font-size:11px;color:var(--text3);margin-bottom:8px">&#128161; GTIN baza je skupna z Zebro (pregledBK_db). Spremembe so vidne na obeh napravah po sinhronizaciji. &middot; UDI dobavljenih pripomočkov se hrani elektronsko (čl. 24(8) IVDR) &mdash; <a href="javascript:void(0)" onclick="exportUdiCSV()" style="color:var(--abbott-teal);font-weight:600">&#128190; izvozi UDI evidenco</a></div>
   <div class="fr">
     <input type="text" id="gtinSrch" placeholder="&#128269; Išči naziv, GTIN..." oninput="renderGtins()">
     <select id="gtinTypeFilter" onchange="renderGtins()">
@@ -496,7 +496,8 @@ body.dark .notif{background:rgba(13,25,50,.95)}
   <div class="modal" style="max-width:460px">
     <div class="mh"><h3 id="gtinMoT">Dodaj GTIN</h3><button class="mc" onclick="closeMo('moGtin')">&#10005;</button></div>
     <div class="mb">
-      <div class="fg"><label>GTIN (14 mest)</label><input type="text" id="gtinCode" maxlength="14" style="font-family:var(--mono)" inputmode="numeric"></div>
+      <div class="fg"><label>GTIN (14 mest)</label><input type="text" id="gtinCode" maxlength="14" style="font-family:var(--mono)" inputmode="numeric" oninput="_updUdiPreview()"></div>
+      <div id="gtinUdiPreview" style="font-family:var(--mono);font-size:11px;color:var(--text3);margin:-6px 0 10px 2px"></div>
       <div class="fg"><label>Naziv</label><input type="text" id="gtinName"></div>
       <div class="fr" style="gap:8px">
         <div class="fg" style="flex:1"><label>Tip</label>
@@ -524,7 +525,18 @@ body.dark .notif{background:rgba(13,25,50,.95)}
             <option value="D">D</option>
           </select></div>
       </div>
-      <div class="fg"><label>Package insert (IFU) &mdash; povezava</label><input type="text" id="gtinPiUrl" placeholder="https://..."></div>
+      <div class="fg"><label>&#128196; Package insert / reagenčni list (IFU) &mdash; povezava</label>
+        <div style="display:flex;gap:6px">
+          <input type="text" id="gtinPiUrl" placeholder="https://..." style="flex:1">
+          <button class="btn btn-g btn-sm" onclick="openDocPick('pi')" title="Izberi iz OneDrive">&#128194;</button>
+        </div>
+      </div>
+      <div class="fg"><label>&#129514; Varnostni list (SDS) &mdash; povezava</label>
+        <div style="display:flex;gap:6px">
+          <input type="text" id="gtinSdsUrl" placeholder="https://..." style="flex:1">
+          <button class="btn btn-g btn-sm" onclick="openDocPick('sds')" title="Izberi iz OneDrive">&#128194;</button>
+        </div>
+      </div>
       <div class="fg"><label>Opomba</label><input type="text" id="gtinNote"></div>
       <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin:4px 0">
         <input type="checkbox" id="gtinLotNotify" style="width:18px;height:18px;flex-shrink:0">
@@ -549,6 +561,20 @@ body.dark .notif{background:rgba(13,25,50,.95)}
     </div>
     <div class="mf">
       <button class="btn btn-a" onclick="closeMo('moPkgIns')" style="width:100%;justify-content:center">Zapri</button>
+    </div>
+  </div>
+</div>
+
+<!-- ONEDRIVE DOC PICKER MODAL -->
+<div class="mo" id="moDocPick">
+  <div class="modal" style="max-width:520px">
+    <div class="mh"><h3 id="docPickTitle">&#128194; Izberi dokument</h3><button class="mc" onclick="closeMo('moDocPick')">&#10005;</button></div>
+    <div class="mb">
+      <div class="fg"><input type="text" id="docPickSrch" placeholder="&#128269; Išči datoteko..." oninput="renderDocPick()"></div>
+      <div id="docPickBody" style="max-height:50vh;overflow-y:auto"><div class="empty">Nalagam&#8230;</div></div>
+    </div>
+    <div class="mf">
+      <button class="btn btn-g" onclick="closeMo('moDocPick')" style="width:100%;justify-content:center">Prekliči</button>
     </div>
   </div>
 </div>
@@ -1823,8 +1849,9 @@ function showItemDetail(idx){
     '<div><span class="muted" style="font-size:11px">Količina</span><br><strong>'+(it.qty||0)+'</strong></div>'+
     '<div><span class="muted" style="font-size:11px">Tip</span><br><span class="badge '+(TYPE_BADGE[it.type]||'b-gray')+'">'+(TYPE_LABELS[it.type]||it.type||'&ndash;')+'</span></div>'+
     '</div>'+
-    (units.length?'<div style="margin-top:14px"><div class="muted" style="font-size:11px;text-transform:uppercase;margin-bottom:6px">Enote (SN / EPC)</div>'+
-      units.map(u=>'<div style="padding:6px 0;border-bottom:1px solid var(--border)"><div style="font-family:var(--mono);font-size:12px;font-weight:600">'+(u.sn||'&ndash;')+'</div>'+(u.epc?'<div style="font-family:var(--mono);font-size:10px;color:var(--text3);padding-left:14px;word-break:break-all">'+u.epc+'</div>':'')+'</div>').join('')+'</div>'
+    (it.gtin?'<div style="margin-top:12px"><span class="muted" style="font-size:11px;text-transform:uppercase">UDI (IVDR čl. 24)</span><div style="font-family:var(--mono);font-size:11px;word-break:break-all;margin-top:3px">'+formatUDI(it.gtin,it.lot,it.expiry,'')+'</div></div>':'')+
+    (units.length?'<div style="margin-top:14px"><div class="muted" style="font-size:11px;text-transform:uppercase;margin-bottom:6px">Enote (SN / EPC / UDI)</div>'+
+      units.map(u=>'<div style="padding:6px 0;border-bottom:1px solid var(--border)"><div style="font-family:var(--mono);font-size:12px;font-weight:600">'+(u.sn||'&ndash;')+'</div>'+(u.sn&&it.gtin?'<div style="font-family:var(--mono);font-size:10px;color:var(--abbott-teal);padding-left:14px;word-break:break-all">'+formatUDI(it.gtin,it.lot,it.expiry,u.sn)+'</div>':'')+(u.epc?'<div style="font-family:var(--mono);font-size:10px;color:var(--text3);padding-left:14px;word-break:break-all">'+u.epc+'</div>':'')+'</div>').join('')+'</div>'
       : (it.serials&&it.serials.length?'<div style="margin-top:14px"><div class="muted" style="font-size:11px;text-transform:uppercase;margin-bottom:6px">Serijske številke</div><div style="font-family:var(--mono);font-size:12px">'+it.serials.join(', ')+'</div></div>':''));
   showMo('detailModal');
 }
@@ -2211,7 +2238,7 @@ function renderGtins(){
     var badge=TYPE_BADGE[g.type]||'b-gray';
     var lbl=TYPE_LABELS[g.type]||g.type;
     return '<tr style="border-bottom:1px solid var(--border)">'+
-      '<td class="gtin" style="padding:6px 4px;white-space:nowrap">'+g.gtin+'</td>'+
+      '<td class="gtin" style="padding:6px 4px;white-space:nowrap">'+g.gtin+'<div style="font-size:9px;color:var(--text3)">UDI-DI (01)'+g.gtin+'</div></td>'+
       '<td style="padding:6px 4px"><div style="font-size:12px;font-weight:600">'+_ge(g.name)+'</div>'+(g.note?'<div style="font-size:10px;color:var(--text3)">'+_ge(g.note)+'</div>':'')+'</td>'+
       '<td style="padding:6px 4px"><span class="badge '+badge+'">'+lbl+'</span> '+riskBadge(g.riskClass)+'</td>'+
       '<td style="padding:6px 4px;font-size:11px;color:var(--text2)">'+(g.analyser||'&ndash;')+'</td>'+
@@ -2261,6 +2288,7 @@ function renderPkgIns(){
     tItems.forEach(function(g){
       var ri=(DB_PREGLED.gtins||[]).indexOf(g);
       var has=!!(g.piUrl&&g.piUrl.trim());
+      var hasSds=!!(g.sdsUrl&&g.sdsUrl.trim());
       var updStr=g.piUpdatedAt?g.piUpdatedAt.slice(0,10):'';
       var isCD=(g.riskClass==='C'||g.riskClass==='D');
       var mandMiss=!has&&isCD;
@@ -2270,9 +2298,11 @@ function renderPkgIns(){
       h+='<div style="flex:1">';
       h+='<div style="font-size:11px;font-weight:600">'+_ge(g.name)+' '+riskBadge(g.riskClass)+'</div>';
       h+='<div style="font-size:10px;color:'+(has?'var(--success,#16a34a)':(mandMiss?'var(--red)':'var(--orange)'))+';margin-top:2px">'+
-        (has?'&#128279; povezava &middot; Zadnja sprememba: '+updStr:(mandMiss?'&#9888; IFU OBVEZNO (razred '+g.riskClass+')':'&#9888; povezava manjka'))+'</div>';
+        (has?'&#128196; IFU &middot; '+updStr:(mandMiss?'&#9888; IFU OBVEZNO (razred '+g.riskClass+')':'&#9888; IFU manjka'))+
+        ' &nbsp;&middot;&nbsp; <span style="color:'+(hasSds?'var(--success,#16a34a)':'var(--text3)')+'">'+(hasSds?'&#129514; VL':'VL manjka')+'</span></div>';
       h+='</div>';
-      if(has)h+='<button class="btn btn-a btn-sm" onclick="openPiUrl('+ri+')" style="padding:5px 9px;min-height:32px">Odpri</button>';
+      if(has)h+='<button class="btn btn-a btn-sm" onclick="openPiUrl('+ri+')" style="padding:5px 9px;min-height:32px">IFU</button>';
+      if(hasSds)h+='<button class="btn btn-teal btn-sm" onclick="openSdsUrl('+ri+')" style="padding:5px 9px;min-height:32px">VL</button>';
       h+='<button class="btn btn-g btn-sm" onclick="closeMo(\'moPkgIns\');openGtinMo('+ri+')" style="padding:5px 8px;min-height:32px">&#9998;</button>';
       h+='</div></div>';
     });
@@ -2284,6 +2314,90 @@ function openPiUrl(idx){
   var g=(DB_PREGLED.gtins||[])[idx];
   if(!g||!g.piUrl){notify('Povezava ni nastavljena','warn');return;}
   try{window.open(g.piUrl,'_blank');}catch(e){notify('Povezave ni mogoče odpreti','err');}
+}
+function openSdsUrl(idx){
+  var g=(DB_PREGLED.gtins||[])[idx];
+  if(!g||!g.sdsUrl){notify('Varnostni list ni povezan','warn');return;}
+  try{window.open(g.sdsUrl,'_blank');}catch(e){notify('Povezave ni mogoče odpreti','err');}
+}
+/* ===== UDI (IVDR čl. 24) — GS1: (01) GTIN, (10) lot, (17) rok, (21) serijska ===== */
+function formatUDI(gtin,lot,expiry,serial){
+  var g=(gtin||'');while(g.length<14)g='0'+g;
+  var s='(01)'+g;
+  if(lot)s+='(10)'+lot;
+  if(expiry)s+='(17)'+(fmtExp(expiry)||'').replace(/-/g,'').slice(2,8);
+  if(serial)s+='(21)'+serial;
+  return s;
+}
+function _updUdiPreview(){
+  var el=$i('gtinUdiPreview');if(!el)return;
+  var g=($i('gtinCode').value||'').replace(/\D/g,'');
+  el.textContent=g.length?('UDI-DI: (01)'+('00000000000000'+g).slice(-14)):'';
+}
+/* UDI evidenca dobavljenih pripomočkov — elektronska hramba po čl. 24(8) IVDR */
+function exportUdiCSV(){
+  var byG={};(DB_PREGLED.gtins||[]).forEach(function(g){byG[g.gtin]=g;});
+  var rows=[['UDI-DI','UDI-PI','UDI (celoten)','GTIN','Naziv','Lot','Rok','Serijska','Prejeto']];
+  (DB_PREGLED.received||[]).forEach(function(r){
+    if(!r||!r.gtin)return;
+    var name=(byG[r.gtin]||{}).name||r.name||'';
+    var serials=(r.serials&&r.serials.length)?r.serials:(r.serial?[r.serial]:['']);
+    serials.forEach(function(sn){
+      var udi=formatUDI(r.gtin,r.lot,r.expiry,sn);
+      var pi=udi.replace(/^\(01\)\d{14}/,'');
+      rows.push(['(01)'+('00000000000000'+r.gtin).slice(-14),pi,udi,r.gtin,name,r.lot||'',fmtExp(r.expiry||'')||'',sn||'',(r.receivedAt||'').slice(0,10)]);
+    });
+  });
+  if(rows.length===1){notify('Ni sprejemov za izvoz','warn');return;}
+  var csv=rows.map(function(r){return r.map(function(v){return'"'+String(v||'').replace(/"/g,'""')+'"';}).join(';');}).join('\r\n');
+  var blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
+  var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='UDI_evidenca_'+new Date().toISOString().slice(0,10)+'.csv';a.click();
+  notify('UDI evidenca izvožena ('+(rows.length-1)+' enot)','ok');
+}
+/* ===== OneDrive izbirnik dokumentov (Reagenčni/Varnostni listi) ===== */
+var _docPickTarget=null;var _docPickFiles=[];
+var DOC_FOLDERS={pi:'Reagenčni listi',sds:'Varnostni listi'};
+function openDocPick(target){
+  _docPickTarget=target;_docPickFiles=[];
+  $i('docPickTitle').innerHTML='&#128194; '+(DOC_FOLDERS[target]||'Dokumenti');
+  $i('docPickSrch').value='';
+  $i('docPickBody').innerHTML='<div class="empty">Nalagam&#8230;</div>';
+  showMo('moDocPick');
+  if(_hasBridge()&&AndroidBridge.msListFolder){
+    try{
+      if(!(AndroidBridge.msIsSignedIn&&AndroidBridge.msIsSignedIn())){$i('docPickBody').innerHTML='<div class="empty">Najprej se prijavite v OneDrive (Več &rarr; Sinhronizacija).</div>';return;}
+      _msListCtx='docpick';
+      AndroidBridge.msListFolder(DOC_FOLDERS[target]);
+    }catch(e){$i('docPickBody').innerHTML='<div class="empty">Napaka: '+_ge(e.message||'')+'</div>';}
+  }else{
+    $i('docPickBody').innerHTML='<div class="empty">Izbirnik deluje na napravi z OneDrive prijavo.<br>Tu prilepi povezavo ročno.</div>';
+  }
+}
+function onDocPickListed(json,msg){
+  if(!json){$i('docPickBody').innerHTML='<div class="empty">'+_ge(msg||'Mape ni mogoče prebrati')+'</div>';return;}
+  var obj;try{obj=JSON.parse(json);}catch(e){$i('docPickBody').innerHTML='<div class="empty">Neveljaven odgovor</div>';return;}
+  _docPickFiles=(obj.value||[]).filter(function(f){return f&&f.name&&!f.folder;});
+  renderDocPick();
+}
+function renderDocPick(){
+  var q=($i('docPickSrch').value||'').toLowerCase();
+  var items=_docPickFiles.filter(function(f){return !q||f.name.toLowerCase().indexOf(q)>=0;});
+  if(!items.length){$i('docPickBody').innerHTML='<div class="empty">Ni datotek.</div>';return;}
+  $i('docPickBody').innerHTML=items.map(function(f,i){
+    var d=(f.lastModifiedDateTime||'').slice(0,10);
+    return '<div class="assay-pick-item" onclick="docPickChoose('+_docPickFiles.indexOf(f)+')">'+
+      '<span style="flex:1;font-size:12px;font-weight:600">'+_ge(f.name)+'</span>'+
+      '<span style="font-size:10px;color:var(--text3)">'+d+'</span></div>';
+  }).join('');
+}
+function docPickChoose(i){
+  var f=_docPickFiles[i];if(!f)return;
+  var url=f.webUrl||'';
+  if(!url){notify('Datoteka nima spletne povezave (posodobi aplikacijo)','warn');return;}
+  var fieldId=_docPickTarget==='sds'?'gtinSdsUrl':'gtinPiUrl';
+  $i(fieldId).value=url;
+  closeMo('moDocPick');
+  notify('Povezava vstavljena: '+f.name,'ok');
 }
 /* Preveri/uvozi GTIN podatke iz predlog naročilnic (NAROC_GTINS, naroc_gtins.js) */
 function importNarocGtins(doImport){
@@ -2325,11 +2439,13 @@ function openGtinMo(idx){
     $i('gtinMfr').value=g.manufacturer||'';$i('gtinAnal').value=g.analyser||'';
     $i('gtinNote').value=g.note||'';$i('gtinCatalog').value=g.catalog||'';
     $i('gtinIdent').value=g.ident||'';$i('gtinRisk').value=g.riskClass||'';$i('gtinPiUrl').value=g.piUrl||'';
+    $i('gtinSdsUrl').value=g.sdsUrl||'';
     $i('gtinLotNotify').checked=(g.lotNotify!==false);
   }else{
-    ['gtinCode','gtinName','gtinMfr','gtinAnal','gtinNote','gtinCatalog','gtinIdent','gtinPiUrl'].forEach(function(id){$i(id).value='';});
+    ['gtinCode','gtinName','gtinMfr','gtinAnal','gtinNote','gtinCatalog','gtinIdent','gtinPiUrl','gtinSdsUrl'].forEach(function(id){$i(id).value='';});
     $i('gtinTypeVal').value='control';$i('gtinRisk').value='';$i('gtinLotNotify').checked=true;
   }
+  _updUdiPreview();
   showMo('moGtin');
 }
 function updateLotNotifyDefault(){
@@ -2350,6 +2466,9 @@ function saveGtin(){
   var prevForPi=_editGtinIdx!=null?(DB_PREGLED.gtins||[])[_editGtinIdx]:null;
   obj.piUrl=piUrl;
   obj.piUpdatedAt=(prevForPi&&prevForPi.piUrl===piUrl)?(prevForPi.piUpdatedAt||''):(piUrl?new Date().toISOString():'');
+  var sdsUrl=$i('gtinSdsUrl').value.trim();
+  obj.sdsUrl=sdsUrl;
+  obj.sdsUpdatedAt=(prevForPi&&prevForPi.sdsUrl===sdsUrl)?(prevForPi.sdsUpdatedAt||''):(sdsUrl?new Date().toISOString():'');
   if(_editGtinIdx!=null){
     var prev=(DB_PREGLED.gtins||[])[_editGtinIdx];
     if(prev&&prev.type!==obj.type)(DB_PREGLED.inventory||[]).forEach(function(inv){if(inv.gtin===obj.gtin)inv.type=obj.type;});
@@ -5683,9 +5802,13 @@ function _delivStatus(d){
 function salusCheckNew(){
   if(typeof AndroidBridge==='undefined'||!AndroidBridge.msIsSignedIn||!AndroidBridge.msIsSignedIn()){notify('Ni prijave v OneDrive','warning');return;}
   if(!AndroidBridge.msListFolder){notify('msListFolder ni na voljo','warning');return;}
+  _msListCtx='salus';
   try{AndroidBridge.msListFolder('Salus_Dobavnice');}catch(e){notify('Napaka: '+e,'error');}
 }
+/* Kontekst zadnjega msListFolder klica — isti Java callback servira Salus in izbirnik dokumentov */
+var _msListCtx='salus';
 function onMsFolderListed(json,msg){
+  if(_msListCtx==='docpick'){_msListCtx='salus';onDocPickListed(json,msg);return;}
   if(!json){notify('Napaka OneDrive: '+(msg||''),'error');return;}
   var data;try{data=JSON.parse(json);}catch(e){return;}
   var files=data.value||[];

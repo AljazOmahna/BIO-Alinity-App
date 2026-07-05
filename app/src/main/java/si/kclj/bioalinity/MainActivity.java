@@ -667,7 +667,7 @@ public class MainActivity extends AppCompatActivity {
             if (!seg.isEmpty()) sb.append("/").append(Uri.encode(seg));
         }
         String url = "https://graph.microsoft.com/v1.0/me/drive/root:/"
-                + sb + ":/children?$select=name,id,lastModifiedDateTime&$top=200";
+                + sb + ":/children?$select=name,id,lastModifiedDateTime,webUrl,folder&$top=200";
         Request req = new Request.Builder()
                 .url(url)
                 .header("Authorization", "Bearer " + token)
