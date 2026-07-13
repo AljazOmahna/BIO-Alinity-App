@@ -606,13 +606,18 @@ body.dark .notif{background:rgba(13,25,50,.95)}
         <div id="lotEvalLot" style="font-family:var(--mono);font-size:11px;color:var(--text3);margin-top:2px"></div>
       </div>
       <div class="fg"><label>Datum ovrednotenja</label><input type="date" id="lotEvalDate"></div>
-      <div class="fg"><label>Vpisano na analizatorje</label>
-        <div style="display:flex;gap:16px;flex-wrap:wrap;padding:4px 0">
-          <label style="display:flex;align-items:center;gap:6px;font-size:14px"><input type="checkbox" id="evalAL01" style="width:18px;height:18px"> AL01</label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:14px"><input type="checkbox" id="evalAL02" style="width:18px;height:18px"> AL02</label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:14px"><input type="checkbox" id="evalAL03" style="width:18px;height:18px"> AL03</label>
-          <label style="display:flex;align-items:center;gap:6px;font-size:14px"><input type="checkbox" id="evalAL04" style="width:18px;height:18px"> AL04</label>
+      <div id="evalAnalyzerSection">
+        <div class="fg"><label>Vpisano na analizatorje</label>
+          <div style="display:flex;gap:16px;flex-wrap:wrap;padding:4px 0">
+            <label style="display:flex;align-items:center;gap:6px;font-size:14px"><input type="checkbox" id="evalAL01" style="width:18px;height:18px"> AL01</label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:14px"><input type="checkbox" id="evalAL02" style="width:18px;height:18px"> AL02</label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:14px"><input type="checkbox" id="evalAL03" style="width:18px;height:18px"> AL03</label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:14px"><input type="checkbox" id="evalAL04" style="width:18px;height:18px"> AL04</label>
+          </div>
         </div>
+      </div>
+      <div id="evalDocSection" style="display:none">
+        <div class="fg"><label>Sklic na dokument (lot-to-lot primerjava)</label><input type="text" id="lotEvalDoc" placeholder="npr. LTL-2026-042, protokol validacije..."></div>
       </div>
     </div>
     <div class="mf">
@@ -1985,7 +1990,7 @@ function renderLoti(){
           h+='</div>';
           if(needsEval&&l.checked){
             h+='<div style="font-size:10px;color:var(--green);margin-top:4px;padding-top:4px;border-top:1px solid var(--border)">';
-            h+='&#10003; Ovrednoten '+(l.evalDate||l.checkedAt||'').slice(0,10)+(l.evalAnalyzers&&l.evalAnalyzers.length?' &middot; '+l.evalAnalyzers.join(', '):'');
+            h+='&#10003; Ovrednoten '+(l.evalDate||l.checkedAt||'').slice(0,10)+(l.evalAnalyzers&&l.evalAnalyzers.length?' &middot; '+l.evalAnalyzers.join(', '):'')+(l.evalDoc?' &middot; &#128196; '+l.evalDoc:'');
             h+=' <a href="#" onclick="openLotEval(\''+gtin+'\',\''+lotSafe+'\');return false" style="color:var(--text3);font-size:9px;margin-left:6px">uredi</a>';
             h+=' <a href="#" onclick="clearLotEval(\''+gtin+'\',\''+lotSafe+'\');return false" style="color:var(--red);font-size:9px;margin-left:4px">prekliči</a>';
             h+='</div>';
@@ -2008,6 +2013,11 @@ function openLotEval(gtin,lot){
   $i('lotEvalName').textContent=l.name;
   $i('lotEvalLot').textContent='Lot: '+l.lot;
   $i('lotEvalDate').value=l.evalDate||new Date().toISOString().slice(0,10);
+  var isCalib=(l.type==='calibrator');
+  var as=$i('evalAnalyzerSection'),ds=$i('evalDocSection');
+  if(as)as.style.display=isCalib?'block':'none';
+  if(ds)ds.style.display=isCalib?'none':'block';
+  if(!isCalib){var dinp=$i('lotEvalDoc');if(dinp)dinp.value=l.evalDoc||'';}
   var ea=l.evalAnalyzers||[];
   ['AL01','AL02','AL03','AL04'].forEach(function(a){var el=$i('eval'+a);if(el)el.checked=ea.indexOf(a)>=0;});
   showMo('moLotEval');
@@ -2016,10 +2026,17 @@ function confirmLotEval(){
   if(!_lotEvalKey)return;
   var l=(DB_PREGLED.lots||[]).filter(function(x){return x.gtin===_lotEvalKey.gtin&&x.lot===_lotEvalKey.lot;})[0];
   if(!l)return;
-  var analyzers=['AL01','AL02','AL03','AL04'].filter(function(a){var el=$i('eval'+a);return el&&el.checked;});
-  if(analyzers.length<4){notify('Označite vse analizatorje (AL01–AL04)','warning');return;}
+  var isCalib=(l.type==='calibrator');
+  if(isCalib){
+    var analyzers=['AL01','AL02','AL03','AL04'].filter(function(a){var el=$i('eval'+a);return el&&el.checked;});
+    if(analyzers.length<4){notify('Označite vse analizatorje (AL01–AL04)','warning');return;}
+    l.evalAnalyzers=analyzers;
+  }else{
+    var doc=($i('lotEvalDoc')?$i('lotEvalDoc').value||'':'').trim();
+    if(!doc){notify('Vnesite sklic na dokument lot-to-lot primerjave','warning');return;}
+    l.evalDoc=doc;
+  }
   l.evalDate=$i('lotEvalDate').value||new Date().toISOString().slice(0,10);
-  l.evalAnalyzers=analyzers;
   l.checked=true;
   l.checkedAt=new Date().toISOString();
   _lotEvalKey=null;
@@ -2041,7 +2058,7 @@ function toggleLotChecked(gtin,lot){
 function clearLotEval(gtin,lot){
   var l=(DB_PREGLED.lots||[]).filter(function(x){return x.gtin===gtin&&x.lot===lot;})[0];
   if(!l||!confirm('Preklicati ovrednotenje lota '+lot+'?'))return;
-  l.checked=false;l.checkedAt=null;l.evalDate='';l.evalAnalyzers=[];
+  l.checked=false;l.checkedAt=null;l.evalDate='';l.evalAnalyzers=[];l.evalDoc='';
   savePregledDB();renderLoti();notify('Ovrednotenje preklicano');
 }
 
