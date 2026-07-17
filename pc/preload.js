@@ -9,8 +9,9 @@ const fs = require('fs');
 const path = require('path');
 const { ipcRenderer } = require('electron');
 
-const CFG = ipcRenderer.sendSync('bridge:config');   // { digiLab, appBuild, appVersion, platform, model }
+const CFG = ipcRenderer.sendSync('bridge:config');   // { digiLab, kcljDigiLab, appBuild, appVersion, platform, model }
 const DIGILAB = CFG.digiLab || '';
+const KCLJ_DIGILAB = CFG.kcljDigiLab || '';
 let LAST_SYNC = '';
 
 function dlPath(rel) { return path.join(DIGILAB, rel); }
@@ -124,6 +125,15 @@ const Bridge = {
       fs.writeFileSync(p, xml != null ? xml : '', 'utf8');
       call('onQcXmlSaved', p, true, 'ok');
     } catch (e) { call('onQcXmlSaved', null, false, e.message); }
+  }
+  // ---------- Abbott servisna porocila: odpri PDF iz KCLJ OneDrive ----------
+  servAbottOpenPdf(filename) {
+    try {
+      if (!KCLJ_DIGILAB) { call('onServAbottError', 'KCLJ DigiLab mapa ni nastavljena'); return; }
+      const p = path.join(KCLJ_DIGILAB, 'Servis_Abbott', filename);
+      if (!exists(p)) { call('onServAbottError', 'Datoteka ne obstaja: ' + filename); return; }
+      ipcRenderer.invoke('bridge:openPath', p);
+    } catch (e) { call('onServAbottError', e.message); }
   }
   // Opomba: pickReportFile / pickQcValuesFile / quickShare namenoma NISO definirani —
   // HTML jih klice pogojno (if(AndroidBridge.pickReportFile)) in se brez njih elegantno izogne.

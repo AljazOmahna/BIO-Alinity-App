@@ -11,7 +11,8 @@ const fs = require('fs');
 const os = require('os');
 
 let CONFIG_PATH = '';      // pc-config.json v userData
-let DIGILAB = '';          // absolutna pot do mape DigiLab
+let DIGILAB = '';          // absolutna pot do mape DigiLab (Hotmail OneDrive)
+let KCLJ_DIGILAB = '';     // absolutna pot do mape DigiLab (KCLJ OneDrive — samo branje)
 let mainWin = null;
 
 // ---- verzija / build (uskladi z Android buildom prek build-info.json, ki ga zapise CI) ----
@@ -61,11 +62,24 @@ function autoDetectDigiLab() {
   }
   return '';
 }
+function autoDetectKcljDigiLab() {
+  const home = os.homedir();
+  try {
+    for (const d of fs.readdirSync(home)) {
+      // KCLJ OneDrive ima v imenu "Univerzitetni" ali "UKCL" ali "kclj"
+      if (/OneDrive/i.test(d) && /univerz|ukcl|kclj/i.test(d)) {
+        const c = path.join(home, d, 'DigiLab');
+        try { if (fs.statSync(c).isDirectory()) return c; } catch (e) {}
+      }
+    }
+  } catch (e) {}
+  return '';
+}
 async function ensureDigiLab() {
   DIGILAB = loadConfig();
-  if (DIGILAB && fs.existsSync(DIGILAB)) return;
+  if (DIGILAB && fs.existsSync(DIGILAB)) { KCLJ_DIGILAB = autoDetectKcljDigiLab(); return; }
   const auto = autoDetectDigiLab();
-  if (auto) { DIGILAB = auto; saveConfig(); return; }
+  if (auto) { DIGILAB = auto; saveConfig(); KCLJ_DIGILAB = autoDetectKcljDigiLab(); return; }
   // Vprasaj uporabnika
   const res = await dialog.showOpenDialog({
     title: 'Izberite mapo DigiLab (OneDrive)',
@@ -73,6 +87,7 @@ async function ensureDigiLab() {
     properties: ['openDirectory']
   });
   if (!res.canceled && res.filePaths[0]) { DIGILAB = res.filePaths[0]; saveConfig(); }
+  KCLJ_DIGILAB = autoDetectKcljDigiLab();
 }
 
 function createWindow() {
@@ -111,7 +126,7 @@ function createWindow() {
 // ===================== IPC: most do datotek / sistema =====================
 
 ipcMain.on('bridge:config', (e) => {
-  e.returnValue = { digiLab: DIGILAB, ...buildInfo(), platform: 'pc', model: os.hostname() };
+  e.returnValue = { digiLab: DIGILAB, kcljDigiLab: KCLJ_DIGILAB, ...buildInfo(), platform: 'pc', model: os.hostname() };
 });
 
 // Sestavi PDF iz HTML in shrani lokalno (Poročila/<leto>) + v DigiLab/<subfolder>

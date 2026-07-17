@@ -1293,6 +1293,23 @@ body.dark .notif{background:rgba(13,25,50,.95)}
   </div>
 </div>
 
+<!-- ============ ABBOTT SERVISNA POROCILA ============ -->
+<div class="page-main" id="main-abbott">
+  <div class="sec-hdr">
+    <div class="sec-title" style="font-size:16px">&#128203; Abbott servisna poročila</div>
+    <button class="btn btn-g btn-sm" onclick="abbottRefresh()">&#8635; Osveži</button>
+  </div>
+  <div style="padding:8px 12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+    <select id="abbottFilterYear" onchange="abbottRender()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--card);color:var(--text1);font-size:13px">
+      <option value="">Vsa leta</option>
+    </select>
+    <input id="abbottFilterInst" type="text" placeholder="&#128269; Naprava…" oninput="abbottRender()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--card);color:var(--text1);font-size:13px;width:130px">
+    <input id="abbottFilterDesc" type="text" placeholder="&#128269; Iskanje…" oninput="abbottRender()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--card);color:var(--text1);font-size:13px;flex:1;min-width:120px">
+    <span id="abbottCount" style="font-size:12px;color:var(--text3)"></span>
+  </div>
+  <div id="abbottList" style="padding:0 8px 12px"></div>
+</div>
+
 </main>
 </div>
 
@@ -1305,6 +1322,7 @@ body.dark .notif{background:rgba(13,25,50,.95)}
   <div class="bn-item" data-main="narocila" onclick="navMain('narocila')"><div class="bn-icon">&#128722;</div>Naročila</div>
   <div class="bn-item" data-main="deliveries" onclick="navMain('deliveries')"><div class="bn-icon">&#128666;</div>Dobavnice</div>
   <div class="bn-item" data-main="servis" onclick="navMain('servis')"><div class="bn-icon">&#128295;</div>Servis</div>
+  <div class="bn-item" data-main="abbott" onclick="navMain('abbott')"><div class="bn-icon">&#128203;</div>Abbott</div>
   <div class="bn-item" data-main="qc" onclick="navMain('qc')"><div class="bn-icon">&#128202;</div>QC</div>
   <div class="bn-item" data-main="reklamacije" onclick="navMain('reklamacije')"><div class="bn-icon">&#9888;&#65039;</div>Reklam.</div>
   <div class="bn-item" data-main="vec" onclick="navMain('vec')"><div class="bn-icon">&#9776;</div>Več</div>
@@ -1678,6 +1696,7 @@ function navMain(tab){
   if(tab==='servis') navSrv(currentSrv||'entry');
   if(tab==='deliveries') renderDeliveries();
   if(tab==='reklamacije') navRekl(currentRekl||'vpis');
+  if(tab==='abbott') renderAbbott();
   try{renderAlertUI();}catch(e){}
 }
 
@@ -5339,6 +5358,7 @@ function onMsDownloadDone(key,json,msg){
   try{
     if(key==='qclab_v2'){const cloud=JSON.parse(json);Object.assign(S,cloud);delete S.exportedAt;save();initState();notify('QC podatki združeni','ok');navQc(currentQc);}
     else if(key==='pregledBK_db'){const cloud=JSON.parse(json);const r=mergePregledDB(cloud);savePregledDB();notify('Zaloga združena: +'+r.received+' sprejem, +'+r.lots+' lotov','ok');renderZaloga();}
+    else if(key==='servis_abbott'){_abbottData=JSON.parse(json);_abbottBuildFilters();renderAbbott();notify('Abbott poročila posodobljena','ok');}
     refreshSyncUI();
   }catch(e){notify('Napaka pri branju podatkov','err');}
 }
@@ -5752,6 +5772,70 @@ function drawBars(canvasId,data,title){
     ctx.fillStyle='#00a3ad';ctx.fillRect(x-bw/2,y,bw,bh);
     ctx.fillStyle=getComputedStyle(document.body).getPropertyValue('--text')||'#000';ctx.font='bold 10px system-ui';ctx.textAlign='center';ctx.fillText(d.val,x,y-3);
     ctx.save();ctx.translate(x,pad.t+cH+8);ctx.rotate(-Math.PI/4);ctx.fillStyle='#6b7280';ctx.font='9px system-ui';ctx.textAlign='right';ctx.fillText(String(d.label).slice(0,18),0,0);ctx.restore();});
+}
+
+/* ============ ABBOTT SERVISNA POROCILA ============ */
+var _abbottData=null;
+function abbottRefresh(){
+  if(typeof AndroidBridge==='undefined'||!AndroidBridge.msIsSignedIn||!AndroidBridge.msIsSignedIn()){notify('Ni prijave v OneDrive','warning');return;}
+  if(!AndroidBridge.msDownload){notify('msDownload ni na voljo','warning');return;}
+  try{AndroidBridge.msDownload('servis_abbott');}catch(e){notify('Napaka: '+e,'error');}
+}
+function _abbottBuildFilters(){
+  var sel=$i('abbottFilterYear');if(!sel)return;
+  var cur=sel.value;
+  var years=[];
+  (_abbottData&&_abbottData.records||[]).forEach(function(r){if(r.year&&years.indexOf(r.year)<0)years.push(r.year);});
+  years.sort(function(a,b){return b-a;});
+  sel.innerHTML='<option value="">Vsa leta</option>';
+  years.forEach(function(y){var o=document.createElement('option');o.value=y;o.textContent=y;if(String(y)===cur)o.selected=true;sel.appendChild(o);});
+}
+function renderAbbott(){
+  var list=$i('abbottList');if(!list)return;
+  if(!_abbottData){
+    list.innerHTML='<div style="text-align:center;color:var(--text3);padding:40px 20px">Ni podatkov.<br><small>Kliknite &#8635; Osveži za prenos iz OneDrive.</small></div>';
+    abbottRefresh();return;
+  }
+  var records=_abbottData.records||[];
+  var yearF=($i('abbottFilterYear')||{}).value||'';
+  var instF=(($i('abbottFilterInst')||{}).value||'').toLowerCase().trim();
+  var descF=(($i('abbottFilterDesc')||{}).value||'').toLowerCase().trim();
+  var filtered=records.filter(function(r){
+    if(yearF&&String(r.year)!==yearF)return false;
+    if(instF&&(r.instrument||'').toLowerCase().indexOf(instF)<0)return false;
+    if(descF&&(r.desc||'').toLowerCase().indexOf(descF)<0&&(r.instrument||'').toLowerCase().indexOf(descF)<0&&(r.file||'').toLowerCase().indexOf(descF)<0)return false;
+    return true;
+  });
+  var canOpen=typeof AndroidBridge!=='undefined'&&typeof AndroidBridge.servAbottOpenPdf==='function';
+  var cnt=$i('abbottCount');if(cnt)cnt.textContent=filtered.length+' / '+records.length+' poročil';
+  if(!filtered.length){list.innerHTML='<div style="text-align:center;color:var(--text3);padding:24px">Ni zadetkov.</div>';return;}
+  var h='<table style="width:100%;border-collapse:collapse;font-size:13px">';
+  h+='<thead><tr style="background:var(--sec);color:var(--text2);text-align:left">';
+  h+='<th style="padding:6px 8px;width:80px">Št.</th>';
+  h+='<th style="padding:6px 8px;width:70px">Leto</th>';
+  h+='<th style="padding:6px 8px;width:120px">Naprava</th>';
+  h+='<th style="padding:6px 8px">Opis</th>';
+  if(canOpen)h+='<th style="padding:6px 8px;width:60px"></th>';
+  h+='</tr></thead><tbody>';
+  filtered.forEach(function(r,i){
+    var bg=i%2===0?'var(--card)':'var(--sec)';
+    h+='<tr style="background:'+bg+'">';
+    h+='<td style="padding:5px 8px;color:var(--text2)">'+escH(r.id||'')+'</td>';
+    h+='<td style="padding:5px 8px;color:var(--text3)">'+escH(r.year?String(r.year):'')+'</td>';
+    h+='<td style="padding:5px 8px;font-weight:500">'+escH(r.instrument||'—')+'</td>';
+    h+='<td style="padding:5px 8px;color:var(--text1)">'+escH(r.desc||r.file||'')+'</td>';
+    if(canOpen)h+='<td style="padding:5px 8px"><button class="btn btn-g btn-sm" onclick="abbottOpen('+JSON.stringify(r.file)+')">&#128065; Odpri</button></td>';
+    h+='</tr>';
+  });
+  h+='</tbody></table>';
+  list.innerHTML=h;
+}
+function abbottOpen(file){
+  if(typeof AndroidBridge!=='undefined'&&typeof AndroidBridge.servAbottOpenPdf==='function'){
+    AndroidBridge.servAbottOpenPdf(file);
+  }else{
+    notify('Odpiranje PDF ni na voljo na tej napravi','info');
+  }
 }
 
 /* ============ BOOT ============ */
