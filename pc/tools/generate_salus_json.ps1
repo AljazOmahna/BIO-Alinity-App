@@ -43,7 +43,7 @@ foreach ($pdf in $pdfs) {
             pages     = $pages
         }
         $json = $obj | ConvertTo-Json -Compress -Depth 3
-        [System.IO.File]::WriteAllText($outPath, $json, [System.Text.Encoding]::UTF8)
+        [System.IO.File]::WriteAllText($outPath, $json, (New-Object System.Text.UTF8Encoding($false)))
         $ok++
         Write-Host "  OK  $($pdf.Name)"
     } catch {

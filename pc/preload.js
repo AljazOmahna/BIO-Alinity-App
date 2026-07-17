@@ -16,6 +16,8 @@ let LAST_SYNC = '';
 
 function dlPath(rel) { return path.join(DIGILAB, rel); }
 function exists(p) { try { return fs.existsSync(p); } catch (e) { return false; } }
+// Nekatera orodja (npr. PowerShell) pišejo UTF-8 z BOM — odstrani, sicer JSON.parse pade.
+function readText(p) { return fs.readFileSync(p, 'utf8').replace(/^﻿/, ''); }
 
 // Povratne klice zaganjamo asinhrono (kot na tablici), da se notify/UABI tok ujema.
 function cb(code) { setTimeout(() => { try { window.eval(code); } catch (e) {} }, 0); }
@@ -58,7 +60,7 @@ const Bridge = {
     try {
       const p = dlPath(key + '.json');
       if (!exists(p)) { call('onMsDownloadDone', key, null, 'Ni datoteke v DigiLab'); return; }
-      const txt = fs.readFileSync(p, 'utf8');
+      const txt = readText(p);
       LAST_SYNC = new Date().toLocaleString('sl-SI');
       call('onMsDownloadDone', key, txt, 'ok');
     } catch (e) { call('onMsDownloadDone', key, null, 'Napaka branja: ' + e.message); }
@@ -77,7 +79,7 @@ const Bridge = {
     try {
       const p = dlPath(rel);
       if (!exists(p)) { call('onMsTextFile', null, 'Ni datoteke'); return; }
-      call('onMsTextFile', fs.readFileSync(p, 'utf8'), 'ok');
+      call('onMsTextFile', readText(p), 'ok');
     } catch (e) { call('onMsTextFile', null, e.message); }
   },
 
@@ -125,7 +127,7 @@ const Bridge = {
       fs.writeFileSync(p, xml != null ? xml : '', 'utf8');
       call('onQcXmlSaved', p, true, 'ok');
     } catch (e) { call('onQcXmlSaved', null, false, e.message); }
-  }
+  },
   // ---------- Abbott servisna porocila: odpri PDF iz KCLJ OneDrive ----------
   servAbottOpenPdf(filename) {
     try {

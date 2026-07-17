@@ -5803,7 +5803,7 @@ function renderAbbott(){
   var filtered=records.filter(function(r){
     if(yearF&&String(r.year)!==yearF)return false;
     if(instF&&(r.instrument||'').toLowerCase().indexOf(instF)<0)return false;
-    if(descF&&(r.desc||'').toLowerCase().indexOf(descF)<0&&(r.instrument||'').toLowerCase().indexOf(descF)<0&&(r.file||'').toLowerCase().indexOf(descF)<0)return false;
+    if(descF&&(r.desc||'').toLowerCase().indexOf(descF)<0&&(r.instrument||'').toLowerCase().indexOf(descF)<0&&(r.file||'').toLowerCase().indexOf(descF)<0&&(r.text||'').toLowerCase().indexOf(descF)<0)return false;
     return true;
   });
   var canOpen=typeof AndroidBridge!=='undefined'&&typeof AndroidBridge.servAbottOpenPdf==='function';
@@ -5819,12 +5819,12 @@ function renderAbbott(){
   h+='</tr></thead><tbody>';
   filtered.forEach(function(r,i){
     var bg=i%2===0?'var(--card)':'var(--sec)';
-    h+='<tr style="background:'+bg+'">';
-    h+='<td style="padding:5px 8px;color:var(--text2)">'+escH(r.id||'')+'</td>';
-    h+='<td style="padding:5px 8px;color:var(--text3)">'+escH(r.year?String(r.year):'')+'</td>';
-    h+='<td style="padding:5px 8px;font-weight:500">'+escH(r.instrument||'—')+'</td>';
-    h+='<td style="padding:5px 8px;color:var(--text1)">'+escH(r.desc||r.file||'')+'</td>';
-    if(canOpen)h+='<td style="padding:5px 8px"><button class="btn btn-g btn-sm" onclick="abbottOpen('+JSON.stringify(r.file)+')">&#128065; Odpri</button></td>';
+    h+='<tr style="background:'+bg+';cursor:pointer" data-file="'+_ge(r.file||'')+'" onclick="abbottShowDetail(this.getAttribute(\'data-file\'))">';
+    h+='<td style="padding:5px 8px;color:var(--text2)">'+_ge(r.id||'')+'</td>';
+    h+='<td style="padding:5px 8px;color:var(--text3)">'+_ge(r.year?String(r.year):'')+'</td>';
+    h+='<td style="padding:5px 8px;font-weight:500">'+_ge(r.instrument||'—')+'</td>';
+    h+='<td style="padding:5px 8px;color:var(--text1)">'+_ge(r.desc||r.file||'')+'</td>';
+    if(canOpen)h+='<td style="padding:5px 8px"><button class="btn btn-g btn-sm" data-file="'+_ge(r.file||'')+'" onclick="event.stopPropagation();abbottOpen(this.getAttribute(\'data-file\'))">&#128065; Odpri</button></td>';
     h+='</tr>';
   });
   h+='</tbody></table>';
@@ -5836,6 +5836,21 @@ function abbottOpen(file){
   }else{
     notify('Odpiranje PDF ni na voljo na tej napravi','info');
   }
+}
+function abbottShowDetail(file){
+  var r=(_abbottData&&_abbottData.records||[]).filter(function(x){return x.file===file;})[0];
+  if(!r)return;
+  var canOpen=typeof AndroidBridge!=='undefined'&&typeof AndroidBridge.servAbottOpenPdf==='function';
+  var h='<div class="mo" id="abbottDetailModal" style="display:flex"><div class="modal" style="max-width:640px;max-height:82vh;display:flex;flex-direction:column">';
+  h+='<div class="mh"><h3>'+_ge(r.id||'')+' &middot; '+_ge(r.instrument||'—')+'</h3><button class="mc" onclick="$i(\'abbottDetailModal\').remove()">&#10005;</button></div>';
+  h+='<div class="mb" style="overflow-y:auto;flex:1">';
+  h+='<div class="muted" style="font-size:12px;margin-bottom:8px">'+_ge(r.file||'')+'</div>';
+  h+='<pre style="white-space:pre-wrap;font-family:inherit;font-size:12.5px;line-height:1.5;color:var(--text1);margin:0">'+_ge(r.text||r.desc||'(ni besedila)')+'</pre>';
+  h+='</div>';
+  h+='<div class="mf">'+(canOpen?'<button class="btn btn-blue" data-file="'+_ge(r.file||'')+'" onclick="abbottOpen(this.getAttribute(\'data-file\'))">&#128065; Odpri PDF</button>':'')+'<button class="btn btn-g" onclick="$i(\'abbottDetailModal\').remove()">Zapri</button></div>';
+  h+='</div></div>';
+  var old=$i('abbottDetailModal');if(old)old.remove();
+  document.body.insertAdjacentHTML('beforeend',h);
 }
 
 /* ============ BOOT ============ */
