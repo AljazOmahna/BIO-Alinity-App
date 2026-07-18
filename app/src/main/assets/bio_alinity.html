@@ -1773,23 +1773,48 @@ function navQc(page){
 var DD_TYPES={
   bio:{label:'BIO', ciljSheet:1, rowStart:2, rowEnd:32, nameCol:0, ciljCol:1, overallCol:15,
     channels:[{n:'AL01 C1',c:2},{n:'AL01 C3',c:4},{n:'AL02 C1',c:6},{n:'AL02 C3',c:8},{n:'AL03 C1',c:10},{n:'AL03 C3',c:12}],
+    rawCols:[1,3,5,7,9,11],
     exclude:['Template','CILJ%','Statistika CV','AL01 I CV','AL02 I CV','AL03 I CV','AL01 C1 CV','AL01 C3 CV','AL02 C1 CV','AL02 C3 CV','AL03 C1 CV','AL03 C3 CV']},
   imuno:{label:'IMUNO', ciljSheet:1, rowStart:2, rowEnd:8, nameCol:0, ciljCol:1, overallCol:9,
     channels:[{n:'AL01 I',c:2},{n:'AL02 I',c:4},{n:'AL03 I',c:6}],
+    rawCols:[1,3,5],
     exclude:['Template','CILJ%','Statistika CV','AL01 I CV','AL02 I CV','AL03 I CV']},
   urin:{label:'URIN', ciljSheet:1, rowStart:2, rowEnd:14, nameCol:0, ciljCol:1, overallCol:15,
     channels:[{n:'AL01 C1',c:2},{n:'AL01 C3',c:4},{n:'AL02 C1',c:6},{n:'AL02 C3',c:8},{n:'AL03 C1',c:10},{n:'AL03 C3',c:12}],
+    rawCols:[1,3,5,7,9,11],
     exclude:['Template','CILJ%','Statistika CV','AL01 I CV','AL02 I CV','AL03 I CV','AL01 C1 CV','AL01 C3 CV','AL02 C1 CV','AL02 C3 CV','AL03 C1 CV','AL03 C3 CV']}
 };
 function _ddNum(ws,r,c){var cell=ws[XLSX.utils.encode_cell({r:r,c:c})];var v=cell&&cell.v;return (typeof v==='number'&&isFinite(v))?v:null;}
 function _ddStr(ws,r,c){var cell=ws[XLSX.utils.encode_cell({r:r,c:c})];return (cell&&cell.v!=null)?String(cell.v).trim():'';}
+/* Ekstrahira število iz celice: številka ali tekst kot "<4,5", ">5", "pod 5". */
+function _ddNumOrSign(ws,r,c){
+  var cell=ws[XLSX.utils.encode_cell({r:r,c:c})];if(!cell)return null;
+  if(cell.t==='n'&&typeof cell.v==='number'&&isFinite(cell.v))return cell.v;
+  if(cell.t==='s'){
+    var s=String(cell.v).trim();
+    if(s.charAt(0)==='<'||s.charAt(0)==='>'){var n=parseFloat(s.slice(1).replace(',','.'));return isNaN(n)?null:n;}
+    var m=s.match(/^pod\s+([\d,\.]+)/i);if(m){var n2=parseFloat(m[1].replace(',','.'));return isNaN(n2)?null:n2;}
+  }
+  return null;
+}
+/* Izračuna CV% iz surovih meritev ko je P-stolpec error (vse vrednosti tekst). */
+function _ddCvFromRaw(ws,r,rawCols){
+  var vals=rawCols.map(function(c){return _ddNumOrSign(ws,r,c);}).filter(function(v){return v!=null&&v>0;});
+  if(vals.length<2)return null;
+  var mean=vals.reduce(function(a,b){return a+b;},0)/vals.length;
+  if(mean===0)return null;
+  var vari=vals.reduce(function(a,v){return a+(v-mean)*(v-mean);},0)/(vals.length-1);
+  return Math.sqrt(vari)/mean*100;
+}
 /* AVERAGEIF(">0") — povprečje samo pozitivnih vrednosti (kot v VBA).
    Dodatno izključi natančno vrednost DD_PLACEHOLDER (7) — privzeta vrednost
    iz predloge, ki ostane v listu za dneve, ko ni bilo dela (vikendi,
    dnevi pred začetkom vodenja); pravi izmerjeni CV% nikoli ni točno 7.000000. */
 var DD_PLACEHOLDER=7;
 function _ddAvgPos(arr){
-  var p=arr.filter(function(x){return typeof x==='number'&&x>0&&x!==DD_PLACEHOLDER;});
+  /* x>=0: vključimo 0% CV ki nastane ko so vse meritve tekst (<x, pod x) —
+     VBA AVERAGEIF(">0") bi jih izpustil ker P=error, a tu jih izrecno dodamo. */
+  var p=arr.filter(function(x){return typeof x==='number'&&x>=0&&x!==DD_PLACEHOLDER;});
   return {avg:p.length?(p.reduce(function(a,b){return a+b;},0)/p.length):null, n:p.length};
 }
 function _ddCompute(wb,cfg){
@@ -1804,7 +1829,20 @@ function _ddCompute(wb,cfg){
     var cilj=_ddNum(cs,r,cfg.ciljCol);
     var ch={};
     cfg.channels.forEach(function(k){ch[k.n]=_ddAvgPos(dayNames.map(function(dn){return _ddNum(wb.Sheets[dn],r,k.c);})).avg;});
-    var ov=(cfg.overallCol!=null)?_ddAvgPos(dayNames.map(function(dn){return _ddNum(wb.Sheets[dn],r,cfg.overallCol);})):{avg:null,n:0};
+    var ov;
+    if(cfg.overallCol!=null){
+      var ovVals=dayNames.map(function(dn){
+        var ws=wb.Sheets[dn];
+        var v=_ddNum(ws,r,cfg.overallCol);
+        /* P-stolpec je error (t='e') ko so vse meritve tekst (<x, pod x) —
+           Excel AVERAGE() vrne #DIV/0!. Izračunamo CV% sami iz rawCols. */
+        if(v===null&&cfg.rawCols){v=_ddCvFromRaw(ws,r,cfg.rawCols);}
+        return v;
+      });
+      ov=_ddAvgPos(ovVals);
+    } else {
+      ov={avg:null,n:0};
+    }
     var flag=(ov.avg!=null&&cilj!=null&&ov.avg>cilj);
     if(flag)flagged++;
     assays.push({name:nm,cilj:cilj,ch:ch,overall:ov.avg,n:ov.n,flag:flag});
