@@ -1,0 +1,60 @@
+{
+  "name": "bioalinity-pc",
+  "productName": "BIO Alinity PC",
+  "version": "1.0.0",
+  "description": "Namizna (Windows) razlicica BIO Alinity aplikacije — nalozi isti bio_alinity.html kot tablica, sinhronizira prek lokalne OneDrive DigiLab mape.",
+  "author": "UKCL laboratorij BK <aljaz.omahna@kclj.si>",
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win --x64 --publish never",
+    "publish": "electron-builder --win --x64 --publish always"
+  },
+  "build": {
+    "appId": "si.kclj.bioalinity.pc",
+    "productName": "BIO Alinity PC",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "build-info.json",
+      "renderer/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "../app/src/main/assets",
+        "to": "app-assets",
+        "filter": ["bio_alinity.html", "order_templates.js"]
+      }
+    ],
+    "win": {
+      "target": ["nsis"],
+      "artifactName": "BIO-Alinity-PC-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "BIO Alinity PC"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "AljazOmahna",
+        "repo": "BIO-Alinity-App"
+      }
+    ]
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.9"
+  }
+}

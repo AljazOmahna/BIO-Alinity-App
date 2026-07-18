@@ -1,0 +1,40 @@
+name: Build PC (Windows)
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: pc
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Uskladi verzijo z Android buildom
+        shell: bash
+        run: |
+          echo "{ \"appBuild\": ${{ github.run_number }}, \"appVersion\": \"1.0.${{ github.run_number }}\" }" > build-info.json
+
+      - name: Namesti odvisnosti
+        run: npm install
+
+      - name: Zgradi namestilnik
+        run: npm run dist
+
+      - name: Nalozi artefakt
+        uses: actions/upload-artifact@v4
+        with:
+          name: bio-alinity-pc-setup-${{ github.run_number }}
+          path: pc/dist/*.exe
+          retention-days: 30
