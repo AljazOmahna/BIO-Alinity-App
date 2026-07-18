@@ -993,6 +993,7 @@ body.dark .notif{background:rgba(13,25,50,.95)}
     <div class="tab" data-srv="open" onclick="navSrv('open')">&#9203; Nezaključene</div>
     <div class="tab" data-srv="list" onclick="navSrv('list')">&#9989; Zaključene</div>
     <div class="tab" data-srv="stats" onclick="navSrv('stats')">&#128200; Statistika</div>
+    <div class="tab" data-srv="abbott" onclick="navSrv('abbott')">&#128203; Servisni zapisniki</div>
   </div>
 
   <!-- SRV ENTRY -->
@@ -1090,6 +1091,23 @@ body.dark .notif{background:rgba(13,25,50,.95)}
       <div class="card" style="padding:8px"><canvas id="srvStatsCanvas" style="width:100%;height:300px"></canvas></div>
       <div class="tbl-wrap"><table><thead><tr><th>Naprava</th><th>Napak</th><th>Odpravljenih</th><th>Odprtih</th><th>Povpr. čas do odprave</th></tr></thead><tbody id="srvStatsBody"></tbody></table></div>
     </div>
+  </div>
+
+  <!-- SRV ABBOTT (servisni zapisniki Abbott) -->
+  <div class="page srv-page" id="srv-abbott">
+    <div class="sec-hdr">
+      <div class="sec-title" style="font-size:16px">&#128203; Servisni zapisniki Abbott</div>
+      <button class="btn btn-g btn-sm" onclick="abbottRefresh()">&#8635; Osveži</button>
+    </div>
+    <div style="padding:8px 12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <select id="abbottFilterYear" onchange="abbottRender()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--card);color:var(--text1);font-size:13px">
+        <option value="">Vsa leta</option>
+      </select>
+      <input id="abbottFilterInst" type="text" placeholder="&#128269; Naprava…" oninput="abbottRender()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--card);color:var(--text1);font-size:13px;width:130px">
+      <input id="abbottFilterDesc" type="text" placeholder="&#128269; Iskanje…" oninput="abbottRender()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--card);color:var(--text1);font-size:13px;flex:1;min-width:120px">
+      <span id="abbottCount" style="font-size:12px;color:var(--text3)"></span>
+    </div>
+    <div id="abbottList" style="padding:0 8px 12px"></div>
   </div>
 </div>
 
@@ -1293,22 +1311,6 @@ body.dark .notif{background:rgba(13,25,50,.95)}
   </div>
 </div>
 
-<!-- ============ ABBOTT SERVISNA POROCILA ============ -->
-<div class="page-main" id="main-abbott">
-  <div class="sec-hdr">
-    <div class="sec-title" style="font-size:16px">&#128203; Abbott servisna poročila</div>
-    <button class="btn btn-g btn-sm" onclick="abbottRefresh()">&#8635; Osveži</button>
-  </div>
-  <div style="padding:8px 12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-    <select id="abbottFilterYear" onchange="abbottRender()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--card);color:var(--text1);font-size:13px">
-      <option value="">Vsa leta</option>
-    </select>
-    <input id="abbottFilterInst" type="text" placeholder="&#128269; Naprava…" oninput="abbottRender()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--card);color:var(--text1);font-size:13px;width:130px">
-    <input id="abbottFilterDesc" type="text" placeholder="&#128269; Iskanje…" oninput="abbottRender()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--card);color:var(--text1);font-size:13px;flex:1;min-width:120px">
-    <span id="abbottCount" style="font-size:12px;color:var(--text3)"></span>
-  </div>
-  <div id="abbottList" style="padding:0 8px 12px"></div>
-</div>
 
 </main>
 </div>
@@ -1322,7 +1324,6 @@ body.dark .notif{background:rgba(13,25,50,.95)}
   <div class="bn-item" data-main="narocila" onclick="navMain('narocila')"><div class="bn-icon">&#128722;</div>Naročila</div>
   <div class="bn-item" data-main="deliveries" onclick="navMain('deliveries')"><div class="bn-icon">&#128666;</div>Dobavnice</div>
   <div class="bn-item" data-main="servis" onclick="navMain('servis')"><div class="bn-icon">&#128295;</div>Servis</div>
-  <div class="bn-item" data-main="abbott" onclick="navMain('abbott')"><div class="bn-icon">&#128203;</div>Abbott</div>
   <div class="bn-item" data-main="qc" onclick="navMain('qc')"><div class="bn-icon">&#128202;</div>QC</div>
   <div class="bn-item" data-main="reklamacije" onclick="navMain('reklamacije')"><div class="bn-icon">&#9888;&#65039;</div>Reklam.</div>
   <div class="bn-item" data-main="vec" onclick="navMain('vec')"><div class="bn-icon">&#9776;</div>Več</div>
@@ -1696,7 +1697,6 @@ function navMain(tab){
   if(tab==='servis') navSrv(currentSrv||'entry');
   if(tab==='deliveries') renderDeliveries();
   if(tab==='reklamacije') navRekl(currentRekl||'vpis');
-  if(tab==='abbott') renderAbbott();
   try{renderAlertUI();}catch(e){}
 }
 
@@ -4604,6 +4604,7 @@ function navSrv(page){
   if(page==='open')renderSrvOpen();
   if(page==='list')renderSrvList();
   if(page==='stats')renderSrvStats();
+  if(page==='abbott')renderAbbott();
 }
 function srvInitSelects(){
   const opts=SERVICE_DEVICES.map(d=>'<option value="'+d+'">'+d+'</option>').join('');
