@@ -1227,8 +1227,13 @@ body.dark .notif{background:rgba(13,25,50,.95)}
 <div class="page-main" id="main-deliveries">
   <div class="sec-hdr">
     <div class="sec-title">&#128666; Dobavnice</div>
-    <button class="btn btn-a btn-sm" onclick="salusCheckNew()">&#8635; Preveri</button>
+    <div style="display:flex;gap:6px">
+      <button class="btn btn-g btn-sm" onclick="$i('importDelivJson').click()">&#8679; Uvozi JSON</button>
+      <button class="btn btn-g btn-sm" onclick="if(reconcileDeliveriesFromReceived()){renderDeliveries();notify('Dobavnice usklajene s sprejemom','ok');}else{notify('Ni sprememb','ok');}">&#8644; Uskladi</button>
+      <button class="btn btn-a btn-sm" onclick="salusCheckNew()">&#8635; Preveri</button>
+    </div>
   </div>
+  <input type="file" id="importDelivJson" accept=".json" style="display:none" onchange="importDeliveriesJson(event)">
   <div id="deliveriesBody" style="padding:8px 4px"></div>
 </div>
 
@@ -5881,6 +5886,8 @@ function parseSalusText(pages){
   var out=[];Object.keys(items).forEach(function(k){out.push(items[k]);});
   return out;
 }
+/* Salus dobavnice shranijo rok kot DDMMYY; kanonični format (skenirano, daysLeft, fmtExp) je YYMMDD. */
+function _delivExpIso(exp){return (exp&&exp.length===6)?exp.slice(4,6)+exp.slice(2,4)+exp.slice(0,2):(exp||'');}
 function _salusGuessType(name){
   var n=(name||'').toUpperCase();
   if(n.indexOf('KALIB')>=0)return 'calibrator';
@@ -5993,8 +6000,10 @@ function _renderDelivCard(d,canConfirm){
   var items=d.items||[];
   var totExp=items.reduce(function(s,it){return s+(it.qty||0);},0);
   var totRec=items.reduce(function(s,it){return s+(it.received||0);},0);
+  var totConf=items.reduce(function(s,it){return s+(it.confirmed||0);},0);
   var hasUnknown=items.some(function(it){return !it.matched;});
   var newLots=items.filter(function(it){return it.isNewLot;});
+  var nearExp=items.filter(function(it){return it.expiry&&daysLeft(_delivExpIso(it.expiry))<=90;});
   var pct=totExp?Math.round(totRec/totExp*100):0;
   var badge=d.status==='done'?'<span style="color:var(--green);font-weight:700">&#10003; Sprejeto</span>':
     d.status==='delno'?'<span style="color:var(--orange);font-weight:700">&#9696; Delno</span>':
@@ -6003,7 +6012,7 @@ function _renderDelivCard(d,canConfirm){
   var h='<div style="border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:10px;background:var(--bg2)">';
   h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">';
   h+='<div><div style="font-size:12px;font-weight:700;color:var(--text)">'+fname+'</div>';
-  h+='<div style="font-size:10px;color:var(--text3)">'+date+' &middot; '+items.length+' art. &middot; sprejeto '+totRec+' / '+totExp+' kos</div></div>';
+  h+='<div style="font-size:10px;color:var(--text3)">'+date+' &middot; '+items.length+' art. &middot; sprejeto '+totConf+' / '+totExp+' kos</div></div>';
   h+=badge+'</div>';
   // Napredek sprejema
   if(canConfirm||d.status==='delno'){
@@ -6017,21 +6026,29 @@ function _renderDelivCard(d,canConfirm){
     h+='<span style="font-size:10px;color:var(--orange);line-height:1.4"><strong>'+newLots.length+' nov'+(newLots.length===1?' lot':(newLots.length===2?'a lota':' novi loti'))+'</strong> v tej dobavnici &mdash; ob sprejemu potrebno ovrednotenje (AL01&ndash;AL04).</span></div>';
   }
   if(hasUnknown&&canConfirm)h+='<div style="font-size:10px;color:var(--orange);margin-bottom:6px">&#9888; Nekateri GTIN niso v šifrantu</div>';
+  if(nearExp.length&&d.status!=='done'){
+    h+='<div style="display:flex;gap:6px;align-items:flex-start;background:var(--obg);border:1px solid var(--orange);border-radius:7px;padding:7px 9px;margin-bottom:8px">';
+    h+='<span style="color:var(--orange);font-size:14px;flex-shrink:0">&#9888;</span>';
+    h+='<span style="font-size:10px;color:var(--orange);line-height:1.4"><strong>'+nearExp.length+' artikel'+(nearExp.length===1?'':'jev')+' z rokom izteka &lt; 3 mesece</strong> &mdash; preverite pred sprejemom.</span></div>';
+  }
   h+='<div style="font-size:11px;max-height:220px;overflow-y:auto;margin-bottom:8px">';
   items.forEach(function(it,idx){
     var expStr=it.expiry?(it.expiry.slice(0,2)+'.'+it.expiry.slice(2,4)+'.20'+it.expiry.slice(4)):'';
     var tc={calibrator:'#8b5cf6','reagent-bio':'#3b82f6','reagent-imuno':'#06b6d4',control:'#f59e0b',consumable:'#6b7280'};
     var col=tc[it.matchedType]||'#999';
-    var rec=it.received||0, exp=it.qty||1;
+    var rec=it.received||0, exp=it.qty||1, conf=it.confirmed||0;
     var full=rec>=exp, part=rec>0&&rec<exp;
     var ic=full?'<span style="color:var(--green)">&#10003;</span>':part?'<span style="color:var(--orange)">&#9696;</span>':'<span style="color:var(--text3)">&#9675;</span>';
+    var dl=it.expiry?daysLeft(_delivExpIso(it.expiry)):9999;
+    var expCol=dl<0?'#dc2626':dl<=90?'var(--orange)':'var(--text3)';
+    var expWarn=dl<0?' &#10060;':dl<=90?' &#9888;':'';
     h+='<div style="display:flex;gap:6px;padding:5px 0;border-bottom:1px solid var(--border);align-items:center">';
     h+='<span style="min-width:16px;text-align:center;font-size:13px">'+ic+'</span>';
     h+='<div style="flex:1;min-width:0">';
     h+='<div style="font-size:11px;color:'+(it.matched?'var(--text)':'var(--orange)')+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(it.matched?'':'&#9888; ')+it.name;
     if(it.isNewLot)h+=' <span style="font-size:9px;font-weight:700;background:var(--orange);color:#fff;padding:1px 5px;border-radius:4px">NOV LOT</span>';
     h+='</div>';
-    h+='<div style="font-size:9px;color:var(--text3)">'+it.lot+(expStr?' &middot; '+expStr:'')+'</div>';
+    h+='<div style="font-size:9px;color:'+expCol+'">'+it.lot+(expStr?' &middot; '+expStr+expWarn:'')+'</div>';
     h+='</div>';
     if(canConfirm){
       h+='<div style="display:flex;align-items:center;gap:4px;flex-shrink:0">';
@@ -6040,7 +6057,7 @@ function _renderDelivCard(d,canConfirm){
       h+='<button class="btn btn-g" style="min-width:26px;min-height:26px;padding:0;font-size:14px;justify-content:center" onclick="delivItemReceive(\''+d.id+'\','+idx+',1)">+</button>';
       h+='</div>';
     } else {
-      h+='<span style="font-size:11px;font-weight:700;color:'+(full?'var(--green)':'var(--orange)')+'">'+rec+'/'+exp+'</span>';
+      h+='<span style="font-size:11px;font-weight:700;color:'+(full?'var(--green)':'var(--orange)')+'">'+conf+'/'+exp+'</span>';
     }
     h+='</div>';
   });
@@ -6088,15 +6105,16 @@ function confirmDelivery(id){
     if(conf===0&&!_lotKnown(it.gtin,it.lot)){
       if(!DB_PREGLED.lots)DB_PREGLED.lots=[];
       DB_PREGLED.lots.push({gtin:it.gtin,lot:it.lot,name:it.name||'',type:type,
-        expiry:it.expiry||'',firstReceivedAt:new Date().toISOString(),
+        expiry:_delivExpIso(it.expiry)||'',firstReceivedAt:new Date().toISOString(),
         checked:false,checkedAt:null,evalDate:'',evalAnalyzers:[]});
       if(EVAL_TYPES.indexOf(type)>=0)newLotsReg++;
     }
     for(var i=0;i<delta;i++){
       if(!DB_PREGLED.received)DB_PREGLED.received=[];
       DB_PREGLED.received.push({id:(Date.now()+added).toString(),gtin:it.gtin,name:it.name||'',
-        type:type,lot:it.lot||'',expiry:it.expiry||'',serial:'',
+        type:type,lot:it.lot||'',expiry:_delivExpIso(it.expiry)||'',serial:'',
         catalog:it.catalog||'',ident:'',rfidEpc:'',
+        supplier:d.supplier||'Salus',delivery:(d.file||'').replace('.pdf',''),
         receivedAt:new Date().toISOString(),status:'active',source:'salus'});
       added++;
     }
@@ -6116,6 +6134,44 @@ function skipDelivery(id){
   if(!d)return;
   if(!confirm('Preskočiti dobavnico '+d.file+'?'))return;
   d.status='skipped';save();renderDeliveries();
+}
+function reconcileDeliveriesFromReceived(){
+  loadPregledDB();
+  var changed=false;
+  (S.deliveries||[]).forEach(function(d){
+    if(d.status==='done'||d.status==='skipped')return;
+    var since=d.fetchedAt||'';
+    (d.items||[]).forEach(function(it){
+      var cnt=(DB_PREGLED.received||[]).filter(function(r){
+        return r.gtin===it.gtin&&r.lot===it.lot&&(!since||r.receivedAt>=since);
+      }).length;
+      if(cnt!==(it.confirmed||0)){it.confirmed=cnt;changed=true;}
+    });
+    d.status=_delivStatus(d);
+  });
+  if(changed)save();
+  return changed;
+}
+function importDeliveriesJson(e){
+  var file=e.target.files[0];if(!file)return;
+  e.target.value='';
+  var reader=new FileReader();
+  reader.onload=function(ev){
+    var arr;try{arr=JSON.parse(ev.target.result);}catch(ex){notify('Napaka pri branju JSON: '+ex.message,'warning');return;}
+    if(!Array.isArray(arr)){notify('JSON mora biti seznam dobavnic','warning');return;}
+    if(!S.deliveries)S.deliveries=[];
+    var known={};S.deliveries.forEach(function(d){known[d.file]=true;});
+    var added=0;
+    arr.forEach(function(d){
+      if(!d.file||known[d.file])return;
+      enrichDeliveryItems(d.items||[]);
+      S.deliveries.push(d);
+      added++;
+    });
+    if(added>0){reconcileDeliveriesFromReceived();renderDeliveries();notify(added+' dobavnic uvoženih','ok');}
+    else{notify('Vse dobavnice že uvožene','ok');}
+  };
+  reader.readAsText(file);
 }
 
 loadPregledDB();
