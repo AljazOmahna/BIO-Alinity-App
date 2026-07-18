@@ -641,6 +641,7 @@ body.dark .notif{background:rgba(13,25,50,.95)}
     <div class="tab" data-qc="maintenance" onclick="navQc('maintenance')">&#128295; Vzdržev.</div>
     <div class="tab" data-qc="maint-review" onclick="navQc('maint-review')">&#128197; Pregled vzd.</div>
     <div class="tab" data-qc="notifications" onclick="navQc('notifications')">&#128276; Obvestila <span id="notifBadge" style="display:none;background:var(--red);color:#fff;border-radius:10px;font-size:10px;padding:1px 6px;margin-left:2px;font-weight:700;vertical-align:middle"></span></div>
+    <div class="tab" data-qc="ddqc" onclick="navQc('ddqc')">&#128203; DD Kontrole</div>
   </div>
 
   <!-- QC DASHBOARD -->
@@ -898,6 +899,38 @@ body.dark .notif{background:rgba(13,25,50,.95)}
       </div>
       <div class="tbl-wrap"><table><thead><tr><th>Datum</th><th>Tip</th><th>Integr.</th><th>Analizator</th><th>Koraki</th><th>Operater</th><th>Opomba</th></tr></thead><tbody id="maintReviewBody"></tbody></table></div>
     </div>
+  </div>
+
+  <!-- QC DD KONTROLE -->
+  <div class="page qc-page" id="page-ddqc">
+    <div class="sec-hdr"><div class="sec-title" style="font-size:16px">&#128203; DD Kontrole &mdash; statistika CV</div>
+      <span style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-g btn-sm" onclick="openDdConfig()">&#128193; Poveži datoteke</button>
+        <button class="btn btn-a btn-sm" onclick="updateDdqc()">&#128260; Posodobi</button>
+      </span>
+    </div>
+    <input type="file" id="ddFileInput" accept=".xls,.xlsx" multiple style="display:none" onchange="ddFilesChosen(this)">
+    <div id="ddqcBody" style="padding:4px"></div>
+  </div>
+</div>
+
+<!-- DD CONFIG MODAL -->
+<div class="mo" id="ddConfigModal">
+  <div class="modal" style="max-width:520px">
+    <div class="mh"><h3>&#128193; DD Kontrole &mdash; povezava datotek</h3><button class="mc" onclick="closeMo('ddConfigModal')">&#10005;</button></div>
+    <div class="mb">
+      <div style="font-size:12px;color:var(--text3);margin-bottom:10px">Datoteke naj bodo v mapi OneDrive <b>DigiLab/<span id="ddFolderLbl">DD_Kontrole</span></b>. Ob „Posodobi" se preberejo najnovejši vnosi. Na PC/brskalniku brez OneDrive lahko datoteke naložiš ročno.</div>
+      <div class="fg"><label>Mapa (v DigiLab)</label><input type="text" id="ddFolder" value="DD_Kontrole"></div>
+      <div class="fg"><label>BIO datoteka</label><input type="text" id="ddFileBio" placeholder="Alinity DD BIO Template.xls"></div>
+      <div class="fg"><label>IMUNO datoteka</label><input type="text" id="ddFileImuno" placeholder="Alinity DD IMUNO Template.xls"></div>
+      <div class="fg"><label>URIN datoteka</label><input type="text" id="ddFileUrin" placeholder="Alinity DD URIN Template.xls"></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+        <button class="btn btn-g btn-sm" onclick="ddAutodetect()">&#128269; Samodejno zaznaj (.xls v mapi)</button>
+        <button class="btn btn-g btn-sm" onclick="$i('ddFileInput').click()">&#128194; Naloži ročno (brskalnik)</button>
+      </div>
+      <div id="ddAutodetectHint" style="font-size:11px;color:var(--text3);margin-top:6px"></div>
+    </div>
+    <div class="mf"><button class="btn btn-g" onclick="closeMo('ddConfigModal')">Prekliči</button><button class="btn btn-a" onclick="saveDdConfig()">Shrani</button></div>
   </div>
 </div>
 
@@ -1341,6 +1374,7 @@ body.dark .notif{background:rgba(13,25,50,.95)}
 
 <script src="order_templates.js"></script>
 <script src="naroc_gtins.js"></script>
+<script src="xlsx.full.min.js"></script>
 
 <!-- DETAIL MODAL (Zaloga item) -->
 <div class="mo" id="detailModal">
@@ -1724,6 +1758,203 @@ function navQc(page){
   if(page==='maintenance') setMaintType(maintState.type||'daily');
   if(page==='maint-review') renderMaintReview();
   if(page==='notifications') renderNotifications();
+  if(page==='ddqc') renderDdqc();
+}
+
+/* ============================================================
+   DD KONTROLE — branje DD Excel (SheetJS) + statistika CV
+   Zamenja VBA makre: povprečni CV/odklon na preiskavo/kanal,
+   primerjava s CILJ (CVb/2); opozorilo ko avg > CILJ.
+   ============================================================ */
+/* Postavitev potrjena iz predlog: CILJ list je drugi (indeks 1),
+   preiskave stolpec A, cilj stolpec B; dnevni listi od indeksa 2,
+   kanali = "Odklon %" (C/E/G/I/K/M), skupni CV% = P (BIO/URIN) / J (IMUNO).
+   0-based indeksi: A=0,C=2,E=4,G=6,I=8,K=10,M=12,J=9,P=15; vrstica3→idx2. */
+var DD_TYPES={
+  bio:{label:'BIO', ciljSheet:1, rowStart:2, rowEnd:32, nameCol:0, ciljCol:1, overallCol:15,
+    channels:[{n:'AL01 C1',c:2},{n:'AL01 C3',c:4},{n:'AL02 C1',c:6},{n:'AL02 C3',c:8},{n:'AL03 C1',c:10},{n:'AL03 C3',c:12}],
+    exclude:['Template','CILJ%','Statistika CV','AL01 I CV','AL02 I CV','AL03 I CV','AL01 C1 CV','AL01 C3 CV','AL02 C1 CV','AL02 C3 CV','AL03 C1 CV','AL03 C3 CV']},
+  imuno:{label:'IMUNO', ciljSheet:1, rowStart:2, rowEnd:8, nameCol:0, ciljCol:1, overallCol:9,
+    channels:[{n:'AL01 I',c:2},{n:'AL02 I',c:4},{n:'AL03 I',c:6}],
+    exclude:['Template','CILJ%','Statistika CV','AL01 I CV','AL02 I CV','AL03 I CV']},
+  urin:{label:'URIN', ciljSheet:1, rowStart:2, rowEnd:14, nameCol:0, ciljCol:1, overallCol:15,
+    channels:[{n:'AL01 C1',c:2},{n:'AL01 C3',c:4},{n:'AL02 C1',c:6},{n:'AL02 C3',c:8},{n:'AL03 C1',c:10},{n:'AL03 C3',c:12}],
+    exclude:['Template','CILJ%','Statistika CV','AL01 I CV','AL02 I CV','AL03 I CV','AL01 C1 CV','AL01 C3 CV','AL02 C1 CV','AL02 C3 CV','AL03 C1 CV','AL03 C3 CV']}
+};
+function _ddNum(ws,r,c){var cell=ws[XLSX.utils.encode_cell({r:r,c:c})];var v=cell&&cell.v;return (typeof v==='number'&&isFinite(v))?v:null;}
+function _ddStr(ws,r,c){var cell=ws[XLSX.utils.encode_cell({r:r,c:c})];return (cell&&cell.v!=null)?String(cell.v).trim():'';}
+/* AVERAGEIF(">0") — povprečje samo pozitivnih vrednosti (kot v VBA) */
+function _ddAvgPos(arr){var p=arr.filter(function(x){return typeof x==='number'&&x>0;});return p.length?(p.reduce(function(a,b){return a+b;},0)/p.length):null;}
+function _ddCompute(wb,cfg){
+  var names=wb.SheetNames;
+  var ciljName=names.indexOf('CILJ%')>=0?'CILJ%':names[cfg.ciljSheet];
+  var cs=wb.Sheets[ciljName];if(!cs)return null;
+  var excl={};cfg.exclude.forEach(function(n){excl[n]=1;});
+  var dayNames=names.filter(function(n,i){return i>=2&&!excl[n]&&n!=='Template'&&n!=='CILJ%';});
+  var assays=[],flagged=0;
+  for(var r=cfg.rowStart;r<=cfg.rowEnd;r++){
+    var nm=_ddStr(cs,r,cfg.nameCol);if(!nm)continue;
+    var cilj=_ddNum(cs,r,cfg.ciljCol);
+    var ch={};
+    cfg.channels.forEach(function(k){ch[k.n]=_ddAvgPos(dayNames.map(function(dn){return _ddNum(wb.Sheets[dn],r,k.c);}));});
+    var overall=(cfg.overallCol!=null)?_ddAvgPos(dayNames.map(function(dn){return _ddNum(wb.Sheets[dn],r,cfg.overallCol);})):null;
+    var flag=(overall!=null&&cilj!=null&&overall>cilj);
+    if(flag)flagged++;
+    assays.push({name:nm,cilj:cilj,ch:ch,overall:overall,flag:flag});
+  }
+  return {assays:assays,nDays:dayNames.length,flagged:flagged};
+}
+function _ddParse(data,type,dtype){
+  if(typeof XLSX==='undefined'){notify('Excel modul (SheetJS) ni naložen','error');return null;}
+  var cfg=DD_TYPES[type];if(!cfg)return null;
+  var opt={sheetRows:cfg.rowEnd+2,cellStyles:false,cellHTML:false,cellFormula:false};
+  opt.type=dtype;
+  var wb=XLSX.read(data,opt);
+  var res=_ddCompute(wb,cfg);
+  if(res){res.type=type;res.updatedAt=new Date().toISOString();}
+  return res;
+}
+/* ---- Config modal ---- */
+function openDdConfig(){
+  var c=(S.ddConfig||{});var f=c.files||{};
+  $i('ddFolder').value=c.folder||'DD_Kontrole';
+  $i('ddFileBio').value=f.bio||'';$i('ddFileImuno').value=f.imuno||'';$i('ddFileUrin').value=f.urin||'';
+  $i('ddAutodetectHint').textContent='';
+  showMo('ddConfigModal');
+}
+function saveDdConfig(){
+  S.ddConfig={folder:($i('ddFolder').value||'DD_Kontrole').trim(),
+    files:{bio:($i('ddFileBio').value||'').trim(),imuno:($i('ddFileImuno').value||'').trim(),urin:($i('ddFileUrin').value||'').trim()}};
+  save();closeMo('ddConfigModal');renderDdqc();notify('DD nastavitev shranjena','ok');
+}
+var _ddAutoList=null;
+function ddAutodetect(){
+  if(!(_hasBridge()&&AndroidBridge.msListFolder)){notify('Samodejno zaznavanje le na napravi (OneDrive)','warning');return;}
+  var folder=($i('ddFolder').value||'DD_Kontrole').trim();
+  _msListCtx='dd';_ddAutoFolder=folder;
+  $i('ddAutodetectHint').textContent='Iščem .xls v '+folder+'…';
+  try{AndroidBridge.msListFolder(folder);}catch(e){notify('Napaka: '+e,'error');}
+}
+var _ddAutoFolder='DD_Kontrole';
+function _ddOnFolderListed(json){
+  var data;try{data=JSON.parse(json);}catch(e){$i('ddAutodetectHint').textContent='Napaka branja mape';return;}
+  var files=(data.value||[]).map(function(f){return f.name||'';}).filter(function(n){return /\.xlsx?$/i.test(n);});
+  var pick=function(kw){return files.filter(function(n){return n.toUpperCase().indexOf(kw)>=0;})[0]||'';};
+  if(pick('BIO'))$i('ddFileBio').value=pick('BIO');
+  if(pick('IMUNO'))$i('ddFileImuno').value=pick('IMUNO');
+  if(pick('URIN'))$i('ddFileUrin').value=pick('URIN');
+  $i('ddAutodetectHint').textContent=files.length?('Najdenih '+files.length+' datotek. Preveri ujemanje in shrani.'):'Ni .xls datotek v mapi '+_ddAutoFolder;
+}
+/* ---- Posodobi: OneDrive binarni prenos ali ročno ---- */
+var _ddPending=null;
+function updateDdqc(){
+  var c=S.ddConfig;
+  if(!c||!c.files||!(c.files.bio||c.files.imuno||c.files.urin)){
+    notify('Najprej poveži datoteke (📁)','warning');openDdConfig();return;
+  }
+  if(!(_hasBridge()&&AndroidBridge.msDownloadBinary)){
+    notify('Prenos iz OneDrive le na napravi/PC — uporabi ročno nalaganje','warning');$i('ddFileInput').click();return;
+  }
+  var folder=c.folder||'DD_Kontrole';
+  _ddPending={queue:[],done:0,total:0,results:{}};
+  ['bio','imuno','urin'].forEach(function(t){if(c.files[t])_ddPending.queue.push({type:t,rel:folder+'/'+c.files[t]});});
+  _ddPending.total=_ddPending.queue.length;
+  if(!_ddPending.total){notify('Ni povezanih datotek','warning');return;}
+  notify('Prenašam '+_ddPending.total+' DD datotek…','ok');
+  _ddDownloadNext();
+}
+function _ddDownloadNext(){
+  if(!_ddPending)return;
+  if(!_ddPending.queue.length){
+    S.ddStats=S.ddStats||{};
+    Object.keys(_ddPending.results).forEach(function(t){S.ddStats[t]=_ddPending.results[t];});
+    S.ddStats.updatedAt=new Date().toISOString();
+    save();_ddPending=null;renderDdqc();notify('DD statistika posodobljena ✓','success');
+    try{if(_hasMsSignedIn())msUpload('qclab_v2');}catch(e){}
+    return;
+  }
+  var job=_ddPending.queue.shift();_ddCurJob=job;
+  try{AndroidBridge.msDownloadBinary(job.rel);}catch(e){_ddDownloadNext();}
+}
+var _ddCurJob=null;
+function onMsBinaryFile(rel,b64,msg){
+  var job=_ddCurJob;_ddCurJob=null;
+  if(job&&b64){
+    try{var res=_ddParse(b64,job.type,'base64');if(res)_ddPending.results[job.type]=res;}
+    catch(e){notify('Napaka branja '+job.type+': '+e.message,'error');}
+  } else if(job){notify('Prenos '+job.type+' ni uspel: '+(msg||''),'warn');}
+  _ddDownloadNext();
+}
+function ddFilesChosen(input){
+  var files=input.files;if(!files||!files.length)return;
+  var remaining=files.length,got={};
+  Array.prototype.forEach.call(files,function(file){
+    var t=_ddGuessType(file.name);
+    var reader=new FileReader();
+    reader.onload=function(e){
+      try{if(t){var res=_ddParse(new Uint8Array(e.target.result),t,'array');if(res)got[t]=res;}}
+      catch(err){notify('Napaka '+file.name+': '+err.message,'error');}
+      if(--remaining===0){
+        S.ddStats=S.ddStats||{};Object.keys(got).forEach(function(k){S.ddStats[k]=got[k];});
+        S.ddStats.updatedAt=new Date().toISOString();save();renderDdqc();
+        var n=Object.keys(got).length;notify(n?('Naloženih '+n+' DD datotek ✓'):'Datoteke niso prepoznane (BIO/IMUNO/URIN v imenu)',n?'success':'warning');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  });
+  input.value='';
+}
+function _ddGuessType(name){var n=(name||'').toUpperCase();if(n.indexOf('IMUNO')>=0)return 'imuno';if(n.indexOf('URIN')>=0)return 'urin';if(n.indexOf('BIO')>=0)return 'bio';return null;}
+/* ---- Render ---- */
+function renderDdqc(){
+  var body=$i('ddqcBody');if(!body)return;
+  var st=S.ddStats||{};
+  var any=['bio','imuno','urin'].some(function(t){return st[t];});
+  if(!any){
+    body.innerHTML='<div class="card empty" style="padding:32px 16px;text-align:center;color:var(--text3)">Ni podatkov DD kontrol.<br><small>1) 📁 Poveži datoteke (BIO/IMUNO/URIN) &nbsp; 2) 🔄 Posodobi</small></div>';
+    return;
+  }
+  var totalFlag=0;['bio','imuno','urin'].forEach(function(t){if(st[t])totalFlag+=(st[t].flagged||0);});
+  var h='';
+  h+='<div style="font-size:11px;color:var(--text3);margin-bottom:10px">Zadnja posodobitev: '+(st.updatedAt?new Date(st.updatedAt).toLocaleString('sl-SI'):'—')+'</div>';
+  if(totalFlag>0){
+    h+='<div style="display:flex;gap:8px;align-items:flex-start;background:var(--rbg,#fef2f2);border:1px solid var(--red);border-radius:8px;padding:10px 12px;margin-bottom:12px">'+
+      '<span style="color:var(--red);font-size:16px">&#9888;</span>'+
+      '<span style="font-size:12px;color:var(--red);font-weight:700;line-height:1.4">'+totalFlag+' preisk'+(totalFlag===1?'ava odstopa':'av odstopa')+' (CV &gt; CILJ) &mdash; priporočena dodatna kalibracija ali ukrep.</span></div>';
+  } else {
+    h+='<div style="display:flex;gap:8px;align-items:center;background:var(--gbg);border:1px solid var(--green);border-radius:8px;padding:10px 12px;margin-bottom:12px">'+
+      '<span style="color:var(--green);font-size:16px">&#10003;</span><span style="font-size:12px;color:var(--green);font-weight:700">Vse preiskave znotraj cilja (CV &le; CILJ).</span></div>';
+  }
+  ['bio','imuno','urin'].forEach(function(t){if(st[t])h+=_ddRenderTable(t,st[t]);});
+  body.innerHTML=h;
+}
+function _ddRenderTable(type,res){
+  var cfg=DD_TYPES[type];
+  var fmt=function(v){return v==null?'':(Math.round(v*100)/100).toFixed(2);};
+  var h='<div class="card" style="margin-bottom:12px;overflow-x:auto">';
+  h+='<div class="card-title" style="justify-content:space-between"><span>'+cfg.label+'</span>'+
+     '<span style="font-size:11px;font-weight:400;color:var(--text3)">'+(res.nDays||0)+' dni'+(res.flagged?' &middot; <span style="color:var(--red);font-weight:700">'+res.flagged+' odstopa</span>':'')+'</span></div>';
+  if(!res.nDays){h+='<div class="empty" style="padding:16px;font-size:12px;color:var(--text3)">Datoteka nima dnevnih listov (samo predloga). Ko LIS napolni dneve, posodobi.</div></div>';return h;}
+  h+='<table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr>'+
+     '<th style="text-align:left;padding:5px 6px;position:sticky;left:0;background:var(--bg3)">Preiskava</th>';
+  cfg.channels.forEach(function(k){h+='<th style="padding:5px 4px">'+k.n+'</th>';});
+  h+='<th style="padding:5px 4px">CV%</th><th style="padding:5px 4px">CILJ</th></tr></thead><tbody>';
+  res.assays.forEach(function(a){
+    h+='<tr style="border-top:1px solid var(--border)">';
+    h+='<td style="text-align:left;padding:5px 6px;font-weight:600;position:sticky;left:0;background:var(--bg2)">'+_repEsc(a.name)+'</td>';
+    cfg.channels.forEach(function(k){
+      var v=a.ch[k.n];var over=(v!=null&&a.cilj!=null&&v>a.cilj);
+      h+='<td style="padding:5px 4px;text-align:center'+(over?';background:var(--rbg,#fef2f2);color:var(--red);font-weight:700':'')+'">'+fmt(v)+'</td>';
+    });
+    var oOver=a.flag;
+    h+='<td style="padding:5px 4px;text-align:center;font-weight:700'+(oOver?';background:var(--red);color:#fff':'')+'">'+fmt(a.overall)+'</td>';
+    h+='<td style="padding:5px 4px;text-align:center;color:var(--text3)">'+fmt(a.cilj)+'</td>';
+    h+='</tr>';
+  });
+  h+='</tbody></table>';
+  h+='<div style="font-size:10px;color:var(--text3);margin-top:6px">Stolpci kanalov = povprečni odklon %; CV% = povprečni skupni CV; CILJ = CVb/2. Rdeče = nad ciljem.</div>';
+  h+='</div>';
+  return h;
 }
 
 /* ============================================================
@@ -2690,6 +2921,8 @@ function initState(){
   if(!S.qcReviews)S.qcReviews=[];
   if(!S.reklamacije)S.reklamacije=[];
   if(!S.alertMute)S.alertMute={};
+  if(!S.ddConfig)S.ddConfig={folder:'DD_Kontrole',files:{bio:'',imuno:'',urin:''}};
+  if(!S.ddStats)S.ddStats={};
   if(!S.auditLog)S.auditLog=[];
   if(!S.notifications)S.notifications=[];
   if(!S.reports)S.reports=[];
@@ -5933,6 +6166,7 @@ function salusCheckNew(){
 var _msListCtx='salus';
 function onMsFolderListed(json,msg){
   if(_msListCtx==='docpick'){_msListCtx='salus';onDocPickListed(json,msg);return;}
+  if(_msListCtx==='dd'){_msListCtx='salus';_ddOnFolderListed(json);return;}
   if(!json){notify('Napaka OneDrive: '+(msg||''),'error');return;}
   var data;try{data=JSON.parse(json);}catch(e){return;}
   var files=data.value||[];

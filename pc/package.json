@@ -28,7 +28,7 @@
       {
         "from": "../app/src/main/assets",
         "to": "app-assets",
-        "filter": ["bio_alinity.html", "order_templates.js"]
+        "filter": ["bio_alinity.html", "order_templates.js", "naroc_gtins.js", "xlsx.full.min.js"]
       }
     ],
     "win": {

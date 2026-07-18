@@ -83,6 +83,15 @@ const Bridge = {
     } catch (e) { call('onMsTextFile', null, e.message); }
   },
 
+  // ---------- binarni prenos (DD Excel .xls): DigiLab/<rel> -> base64 ----------
+  msDownloadBinary(rel) {
+    try {
+      const p = dlPath(rel);
+      if (!exists(p)) { call('onMsBinaryFile', rel, null, 'Ni datoteke'); return; }
+      call('onMsBinaryFile', rel, fs.readFileSync(p).toString('base64'), 'ok');
+    } catch (e) { call('onMsBinaryFile', rel, null, e.message); }
+  },
+
   // ---------- surovi zapis (CSV obvestila): DigiLab/<relPath> ----------
   msUploadRaw(relPath, content, mimeType) {
     try {

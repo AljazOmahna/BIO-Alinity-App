@@ -514,6 +514,16 @@ public class MainActivity extends AppCompatActivity {
             }));
         }
 
+        // Prenese binarno datoteko (DD Excel .xls) iz DigiLab/<rel> in vrne base64.
+        @JavascriptInterface
+        public void msDownloadBinary(String path) {
+            final String p = path;
+            mainHandler.post(() -> msAcquireToken("bin_" + p, (token, err) -> {
+                if (token == null) { callJs("onMsBinaryFile(" + jsStr(p) + ",null," + jsStr(err) + ")"); return; }
+                graphGetBytes(p, token);
+            }));
+        }
+
         // Naloži besedilno vsebino (npr. CSV) v DigiLab/<relPath> v OneDriveju.
         @JavascriptInterface
         public void msUploadRaw(String relPath, String content, String mimeType) {
@@ -708,6 +718,31 @@ public class MainActivity extends AppCompatActivity {
                     callJs("onMsTextFile(" + jsStr(body) + ",'ok')");
                 } else {
                     callJs("onMsTextFile(null," + jsStr("Graph napaka " + code) + ")");
+                }
+            }
+        });
+    }
+
+    // Binarni prenos (DD Excel .xls) -> base64 -> onMsBinaryFile(rel, b64, msg)
+    private void graphGetBytes(final String relPath, String token) {
+        Request req = new Request.Builder()
+                .url(graphPathUrl(relPath))
+                .header("Authorization", "Bearer " + token)
+                .get()
+                .build();
+        http.newCall(req).enqueue(new Callback() {
+            @Override public void onFailure(@NonNull Call call, @NonNull IOException e) {
+                callJs("onMsBinaryFile(" + jsStr(relPath) + ",null," + jsStr("Napaka mreže: " + e.getMessage()) + ")");
+            }
+            @Override public void onResponse(@NonNull Call call, @NonNull Response resp) {
+                int code = resp.code();
+                byte[] bytes = null;
+                try { ResponseBody rb = resp.body(); if (rb != null) bytes = rb.bytes(); } catch (IOException ignored) {} finally { resp.close(); }
+                if (code >= 200 && code < 300 && bytes != null) {
+                    String b64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP);
+                    callJs("onMsBinaryFile(" + jsStr(relPath) + "," + jsStr(b64) + ",'ok')");
+                } else {
+                    callJs("onMsBinaryFile(" + jsStr(relPath) + ",null," + jsStr("Graph napaka " + code) + ")");
                 }
             }
         });
