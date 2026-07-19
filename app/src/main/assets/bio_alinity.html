@@ -1369,6 +1369,20 @@ body.dark .notif{background:rgba(13,25,50,.95)}
 
 <div class="notif" id="notif"></div>
 
+<!-- VPIS / ZAKLEP (fullscreen overlay; matična = vpis) -->
+<div id="loginScreen" style="display:none;position:fixed;inset:0;z-index:9999;background:var(--bg,#f5f7fa);flex-direction:column;align-items:center;justify-content:center;gap:6px">
+  <div style="font-size:44px" id="loginIcon">&#128274;</div>
+  <div style="font-size:20px;font-weight:800;color:var(--abbott-blue)" id="loginTitle">Vpis v aplikacijo</div>
+  <div style="font-size:13px;color:var(--text3)" id="loginSub">Vpi&scaron;ite svojo mati&#269;no &scaron;tevilko</div>
+  <div class="pin-display"><div class="pin-dot" id="lpd0"></div><div class="pin-dot" id="lpd1"></div><div class="pin-dot" id="lpd2"></div><div class="pin-dot" id="lpd3"></div><div class="pin-dot" id="lpd4"></div></div>
+  <div id="loginOpName" style="min-height:20px;font-size:14px;font-weight:700;color:var(--success)"></div>
+  <div class="pin-grid" id="loginGrid" style="max-width:280px"></div>
+  <div id="loginLockedInfo" style="font-size:11px;color:var(--text3);margin-top:10px;max-width:300px;text-align:center"></div>
+</div>
+
+<!-- Prijavljen operater — plavajoči chip -->
+<div id="opChip" onclick="lockNow()" style="display:none;position:fixed;top:8px;right:10px;z-index:500;background:var(--abbott-blue);color:#fff;border-radius:20px;padding:5px 13px;font-size:12px;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.25);cursor:pointer" title="Tapni za zaklep / menjavo operaterja"></div>
+
 <!-- PRINT AREA (en kategorijski obrazec naenkrat) -->
 <div id="orderPrintArea"></div>
 
@@ -1502,6 +1516,12 @@ body.dark .notif{background:rgba(13,25,50,.95)}
     <div class="mb">
       <div class="fg"><label>Matična številka (5 mest)</label><input id="opId" inputmode="numeric" maxlength="5"></div>
       <div class="frow"><div class="fg"><label>Ime</label><input id="opFirst"></div><div class="fg"><label>Priimek</label><input id="opLast"></div></div>
+      <div class="fg"><label>Vloga</label>
+        <select id="opRole">
+          <option value="operator">Operater</option>
+          <option value="advanced">Napredni operater</option>
+          <option value="admin">Administrator</option>
+        </select></div>
     </div>
     <div class="mf"><button class="btn btn-g" onclick="closeMo('operatorModal')">Prekliči</button><button class="btn btn-a" onclick="saveOperator()">Shrani</button></div>
   </div>
@@ -3001,6 +3021,16 @@ function initState(){
   if(!S.qcOverrides)S.qcOverrides={};
   if(!S.qcPanels)S.qcPanels=[];
   if(!S.operators.length) S.operators=DEFAULT_OPERATORS;
+  /* Vloge operaterjev: admin / advanced / operator (privzeto).
+     Enkratna migracija po imenih (ID-ji lahko variirajo med napravami). */
+  if(S.rolesSchema!==1){
+    const _roleByName={'OMAHNA|ALJAŽ':'admin','BOMBEK|DOMEN':'advanced','RADOŠ|NEŽA':'advanced',
+      'OTOREPEC ČERNE|IZA':'advanced','ŠTEBIH|MAŠA':'advanced','ŠPENDAL|NEJC':'advanced'};
+    S.operators.forEach(o=>{if(!o.role)o.role=_roleByName[(o.last||'').toUpperCase()+'|'+(o.first||'').toUpperCase()]||'operator';});
+    S.rolesSchema=1;
+  }
+  S.operators.forEach(o=>{if(!o.role)o.role='operator';});
+  if(!S.session)S.session=null;
 }
 /* Idempotentna nadgradnja QC materialov na shemo z GTIN povezavo + ločenima GFAP/UCHL + Multichem U/Myo.
    Ne briše uporabniških dodatkov; ne dira S.entries (zgodovinski qcName ostane). */
@@ -3035,6 +3065,87 @@ function migrateQcMaterials(){
   }
 }
 function save(){localStorage.setItem('qclab_v2',JSON.stringify(S));}
+
+/* ===== SEJA · VLOGE · ZAKLEP =====
+   Vpis z matično; vloge operator < advanced < admin; samodejni zaklep
+   po 15 min neaktivnosti (zaslon čez app, stanje ostane nedotaknjeno). */
+const ROLE_RANK={operator:1,advanced:2,admin:3};
+const ROLE_LABEL={operator:'Operater',advanced:'Napredni',admin:'Admin'};
+var _lockDelay=15*60*1000; /* test: v konzoli _lockDelay=10000 */
+var _lastActivity=Date.now();
+var _loginVal='';
+function currentOp(){if(!S.session||!S.session.opId||S.session.locked)return null;return S.operators.find(o=>o.id===S.session.opId)||null;}
+function hasRole(min){const op=currentOp();if(!op)return false;return (ROLE_RANK[op.role||'operator']||1)>=(ROLE_RANK[min]||1);}
+function requireRole(min){
+  if(hasRole(min))return true;
+  notify(min==='admin'?'Samo administrator':'Potrebna vloga: napredni operater ali administrator','warning');
+  return false;
+}
+function _sessTs(){try{return parseInt(localStorage.getItem('bioAlinity_sessTs')||'0',10)||0;}catch(e){return 0;}}
+function _touchSess(){try{localStorage.setItem('bioAlinity_sessTs',String(Date.now()));}catch(e){}}
+function buildLoginGrid(){const keys=[1,2,3,4,5,6,7,8,9,'',0,'⌫'];$i('loginGrid').innerHTML=keys.map(k=>'<div class="pin-key" onclick="loginPress(\''+k+'\')">'+k+'</div>').join('');}
+function loginPress(k){
+  if(k===''||k==='undefined')return;
+  if(k==='⌫')_loginVal=_loginVal.slice(0,-1);else if(_loginVal.length<5)_loginVal+=k;
+  for(let i=0;i<5;i++)$i('lpd'+i).classList.toggle('filled',i<_loginVal.length);
+  const op=S.operators.find(o=>o.id===_loginVal);
+  $i('loginOpName').textContent=op?'✓ '+op.first+' '+op.last+' · '+(ROLE_LABEL[op.role||'operator']):(_loginVal.length===5?'⚠ Operater ni najden':'');
+  if(op)setTimeout(()=>{if(_loginVal===op.id)doLogin(op);},350);
+}
+function doLogin(op){
+  const prev=S.session&&S.session.opId;
+  S.session={opId:op.id,ts:Date.now()};
+  save();_touchSess();_lastActivity=Date.now();
+  _audit(prev&&prev!==op.id?'login':'login','session',op.id,'Vpis operaterja '+op.first+' '+op.last+' ('+ROLE_LABEL[op.role||'operator']+')',null,null,op.id);
+  hideLogin();updateOpChip();
+  notify('Pozdravljen/-a, '+op.first+'!','success');
+}
+function showLogin(mode){
+  _loginVal='';for(let i=0;i<5;i++)$i('lpd'+i).classList.remove('filled');
+  $i('loginOpName').textContent='';
+  const locked=mode==='lock';
+  $i('loginIcon').textContent=locked?'🔒':'👤';
+  $i('loginTitle').textContent=locked?'Aplikacija zaklenjena':'Vpis v aplikacijo';
+  $i('loginSub').textContent=locked?'Za nadaljevanje vpišite matično številko':'Vpišite svojo matično številko';
+  $i('loginLockedInfo').textContent=locked?'Samodejni zaklep po '+Math.round(_lockDelay/60000)+' min neaktivnosti. Podatki in nedokončani vnosi so ohranjeni.':'';
+  buildLoginGrid();
+  $i('loginScreen').style.display='flex';
+  $i('opChip').style.display='none';
+}
+function hideLogin(){$i('loginScreen').style.display='none';updateOpChip();}
+function lockNow(){
+  if(S.session){S.session.locked=true;save();_audit('lock','session',S.session.opId,'Zaklep (ročno)',null,null,S.session.opId);}
+  showLogin('lock');
+}
+function _autoLock(){
+  if($i('loginScreen').style.display==='flex')return;
+  if(S.session){S.session.locked=true;save();_audit('lock','session',S.session.opId,'Samodejni zaklep ('+Math.round(_lockDelay/60000)+' min neaktivnosti)',null,null,S.session.opId);}
+  showLogin('lock');
+}
+function updateOpChip(){
+  const op=currentOp();const c=$i('opChip');
+  if(!op){c.style.display='none';return;}
+  c.innerHTML='&#128100; '+op.first+' '+op.last+' <span style="opacity:.75;font-weight:400">· '+(ROLE_LABEL[op.role||'operator'])+'</span>';
+  c.style.display='block';
+}
+function initSession(){
+  ['pointerdown','keydown'].forEach(ev=>document.addEventListener(ev,()=>{_lastActivity=Date.now();},{passive:true}));
+  setInterval(()=>{
+    if($i('loginScreen').style.display==='flex')return;
+    if(Date.now()-_lastActivity>_lockDelay){_autoLock();}
+    else _touchSess();
+  },30000);
+  document.addEventListener('visibilitychange',()=>{
+    if(document.visibilityState==='visible'&&$i('loginScreen').style.display!=='flex'){
+      if(Date.now()-Math.max(_sessTs(),_lastActivity)>_lockDelay)_autoLock();
+    }
+  });
+  const op=S.session&&!S.session.locked?S.operators.find(o=>o.id===S.session.opId):null;
+  if(op&&Date.now()-_sessTs()<=_lockDelay){updateOpChip();}
+  else showLogin(S.session?'lock':'login');
+}
+/* Predizpolni matično prijavljenega v podpisne PIN pade (sopodpis je še vedno mogoč) */
+function _prefillPinId(){const op=currentOp();return op?op.id:'';}
 
 /* ===== REVIZIJSKA SLED (IVDR / ISO 15189 — ALCOA+) =====
    Append-only dnevnik vseh sprememb. Nikoli se ne ureja ali briše.
@@ -3124,8 +3235,11 @@ function pregledLotHint(q){
 function selectAllQcMats(val){document.querySelectorAll('.qc-mat-cb').forEach(cb=>cb.checked=val);}
 function toggleAllQcMats(){const cbs=[...document.querySelectorAll('.qc-mat-cb')];const allOn=cbs.every(cb=>cb.checked);cbs.forEach(cb=>cb.checked=!allOn);}
 
-function initWizard(){S.wiz={};S.pinValue='';showWStep(0);clearPin();populateEntryQcMaterials();const now=new Date();now.setMinutes(now.getMinutes()-now.getTimezoneOffset());$i('entryDateTime').value=now.toISOString().slice(0,16);qcDateCheck();}
-function qcDateCheck(){const v=$i('entryDateTime').value;const today=new Date().toISOString().slice(0,10);const late=v&&v.slice(0,10)<today;const w=$i('qcLateWarn');if(w)w.style.display=late?'block':'none';if(!late){const r=$i('qcLateReason');if(r)r.value='';} }
+function initWizard(){S.wiz={};S.pinValue=_prefillPinId();showWStep(0);updatePinDisplay();populateEntryQcMaterials();const now=new Date();now.setMinutes(now.getMinutes()-now.getTimezoneOffset());$i('entryDateTime').value=now.toISOString().slice(0,16);qcDateCheck();}
+function qcDateCheck(){const v=$i('entryDateTime').value;const today=new Date().toISOString().slice(0,10);const late=v&&v.slice(0,10)<today;
+  /* vnos za nazaj le za napredne operaterje/admin */
+  if(late&&!hasRole('advanced')){requireRole('advanced');const now=new Date();now.setMinutes(now.getMinutes()-now.getTimezoneOffset());$i('entryDateTime').value=now.toISOString().slice(0,16);const w0=$i('qcLateWarn');if(w0)w0.style.display='none';return;}
+  const w=$i('qcLateWarn');if(w)w.style.display=late?'block':'none';if(!late){const r=$i('qcLateReason');if(r)r.value='';} }
 function showWStep(n){document.querySelectorAll('.wizard-step').forEach((s,i)=>s.classList.toggle('active',i===n));document.querySelectorAll('.wizard-dot').forEach((d,i)=>{d.classList.remove('active','done');if(i<n)d.classList.add('done');else if(i===n)d.classList.add('active');});}
 function wizardNext(from){
   if(from===0){
@@ -3256,8 +3370,9 @@ function renderQcSignoff(){
 }
 function deleteQcReview(id){if(!confirm('Izbrisati ta pregled?'))return;const rec=(S.qcReviews||[]).find(r=>r.id===id);S.qcReviews=(S.qcReviews||[]).filter(r=>r.id!==id);if(rec)_audit('delete','qcreview',id,'Izbrisan pregled QC '+rec.instrId+' ('+(rec.fromDate||'')+'–'+(rec.toDate||'')+')',rec,null,'system');save();renderQcSignoff();notify('Pregled izbrisan');}
 function openQcReviewEdit(id){
+  if(!requireRole('advanced'))return;
   const rev=(S.qcReviews||[]).find(r=>r.id===id);if(!rev)return;
-  qcReviewState={instrId:rev.instrId,editId:id};qcRevPin='';
+  qcReviewState={instrId:rev.instrId,editId:id};qcRevPin=_prefillPinId();
   $i('qcRevTitle').textContent='Uredi pregled – '+rev.instrId;
   $i('qcRevSummary').innerHTML='<div style="background:rgba(176,120,0,.1);border:1px solid rgba(176,120,0,.3);border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:4px">'
     +'<div style="font-weight:600;color:var(--yellow);margin-bottom:4px">&#9998; Urejanje obstoječega pregleda</div>'
@@ -3691,13 +3806,13 @@ function applyPanel(idx){
 function saveQcMaterial(){const name=$i('qcName').value.trim(),type=$i('qcType').value,lot=$i('qcLot').value.trim(),levels=parseInt($i('qcLevels').value);const assays=[...$i('qcAssayList').querySelectorAll('input:checked')].map(el=>el.value);const gtins=[...$i('qcGtinList').querySelectorAll('.qc-gtin-cb:checked')].map(el=>el.value);if(!name){notify('Vnesite naziv','warning');return;}const mq=parseInt($i('qcMinQty').value);const obj={name,type,lot,levels,gtins,assays};if(isFinite(mq)&&mq>=0)obj.minQty=mq;if(S.editingQcIdx!=null){const old=S.qcMaterials[S.editingQcIdx];if(old&&old.lotHistory)obj.lotHistory=old.lotHistory;S.qcMaterials[S.editingQcIdx]=obj;}else S.qcMaterials.push(obj);save();closeMo('qcModal');renderQcMats();notify('Material shranjen','success');}
 
 /* ===== OPERATORS ===== */
-function renderOperators(){const q=($i('opSearch')?.value||'').toLowerCase();const filtered=S.operators.filter(o=>(o.first+' '+o.last+' '+o.id).toLowerCase().includes(q));$i('operatorBody').innerHTML=filtered.map(o=>{const ri=S.operators.indexOf(o);return '<tr><td><span class="badge badge-blue">'+o.id+'</span></td><td>'+o.first+'</td><td>'+o.last+'</td><td><button class="btn btn-outline btn-sm" onclick="openOperatorModal('+ri+')">✏️</button> <button class="btn btn-d btn-sm" onclick="deleteOperator('+ri+')">🗑️</button></td></tr>';}).join('')||'<tr><td colspan="4" class="empty">Ni rezultatov.</td></tr>';}
-function openOperatorModal(idx){S.editingOpIdx=idx??null;$i('operatorModalTitle').textContent=idx!=null?'Uredi operaterja':'Nov operater';if(idx!=null){const o=S.operators[idx];$i('opId').value=o.id;$i('opFirst').value=o.first;$i('opLast').value=o.last;}else{$i('opId').value='';$i('opFirst').value='';$i('opLast').value='';}showMo('operatorModal');}
-function deleteOperator(i){if(!confirm('Izbriši operaterja?'))return;const o=S.operators[i];S.operators.splice(i,1);if(o)_audit('delete','operator',o.id,'Izbrisan operater '+o.first+' '+o.last+' ('+o.id+')',o,null,'system');save();renderOperators();_autoSyncOps();notify('Operater izbrisan');}
+function renderOperators(){const q=($i('opSearch')?.value||'').toLowerCase();const filtered=S.operators.filter(o=>(o.first+' '+o.last+' '+o.id).toLowerCase().includes(q));$i('operatorBody').innerHTML=filtered.map(o=>{const ri=S.operators.indexOf(o);const rl=o.role||'operator';const rb=rl==='admin'?'<span class="badge badge-2sd">Admin</span>':rl==='advanced'?'<span class="badge badge-blue">Napredni</span>':'';return '<tr><td><span class="badge badge-blue">'+o.id+'</span></td><td>'+o.first+'</td><td>'+o.last+' '+rb+'</td><td><button class="btn btn-outline btn-sm" onclick="openOperatorModal('+ri+')">✏️</button> <button class="btn btn-d btn-sm" onclick="deleteOperator('+ri+')">🗑️</button></td></tr>';}).join('')||'<tr><td colspan="4" class="empty">Ni rezultatov.</td></tr>';}
+function openOperatorModal(idx){if(!requireRole('admin'))return;S.editingOpIdx=idx??null;$i('operatorModalTitle').textContent=idx!=null?'Uredi operaterja':'Nov operater';if(idx!=null){const o=S.operators[idx];$i('opId').value=o.id;$i('opFirst').value=o.first;$i('opLast').value=o.last;$i('opRole').value=o.role||'operator';}else{$i('opId').value='';$i('opFirst').value='';$i('opLast').value='';$i('opRole').value='operator';}showMo('operatorModal');}
+function deleteOperator(i){if(!requireRole('admin'))return;if(!confirm('Izbriši operaterja?'))return;const o=S.operators[i];S.operators.splice(i,1);if(o)_audit('delete','operator',o.id,'Izbrisan operater '+o.first+' '+o.last+' ('+o.id+')',o,null,(currentOp()||{}).id||'system');save();renderOperators();_autoSyncOps();notify('Operater izbrisan');}
 /* Operaterji so vir resnice v tej aplikaciji; ob spremembi se tiho naložijo v OneDrive (DigiLab/operators.json), od koder jih Zebra (Pregled BK) samo prebere. */
 function _autoSyncOps(){try{if(_hasBridge()&&AndroidBridge.msIsSignedIn&&AndroidBridge.msIsSignedIn())AndroidBridge.msUpload('operators',JSON.stringify(S.operators));}catch(e){}}
 function msUploadOperators(){if(!_hasBridge()){notify('Samo na napravi','warn');return;}try{if(!(AndroidBridge.msIsSignedIn&&AndroidBridge.msIsSignedIn())){notify('Najprej se prijavite v OneDrive (Več → Sinhronizacija)','warn');return;}notify('Nalagam operaterje v OneDrive…','ok');AndroidBridge.msUpload('operators',JSON.stringify(S.operators));}catch(e){notify('Napaka nalaganja','err');}}
-function saveOperator(){const id=$i('opId').value.trim(),first=$i('opFirst').value.trim(),last=$i('opLast').value.trim();if(!id||id.length!==5||isNaN(id)){notify('ID mora biti točno 5 številk','warning');return;}if(!first||!last){notify('Vnesite ime in priimek','warning');return;}if(S.editingOpIdx!=null){const before={id:S.operators[S.editingOpIdx].id,first:S.operators[S.editingOpIdx].first,last:S.operators[S.editingOpIdx].last};S.operators[S.editingOpIdx]={id,first,last};_audit('update','operator',id,'Urejen operater '+first+' '+last+' ('+id+')',before,{id,first,last},'system');}else{if(S.operators.find(o=>o.id===id)){notify('ID že obstaja','error');return;}S.operators.push({id,first,last});_audit('create','operator',id,'Dodan operater '+first+' '+last+' ('+id+')',null,{id,first,last},'system');}save();closeMo('operatorModal');renderOperators();_autoSyncOps();notify('Operater shranjen','success');}
+function saveOperator(){if(!requireRole('admin'))return;const id=$i('opId').value.trim(),first=$i('opFirst').value.trim(),last=$i('opLast').value.trim(),role=$i('opRole').value||'operator';if(!id||id.length!==5||isNaN(id)){notify('ID mora biti točno 5 številk','warning');return;}if(!first||!last){notify('Vnesite ime in priimek','warning');return;}const who=(currentOp()||{}).id||'system';if(S.editingOpIdx!=null){const b=S.operators[S.editingOpIdx];const before={id:b.id,first:b.first,last:b.last,role:b.role||'operator'};S.operators[S.editingOpIdx]={id,first,last,role};_audit('update','operator',id,'Urejen operater '+first+' '+last+' ('+id+')'+(before.role!==role?' · vloga '+before.role+'→'+role:''),before,{id,first,last,role},who);}else{if(S.operators.find(o=>o.id===id)){notify('ID že obstaja','error');return;}S.operators.push({id,first,last,role});_audit('create','operator',id,'Dodan operater '+first+' '+last+' ('+id+') · vloga '+role,null,{id,first,last,role},who);}save();closeMo('operatorModal');renderOperators();_autoSyncOps();notify('Operater shranjen','success');}
 function exportOperators(){const blob=new Blob([JSON.stringify(S.operators,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='operaterji.json';a.click();notify('Operaterji izvoženi','success');}
 function importOperators(input){const f=input.files[0];if(!f)return;const r=new FileReader();r.onload=e=>{try{const arr=JSON.parse(e.target.result);if(Array.isArray(arr)){let added=0;arr.forEach(o=>{if(!o.id)return;const norm={id:o.id,first:o.first||o.name||'',last:o.last||o.surname||''};if(!S.operators.find(x=>x.id===norm.id)){S.operators.push(norm);added++;}});save();renderOperators();notify('Uvoženih '+added+' operaterjev','success');}}catch(err){notify('Napaka pri uvozu','error');}};r.readAsText(f);input.value='';}
 
@@ -4461,13 +4576,13 @@ function renderMaintContent(){
 function toggleMaintStep(instrId,type,stepId,val){const key=instrId+'_'+type;if(!maintState.checked[key])maintState.checked[key]={};maintState.checked[key][stepId]=val;renderMaintContent();}
 function checkAllMaint(instrId,type,val){const instr=INSTRUMENTS.find(i=>i.id===instrId);const steps=getMaintSteps(type,instr?.type);const key=instrId+'_'+type;if(!maintState.checked[key])maintState.checked[key]={};const todayRec=_maintCurRec(instrId,type);const confirmed={};if(todayRec)todayRec.steps.forEach(s=>{if(s.done)confirmed[s.id]=true;});steps.forEach(s=>{if(!confirmed[s.id])maintState.checked[key][s.id]=val;});renderMaintContent();}
 let maintPinVal='';
-function openMaintSign(instrId,type){const instr=INSTRUMENTS.find(i=>i.id===instrId);const steps=getMaintSteps(type,instr.type);const key=instrId+'_'+type;const checked=maintState.checked[key]||{};const ti=MAINT_TYPES[type];const pw=_maintPeriodWord(type);const todayRec=_maintCurRec(instrId,type);const confirmed={};if(todayRec)todayRec.steps.forEach(s=>{if(s.done)confirmed[s.id]=true;});const newCount=steps.filter(s=>!confirmed[s.id]&&!!checked[s.id]).length;const totalDone=steps.filter(s=>confirmed[s.id]||(!confirmed[s.id]&&!!checked[s.id])).length;maintState.pendingSign={instrId,type};maintPinVal='';$i('maintSignTitle').textContent='Potrditev – '+instrId;const prevInfo=todayRec?'<div style="font-size:11px;color:var(--text3);margin-top:4px">Že potrjeno '+pw+': '+Object.keys(confirmed).length+' korakov</div>':'';$i('maintSignSummary').innerHTML='<div style="background:rgba(0,48,135,.05);border-radius:8px;padding:10px 14px"><div style="font-weight:600;font-size:14px;color:var(--abbott-blue);margin-bottom:6px">'+ti.icon+' '+ti.label+' – '+instrId+'</div><div style="font-size:13px">Novih: <strong>'+newCount+'</strong> &nbsp;|&nbsp; Skupno '+pw+': <strong>'+totalDone+' / '+steps.length+'</strong> '+(totalDone===steps.length?'<span class="badge badge-ok">Vse</span>':'<span class="badge badge-2sd">Ni popolno</span>')+'</div>'+prevInfo+'</div>';$i('maintSignNote').value='';updateMaintPinDisplay();buildMaintPinGrid();showMo('maintSignModal');}
+function openMaintSign(instrId,type){const instr=INSTRUMENTS.find(i=>i.id===instrId);const steps=getMaintSteps(type,instr.type);const key=instrId+'_'+type;const checked=maintState.checked[key]||{};const ti=MAINT_TYPES[type];const pw=_maintPeriodWord(type);const todayRec=_maintCurRec(instrId,type);const confirmed={};if(todayRec)todayRec.steps.forEach(s=>{if(s.done)confirmed[s.id]=true;});const newCount=steps.filter(s=>!confirmed[s.id]&&!!checked[s.id]).length;const totalDone=steps.filter(s=>confirmed[s.id]||(!confirmed[s.id]&&!!checked[s.id])).length;maintState.pendingSign={instrId,type};maintPinVal=_prefillPinId();$i('maintSignTitle').textContent='Potrditev – '+instrId;const prevInfo=todayRec?'<div style="font-size:11px;color:var(--text3);margin-top:4px">Že potrjeno '+pw+': '+Object.keys(confirmed).length+' korakov</div>':'';$i('maintSignSummary').innerHTML='<div style="background:rgba(0,48,135,.05);border-radius:8px;padding:10px 14px"><div style="font-weight:600;font-size:14px;color:var(--abbott-blue);margin-bottom:6px">'+ti.icon+' '+ti.label+' – '+instrId+'</div><div style="font-size:13px">Novih: <strong>'+newCount+'</strong> &nbsp;|&nbsp; Skupno '+pw+': <strong>'+totalDone+' / '+steps.length+'</strong> '+(totalDone===steps.length?'<span class="badge badge-ok">Vse</span>':'<span class="badge badge-2sd">Ni popolno</span>')+'</div>'+prevInfo+'</div>';$i('maintSignNote').value='';updateMaintPinDisplay();buildMaintPinGrid();showMo('maintSignModal');}
 function buildMaintPinGrid(){const keys=[1,2,3,4,5,6,7,8,9,'',0,'⌫'];$i('maintPinGrid').innerHTML=keys.map(k=>'<div class="pin-key" onclick="maintPinPress(\''+k+'\')">'+k+'</div>').join('');}
 function maintPinPress(k){if(k===''||k==='undefined')return;if(k==='⌫')maintPinVal=maintPinVal.slice(0,-1);else if(maintPinVal.length<5)maintPinVal+=k;updateMaintPinDisplay();}
 function clearMaintPin(){maintPinVal='';updateMaintPinDisplay();}
 function updateMaintPinDisplay(){for(let i=0;i<5;i++)$i('mpd'+i)?.classList.toggle('filled',i<maintPinVal.length);const op=S.operators.find(o=>o.id===maintPinVal);$i('maintPinName').textContent=op?'✓ '+op.first+' '+op.last:(maintPinVal.length===5?'⚠ Operater ni najden':'');}
 /* ---- naknadni vnos vzdrževanja za nazaj / mirovanje ---- */
-function openMaintBack(){const today=new Date().toISOString().slice(0,10);$i('mbInstr').innerHTML=INSTRUMENTS.map(i=>'<option value="'+i.id+'">'+i.id+' &ndash; '+i.name+'</option>').join('');$i('mbType').value=maintState.type==='triannual'?'quarterly':maintState.type;$i('mbDate').max=today;$i('mbDate').value=today;$i('mbMode').value='done';$i('mbNote').value='';$i('mbReason').value='';$i('mbOp').value='';$i('mbOpName').textContent='';_maintBackRenderSteps();showMo('maintBackModal');}
+function openMaintBack(){if(!requireRole('advanced'))return;const today=new Date().toISOString().slice(0,10);$i('mbInstr').innerHTML=INSTRUMENTS.map(i=>'<option value="'+i.id+'">'+i.id+' &ndash; '+i.name+'</option>').join('');$i('mbType').value=maintState.type==='triannual'?'quarterly':maintState.type;$i('mbDate').max=today;$i('mbDate').value=today;$i('mbMode').value='done';$i('mbNote').value='';$i('mbReason').value='';$i('mbOp').value=_prefillPinId();_maintBackOpName();_maintBackRenderSteps();showMo('maintBackModal');}
 function _maintBackRenderSteps(){
   const instrId=$i('mbInstr').value,type=$i('mbType').value,date=$i('mbDate').value,mode=$i('mbMode').value;
   const today=new Date().toISOString().slice(0,10);const late=date&&date<today;
@@ -4528,7 +4643,7 @@ function _commitMaint(o){
 }
 function saveMaintenance(){if(maintPinVal.length<5){notify('Vpišite matično številko','warning');return;}const op=S.operators.find(o=>o.id===maintPinVal);if(!op){notify('Operater ni registriran','error');return;}const {instrId,type,idle}=maintState.pendingSign;const key=instrId+'_'+type;const checked=maintState.checked[key]||{};const note=$i('maintSignNote').value.trim();_commitMaint({instrId,type,forDate:new Date().toISOString().slice(0,10),checked,idle:!!idle,note,operatorId:maintPinVal});closeMo('maintSignModal');maintState.checked[key]={};renderMaintContent();notify(idle?'Mirovanje zabeleženo 💤':'Vzdrževanje potrjeno! ✓','success');}
 /* označi aparat v mirovanju za tekoče obdobje (sočasno) — preko istega PIN modala */
-function openMaintIdle(instrId,type){const instr=INSTRUMENTS.find(i=>i.id===instrId);const ti=MAINT_TYPES[type];const pw=_maintPeriodWord(type);maintState.pendingSign={instrId,type,idle:true};maintPinVal='';$i('maintSignTitle').textContent='Mirovanje – '+instrId;$i('maintSignSummary').innerHTML='<div style="background:rgba(180,83,9,.07);border:1px solid var(--orange,#b45309);border-radius:8px;padding:10px 14px"><div style="font-weight:600;font-size:14px;color:#b45309;margin-bottom:4px">💤 Aparat v mirovanju</div><div style="font-size:13px">'+ti.icon+' '+ti.label+' – '+instrId+'<br>Beležite, da aparat <strong>'+pw+'</strong> ni obratoval, zato vzdrževanje ni bilo potrebno.</div></div>';$i('maintSignNote').value='';updateMaintPinDisplay();buildMaintPinGrid();showMo('maintSignModal');}
+function openMaintIdle(instrId,type){const instr=INSTRUMENTS.find(i=>i.id===instrId);const ti=MAINT_TYPES[type];const pw=_maintPeriodWord(type);maintState.pendingSign={instrId,type,idle:true};maintPinVal=_prefillPinId();$i('maintSignTitle').textContent='Mirovanje – '+instrId;$i('maintSignSummary').innerHTML='<div style="background:rgba(180,83,9,.07);border:1px solid var(--orange,#b45309);border-radius:8px;padding:10px 14px"><div style="font-weight:600;font-size:14px;color:#b45309;margin-bottom:4px">💤 Aparat v mirovanju</div><div style="font-size:13px">'+ti.icon+' '+ti.label+' – '+instrId+'<br>Beležite, da aparat <strong>'+pw+'</strong> ni obratoval, zato vzdrževanje ni bilo potrebno.</div></div>';$i('maintSignNote').value='';updateMaintPinDisplay();buildMaintPinGrid();showMo('maintSignModal');}
 function getOpName(id){const op=S.operators.find(o=>o.id===id);return op?op.first+' '+op.last:id;}
 /* ---- urejevalnik opravil vzdrževanja ---- */
 function openMaintEdit(){$i('meType').value=maintState.type==='triannual'?'quarterly':maintState.type;renderMaintEdit();showMo('maintEditModal');}
@@ -6475,6 +6590,7 @@ initState();
 buildInstrMap();
 populateEntryInstruments();
 buildPinGrid();
+initSession();
 if(localStorage.getItem('bioAlinity_dark')==='1'){$i('darkToggle').checked=true;document.body.classList.add('dark');}
 renderZaloga();
 renderDashboard();
