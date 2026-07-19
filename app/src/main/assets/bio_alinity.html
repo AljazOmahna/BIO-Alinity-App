@@ -919,8 +919,8 @@ body.dark .notif{background:rgba(13,25,50,.95)}
   <div class="modal" style="max-width:520px">
     <div class="mh"><h3>&#128193; DD Kontrole &mdash; povezava datotek</h3><button class="mc" onclick="closeMo('ddConfigModal')">&#10005;</button></div>
     <div class="mb">
-      <div style="font-size:12px;color:var(--text3);margin-bottom:10px">Datoteke naj bodo v mapi OneDrive <b>DigiLab/<span id="ddFolderLbl">DD_Kontrole</span></b>. Ob „Posodobi" se preberejo najnovejši vnosi. Na PC/brskalniku brez OneDrive lahko datoteke naložiš ročno.</div>
-      <div class="fg"><label>Mapa (v DigiLab)</label><input type="text" id="ddFolder" value="DD_Kontrole"></div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:10px">Datoteke naj bodo v mapi OneDrive <b>DigiLab/<span id="ddFolderLbl">BIO/DD_Kontrole</span></b>. Ob „Posodobi" se preberejo najnovejši vnosi. Na PC/brskalniku brez OneDrive lahko datoteke naložiš ročno.</div>
+      <div class="fg"><label>Mapa (v DigiLab)</label><input type="text" id="ddFolder" value="BIO/DD_Kontrole"></div>
       <div class="fg"><label>BIO datoteka</label><input type="text" id="ddFileBio" placeholder="Alinity DD BIO Template.xls"></div>
       <div class="fg"><label>IMUNO datoteka</label><input type="text" id="ddFileImuno" placeholder="Alinity DD IMUNO Template.xls"></div>
       <div class="fg"><label>URIN datoteka</label><input type="text" id="ddFileUrin" placeholder="Alinity DD URIN Template.xls"></div>
@@ -1862,25 +1862,25 @@ function _ddParse(data,type,dtype){
 /* ---- Config modal ---- */
 function openDdConfig(){
   var c=(S.ddConfig||{});var f=c.files||{};
-  $i('ddFolder').value=c.folder||'DD_Kontrole';
+  $i('ddFolder').value=c.folder||'BIO/DD_Kontrole';
   $i('ddFileBio').value=f.bio||'';$i('ddFileImuno').value=f.imuno||'';$i('ddFileUrin').value=f.urin||'';
   $i('ddAutodetectHint').textContent='';
   showMo('ddConfigModal');
 }
 function saveDdConfig(){
-  S.ddConfig={folder:($i('ddFolder').value||'DD_Kontrole').trim(),
+  S.ddConfig={folder:($i('ddFolder').value||'BIO/DD_Kontrole').trim(),
     files:{bio:($i('ddFileBio').value||'').trim(),imuno:($i('ddFileImuno').value||'').trim(),urin:($i('ddFileUrin').value||'').trim()}};
   save();closeMo('ddConfigModal');renderDdqc();notify('DD nastavitev shranjena','ok');
 }
 var _ddAutoList=null;
 function ddAutodetect(){
   if(!(_hasBridge()&&AndroidBridge.msListFolder)){notify('Samodejno zaznavanje le na napravi (OneDrive)','warning');return;}
-  var folder=($i('ddFolder').value||'DD_Kontrole').trim();
+  var folder=($i('ddFolder').value||'BIO/DD_Kontrole').trim();
   _msListCtx='dd';_ddAutoFolder=folder;
   $i('ddAutodetectHint').textContent='Iščem .xls v '+folder+'…';
   try{AndroidBridge.msListFolder(folder);}catch(e){notify('Napaka: '+e,'error');}
 }
-var _ddAutoFolder='DD_Kontrole';
+var _ddAutoFolder='BIO/DD_Kontrole';
 function _ddOnFolderListed(json){
   var data;try{data=JSON.parse(json);}catch(e){$i('ddAutodetectHint').textContent='Napaka branja mape';return;}
   var files=(data.value||[]).map(function(f){return f.name||'';}).filter(function(n){return /\.xlsx?$/i.test(n);});
@@ -1900,7 +1900,7 @@ function updateDdqc(){
   if(!(_hasBridge()&&AndroidBridge.msDownloadBinary)){
     notify('Prenos iz OneDrive le na napravi/PC — uporabi ročno nalaganje','warning');$i('ddFileInput').click();return;
   }
-  var folder=c.folder||'DD_Kontrole';
+  var folder=c.folder||'BIO/DD_Kontrole';
   _ddPending={queue:[],done:0,total:0,results:{}};
   ['bio','imuno','urin'].forEach(function(t){if(c.files[t])_ddPending.queue.push({type:t,rel:folder+'/'+c.files[t]});});
   _ddPending.total=_ddPending.queue.length;
@@ -2674,10 +2674,19 @@ function exportUdiCSV(){
 }
 /* ===== OneDrive izbirnik dokumentov (Reagenčni/Varnostni listi) ===== */
 var _docPickTarget=null;var _docPickFiles=[];
-var DOC_FOLDERS={pi:'Reagenčni listi',sds:'Varnostni listi'};
+/* Shema B: korenski mapi + podtip glede na kategorijo artikla (gtinTypeVal). */
+var DOC_FOLDERS={pi:'Reagencni_Listi',sds:'Varnostni_Listi'};
+function _docSubtype(){
+  var t=(($i('gtinTypeVal')&&$i('gtinTypeVal').value)||'').toLowerCase();
+  if(t==='control')return 'QC';
+  if(t==='calibrator')return 'Kalibratorji';
+  if(t==='consumable')return 'Potrosni_Material';
+  return 'Reagenti'; // reagent-bio, reagent-imuno, privzeto
+}
+function _docFolderPath(target){return DOC_FOLDERS[target]+'/'+_docSubtype();}
 function openDocPick(target){
   _docPickTarget=target;_docPickFiles=[];
-  $i('docPickTitle').innerHTML='&#128194; '+(DOC_FOLDERS[target]||'Dokumenti');
+  $i('docPickTitle').innerHTML='&#128194; '+_docFolderPath(target);
   $i('docPickSrch').value='';
   $i('docPickBody').innerHTML='<div class="empty">Nalagam&#8230;</div>';
   showMo('moDocPick');
@@ -2685,7 +2694,7 @@ function openDocPick(target){
     try{
       if(!(AndroidBridge.msIsSignedIn&&AndroidBridge.msIsSignedIn())){$i('docPickBody').innerHTML='<div class="empty">Najprej se prijavite v OneDrive (Več &rarr; Sinhronizacija).</div>';return;}
       _msListCtx='docpick';
-      AndroidBridge.msListFolder(DOC_FOLDERS[target]);
+      AndroidBridge.msListFolder(_docFolderPath(target));
     }catch(e){$i('docPickBody').innerHTML='<div class="empty">Napaka: '+_ge(e.message||'')+'</div>';}
   }else{
     $i('docPickBody').innerHTML='<div class="empty">Izbirnik deluje na napravi z OneDrive prijavo.<br>Tu prilepi povezavo ročno.</div>';
@@ -2967,7 +2976,9 @@ function initState(){
   if(!S.qcReviews)S.qcReviews=[];
   if(!S.reklamacije)S.reklamacije=[];
   if(!S.alertMute)S.alertMute={};
-  if(!S.ddConfig)S.ddConfig={folder:'DD_Kontrole',files:{bio:'',imuno:'',urin:''}};
+  if(!S.ddConfig)S.ddConfig={folder:'BIO/DD_Kontrole',files:{bio:'',imuno:'',urin:''}};
+  /* Migracija sheme B: stara plocata mapa 'DD_Kontrole' -> 'BIO/DD_Kontrole' */
+  else if(S.ddConfig.folder==='DD_Kontrole')S.ddConfig.folder='BIO/DD_Kontrole';
   if(!S.ddStats)S.ddStats={};
   if(!S.auditLog)S.auditLog=[];
   if(!S.notifications)S.notifications=[];
@@ -3490,7 +3501,7 @@ function renderNotifications(){
   wrap.innerHTML=html;
   _updateNotifBadge();
 }
-/* CSV log v DigiLab/Obvestila/YYYY-MM.csv */
+/* CSV log v DigiLab/BIO/Obvestila/YYYY-MM.csv */
 function _notifToCsv(month){
   var hdr='﻿"Datum","Čas","Vrsta","Analizator","Sporočilo","Avtor","Rešeno","Rešeno kdaj"\r\n';
   var rows=(S.notifications||[]).filter(n=>(n.datetime||'').slice(0,7)===month).sort((a,b)=>(a.datetime||'').localeCompare(b.datetime||''));
@@ -3508,7 +3519,7 @@ function _notifToCsv(month){
 function _syncNotifLog(){
   try{if(!_hasBridge()||!AndroidBridge.msIsSignedIn||!AndroidBridge.msIsSignedIn())return;
   var month=new Date().toISOString().slice(0,7);
-  AndroidBridge.msUploadRaw('Obvestila/'+month+'.csv',_notifToCsv(month),'text/csv; charset=utf-8');}catch(e){}
+  AndroidBridge.msUploadRaw('BIO/Obvestila/'+month+'.csv',_notifToCsv(month),'text/csv; charset=utf-8');}catch(e){}
 }
 function onMsUploadRawDone(){}
 
@@ -4302,7 +4313,7 @@ function _enqueueQcXmlPdf(lot,matName){
   const today=_qcToday();
   const slug=_qcSlug(matName||lot);
   const filename=slug+'_'+lot+'_'+today+'.pdf';
-  _repQueue.push({type:'qcxmlpdf',lot:lot,matName:matName,filename:filename,subfolder:'QC_vrednosti/'+lot,instrId:null,year:null,month:null});
+  _repQueue.push({type:'qcxmlpdf',lot:lot,matName:matName,filename:filename,subfolder:'BIO/QC_vrednosti/'+lot,instrId:null,year:null,month:null});
   notify('PDF v vrsti: '+filename,'ok');
   _repPump();
 }
@@ -4751,9 +4762,13 @@ function buildQcNonconfHtml(instrId,year,month){
 /* ---- ORKESTRACIJA: vrsta, samodejni sprožilec, čakalna vrsta ---- */
 const REP_TYPES={vzdrzevanje:'Vzdrževanje',kontrole:'Neskladja QC'};
 function _reportFilename(instrId,year,month,type){return year+'-'+_rp2(month)+'_'+_instrTag(instrId)+'_'+type+'.pdf';}
-function _reportFolderForType(type){return type==='kontrole'?'Pregled QC':'Vzdrževanje';}
+function _reportFolderForType(type){return type==='kontrole'?'QC':'Vzdrzevanje';}
 function _reportMonthDir(year,month){return year+'/'+_rp2(month)+' - '+REP_MONTHS[month-1];}
-function _reportSubfolder(type,year,month){return 'Poročila/'+_reportFolderForType(type)+'/'+_reportMonthDir(year,month);}
+function _instrGroup(instrId){return String(instrId).split(/\s+/)[0];} // 'AL01 C1' -> 'AL01'
+/* Shema B: BIO/Arhiv/<QC|Vzdrzevanje>/<AL0x>/<AL0x Cy>/<leto>/<mm - Mesec>/ */
+function _reportSubfolder(type,year,month,instrId){
+  return 'BIO/Arhiv/'+_reportFolderForType(type)+'/'+_instrGroup(instrId)+'/'+instrId+'/'+_reportMonthDir(year,month);
+}
 function _monthKey(y,m){return y+'-'+_rp2(m);}
 function _hasMsSignedIn(){try{return !!(_hasBridge()&&AndroidBridge.msIsSignedIn&&AndroidBridge.msIsSignedIn());}catch(e){return false;}}
 function _hasMonthData(year,month){
@@ -4768,7 +4783,7 @@ function generateMonthlyReports(year,month,opts){
   var instrs=opts.instrIds||INSTRUMENTS.map(function(i){return i.id;});
   var types=opts.types||['vzdrzevanje','kontrole'];
   var jobs=[];
-  instrs.forEach(function(id){types.forEach(function(t){jobs.push({instrId:id,year:year,month:month,type:t,filename:_reportFilename(id,year,month,t),subfolder:_reportSubfolder(t,year,month)});});});
+  instrs.forEach(function(id){types.forEach(function(t){jobs.push({instrId:id,year:year,month:month,type:t,filename:_reportFilename(id,year,month,t),subfolder:_reportSubfolder(t,year,month,id)});});});
   if(!jobs.length){notify('Ni izbranih poročil','warn');return;}
   _repQueue=_repQueue.concat(jobs);
   notify((opts.auto?'Samodejno generiram ':'Generiram ')+jobs.length+' poročil…','ok');
@@ -4861,7 +4876,7 @@ function retryPendingReports(){
   if(!S.pendingReports||!S.pendingReports.length)return;
   if(!_hasMsSignedIn())return;
   var pend=S.pendingReports;S.pendingReports=[];save();
-  pend.forEach(function(j){_repQueue.push({instrId:j.instrId,year:j.year,month:j.month,type:j.type,filename:_reportFilename(j.instrId,j.year,j.month,j.type),subfolder:_reportSubfolder(j.type,j.year,j.month)});});
+  pend.forEach(function(j){_repQueue.push({instrId:j.instrId,year:j.year,month:j.month,type:j.type,filename:_reportFilename(j.instrId,j.year,j.month,j.type),subfolder:_reportSubfolder(j.type,j.year,j.month,j.instrId)});});
   notify('Nalagam '+pend.length+' čakajočih poročil…','ok');
   _repPump();
 }

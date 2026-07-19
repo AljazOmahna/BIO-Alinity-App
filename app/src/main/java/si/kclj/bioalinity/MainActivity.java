@@ -577,7 +577,7 @@ public class MainActivity extends AppCompatActivity {
                     String savedPath = _saveXmlToDownloads(fn, bytes);
                     callJs("if(typeof onQcXmlSaved==='function')onQcXmlSaved(" + jsStr(savedPath) + ",true," + jsStr("ok") + ")");
                     msAcquireToken("qcxml", (token, err) -> {
-                        if (token != null) graphUploadGeneric("QC_vrednosti/" + lotKey + "/" + fn, bytes, "application/xml", token, fn);
+                        if (token != null) graphUploadGeneric("BIO/QC_vrednosti/" + lotKey + "/" + fn, bytes, "application/xml", token, fn);
                     });
                 } catch (Exception e) {
                     callJs("if(typeof onQcXmlSaved==='function')onQcXmlSaved(null,false," + jsStr(e.getMessage()) + ")");
@@ -589,8 +589,20 @@ public class MainActivity extends AppCompatActivity {
     // =========================================================
     // Graph REST — PUT/GET datoteke v mapi DigiLab uporabnikovega OneDrive
     // =========================================================
+    // Preslika logični ključ stanja v pot znotraj DigiLab (shema B: BIO/ in PBK/ predpone).
+    // Deljene datoteke: operaterji (BIO piše, PBK bere) in zaloga PBK (obe app-a).
+    private String mapStateKey(String key) {
+        switch (key) {
+            case "qclab_v2":     return "BIO/qclab_v2";
+            case "operators":    return "BIO/operaterji";
+            case "servis_abbott":return "BIO/servis_abbott";
+            case "pregledBK_db": return "PBK/pbk_sync";
+            default:             return key;
+        }
+    }
+
     private String graphContentUrl(String key) {
-        return "https://graph.microsoft.com/v1.0/me/drive/root:/" + MS_FOLDER + "/" + key + ".json:/content";
+        return "https://graph.microsoft.com/v1.0/me/drive/root:/" + MS_FOLDER + "/" + mapStateKey(key) + ".json:/content";
     }
 
     private void graphPut(final String key, String json, String token) {
@@ -611,7 +623,7 @@ public class MainActivity extends AppCompatActivity {
                 resp.close();
                 if (code >= 200 && code < 300) {
                     msalLastSync = new java.util.Date().toString();
-                    callJs("onMsUploadDone(true," + jsStr("Naloženo v " + MS_FOLDER + "/" + key + ".json") + ")");
+                    callJs("onMsUploadDone(true," + jsStr("Naloženo v " + MS_FOLDER + "/" + mapStateKey(key) + ".json") + ")");
                 } else {
                     callJs("onMsUploadDone(false," + jsStr("Graph napaka " + code) + ")");
                 }
@@ -981,8 +993,8 @@ public class MainActivity extends AppCompatActivity {
                     callJs("if(typeof onQcUploadDone==='function')onQcUploadDone(" + jsStr(flot) + ",false," + jsStr("OneDrive: " + err) + ")");
                     return;
                 }
-                if (fxml != null) graphUploadGeneric("QC_vrednosti/" + flot + "/" + flot + ".xml", fxml, "application/xml", token, flot + ".xml");
-                if (fpdf != null) graphUploadGeneric("QC_vrednosti/" + flot + "/" + (fpdfName != null ? fpdfName : flot + ".pdf"), fpdf, "application/pdf", token, fpdfName != null ? fpdfName : flot + ".pdf");
+                if (fxml != null) graphUploadGeneric("BIO/QC_vrednosti/" + flot + "/" + flot + ".xml", fxml, "application/xml", token, flot + ".xml");
+                if (fpdf != null) graphUploadGeneric("BIO/QC_vrednosti/" + flot + "/" + (fpdfName != null ? fpdfName : flot + ".pdf"), fpdf, "application/pdf", token, fpdfName != null ? fpdfName : flot + ".pdf");
             }));
         } catch (Exception e) {
             callJs("if(typeof onQcValuesPickError==='function')onQcValuesPickError(" + jsStr("Napaka: " + e.getMessage()) + ")");
@@ -1012,7 +1024,7 @@ public class MainActivity extends AppCompatActivity {
         msAcquireToken("qcfetch", (token, err) -> {
             if (token == null) { callJs("if(typeof onQcXmlFetched==='function')onQcXmlFetched(" + jsStr(lot) + ",null," + jsStr(err) + ")"); return; }
             Request req = new Request.Builder()
-                    .url(graphPathUrl("QC_vrednosti/" + lot + "/" + lot + ".xml"))
+                    .url(graphPathUrl("BIO/QC_vrednosti/" + lot + "/" + lot + ".xml"))
                     .header("Authorization", "Bearer " + token).get().build();
             http.newCall(req).enqueue(new Callback() {
                 @Override public void onFailure(@NonNull Call call, @NonNull IOException e) {
