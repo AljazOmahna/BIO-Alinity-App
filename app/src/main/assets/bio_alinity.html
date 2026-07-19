@@ -5805,9 +5805,9 @@ function exportMaintCSV(){const rows=[['Datum','Čas','Tip','Integracija','Anali
    ============================================================ */
 let currentVec='sync';
 function navVec(page){
-  currentVec=page;
-  /* admin-only zavihki */
+  /* admin-only zavihki — ne spremeni currentVec, če je dostop zavrnjen (ostane na prejšnji strani) */
   if((page==='instruments'||page==='settings')&&!requireRole('admin'))return;
+  currentVec=page;
   document.querySelectorAll('#main-vec .vec-page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('#vecSubnav .tab').forEach(t=>t.classList.remove('active'));
   const el=$i('vec-'+page);if(el)el.classList.add('active');
