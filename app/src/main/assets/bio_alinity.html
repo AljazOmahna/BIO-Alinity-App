@@ -4800,7 +4800,7 @@ function _maintWeeklyTable(instrId,instrType,year,month){
   steps.forEach(function(st){
     body+='<tr><td class="lbl">'+_repEsc(st.text)+'</td>'+[1,2,3,4].map(function(w){var done=(byWeek[w]||[]).some(function(r){return _stepDoneIn(r,st.id);});return '<td>'+(done?'✓':'')+'</td>';}).join('')+'</tr>';
   });
-  body+='<tr><td class="lbl">Podpis/parafa</td>'+[1,2,3,4].map(function(w){var rec=(byWeek[w]||[])[0];return '<td>'+(rec?(rec.idle?'M':_opParafa(rec.operatorId))+(rec.late?'*':''):'')+'</td>';}).join('')+'</tr>';
+  body+='<tr><td class="lbl">Ime in priimek</td>'+[1,2,3,4].map(function(w){var rec=(byWeek[w]||[])[0];return '<td>'+(rec?(rec.idle?'M':_repEsc(getOpName(rec.operatorId)))+(rec.late?'*':''):'')+'</td>';}).join('')+'</tr>';
   return '<div class="sechd">Tedensko vzdrževanje</div><table class="grid weekly"><thead>'+head+'</thead><tbody>'+body+'</tbody></table>';
 }
 
@@ -4814,10 +4814,10 @@ function _maintDatumTable(instrId,instrType,year,month,type,heading){
     if(!rec&&idleRec)rec=idleRec;
     var dt=rec?new Date(rec.datetime):null;
     var datum=dt?(_rp2(dt.getDate())+'.'+_rp2(dt.getMonth()+1)+'.'+dt.getFullYear()):'';
-    var par=rec?((rec.idle?'M':_opParafa(rec.operatorId))+(rec.late?'*':'')):'';
+    var par=rec?((rec.idle?'M':_repEsc(getOpName(rec.operatorId)))+(rec.late?'*':'')):'';
     body+='<tr><td class="lbl">'+_repEsc(st.text)+'</td><td>'+datum+'</td><td>'+par+'</td></tr>';
   });
-  return '<div class="sechd">'+_repEsc(heading)+'</div><table class="grid datum"><thead><tr><th class="lbl">'+_repEsc(heading)+'</th><th>DATUM</th><th>Parafa</th></tr></thead><tbody>'+body+'</tbody></table>';
+  return '<div class="sechd">'+_repEsc(heading)+'</div><table class="grid datum"><thead><tr><th class="lbl">'+_repEsc(heading)+'</th><th>DATUM</th><th>Ime in priimek</th></tr></thead><tbody>'+body+'</tbody></table>';
 }
 
 function buildMaintReportHtml(instrId,year,month){
@@ -4831,7 +4831,10 @@ function buildMaintReportHtml(instrId,year,month){
     _maintDatumTable(instr.id,instr.type,year,month,'monthly','Mesečno vzdrževanje'),
     _maintDatumTable(instr.id,instr.type,year,month,'quarterly','3-mesečno vzdrževanje oz. po potrebi')
   ].filter(Boolean).join('<div class="gap"></div>');
-  var legend='<div style="margin-top:6px;font-size:7px;color:#444">M = aparat v mirovanju (ni obratoval) &middot; * = naknadni vnos (glej revizijsko sled)</div>';
+  /* legenda paraf: ime in priimek za vsako parafo v dnevni mreži */
+  var opIds={};['daily','weekly','monthly','quarterly'].forEach(function(t){_maintRecordsFor(instr.id,t,year,month).forEach(function(r){if(r.operatorId&&!r.idle)opIds[r.operatorId]=1;});});
+  var parList=Object.keys(opIds).map(function(id){return '<b>'+_opParafa(id)+'</b> = '+_repEsc(getOpName(id));}).join(' &middot; ');
+  var legend='<div style="margin-top:6px;font-size:7px;color:#444">'+(parList?'Parafe (ime in priimek): '+parList+'<br>':'')+'M = aparat v mirovanju (ni obratoval) &middot; * = naknadni vnos (glej revizijsko sled)</div>';
   var foot=_reportFoot('4.0','78431','213/64');
   return _reportDoc('Evidenca periodičnega vzdrževanja opreme',head+secs+legend+foot);
 }
