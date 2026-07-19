@@ -3024,7 +3024,8 @@ function defaultQcMaterials(){return [
 ];}
 
 /* IVDR / ISO 15189 — identifikacija pripomočka (in-house, čl. 5(5) Uredbe (EU) 2017/746) */
-const IVDR_INFO={
+/* Privzeta identiteta laboratorija — dejanske vrednosti v S.labInfo (Več → Nastavitve, admin) */
+const IVDR_DEFAULTS={
   deviceName:'BIO Alinity',
   legalManufacturer:'UKC Ljubljana — 24-urni laboratorij',
   intendedUse:'Programska podpora notranji kontroli kakovosti (QC) in vodenju zaloge reagentov/kontrol na analizatorjih Abbott Alinity. Za profesionalno uporabo s strani usposobljenega laboratorijskega osebja.',
@@ -3032,6 +3033,19 @@ const IVDR_INFO={
   udiDi:'INT-SI-KCLJ-BIOALINITY',
   contact:'Oddelek za laboratorijsko diagnostiko, UKC Ljubljana'
 };
+function LAB(){return Object.assign({},IVDR_DEFAULTS,S.labInfo||{});}
+/* Privzeta formulacija mesečnih obrazcev — urejljiva v Več → Poročila (admin) */
+const FORM_DEFAULTS={
+  maint:{title:'Evidenca periodičnega vzdrževanja opreme',ob:'213/64',klas:'78431',ver:'4.0',
+         sections:{daily:true,weekly:true,monthly:true,quarterly:true}},
+  qc:  {title:'Vodenje neskladij pri notranji kontroli kakovosti',ob:'216/64',klas:'7832',ver:'3.0',
+         sections:{nonconf:true,review:true}},
+  obPrefix:'OB KIKKB'
+};
+function FORMCFG(){const c=S.formConfig||{};return {
+  maint:Object.assign({},FORM_DEFAULTS.maint,c.maint||{},{sections:Object.assign({},FORM_DEFAULTS.maint.sections,(c.maint||{}).sections||{})}),
+  qc:Object.assign({},FORM_DEFAULTS.qc,c.qc||{},{sections:Object.assign({},FORM_DEFAULTS.qc.sections,(c.qc||{}).sections||{})}),
+  obPrefix:c.obPrefix||FORM_DEFAULTS.obPrefix};}
 let S = { assays:[], qcMaterials:[], operators:[], entries:[], currentAssayTab:'biochem',
   editingAssayIdx:null, editingQcIdx:null, editingOpIdx:null, wiz:{}, pinValue:'',
   ljRules:{'1_2s':true,'1_3s':true,'2_2s':true,'R_4s':true,'4_1s':true,'10_x':true},
@@ -3922,6 +3936,77 @@ function deleteInstr(i){
   save();renderInstrList();buildInstrMap();populateEntryInstruments();notify('Analizator izbrisan');
 }
 
+/* ===== FORMULACIJA OBRAZCEV (Več → Poročila, admin) ===== */
+function renderFormConfig(){
+  var card=$i('formConfigCard');if(!card)return;
+  if(!hasRole('admin')){card.innerHTML='<div class="card-title">&#128221; Formulacija obrazcev</div><div class="muted" style="font-size:12px">Urejanje glave in razdelkov obrazcev je na voljo administratorju.</div>';return;}
+  var c=FORMCFG();
+  var sec=function(pfx,key,lbl,val){return '<label style="display:inline-flex;align-items:center;gap:5px;font-size:12px;margin-right:10px"><input type="checkbox" id="'+pfx+'_'+key+'" '+(val?'checked':'')+' style="width:15px;height:15px"> '+lbl+'</label>';};
+  card.innerHTML='<div class="card-title">&#128221; Formulacija obrazcev (mesečna poročila)</div>'
+    +'<div class="fg"><label>Predpona oznake obrazca</label><input id="fcObPrefix" value="'+_repEsc(c.obPrefix)+'" placeholder="OB KIKKB"></div>'
+    +'<div style="font-size:12px;font-weight:700;margin:10px 0 6px;color:var(--abbott-blue)">Vzdrževanje</div>'
+    +'<div class="fg"><label>Naslov</label><input id="fcMTitle" value="'+_repEsc(c.maint.title)+'"></div>'
+    +'<div class="frow"><div class="fg"><label>Oznaka (OB)</label><input id="fcMOb" value="'+_repEsc(c.maint.ob)+'"></div><div class="fg"><label>Klas. znak</label><input id="fcMKlas" value="'+_repEsc(c.maint.klas)+'"></div><div class="fg"><label>e-verzija</label><input id="fcMVer" value="'+_repEsc(c.maint.ver)+'"></div></div>'
+    +'<div style="margin:4px 0 8px">'+sec('fcM','daily','Dnevno',c.maint.sections.daily)+sec('fcM','weekly','Tedensko',c.maint.sections.weekly)+sec('fcM','monthly','Mesečno',c.maint.sections.monthly)+sec('fcM','quarterly','3-mesečno',c.maint.sections.quarterly)+'</div>'
+    +'<div style="font-size:12px;font-weight:700;margin:10px 0 6px;color:var(--abbott-blue)">Neskladja QC</div>'
+    +'<div class="fg"><label>Naslov</label><input id="fcQTitle" value="'+_repEsc(c.qc.title)+'"></div>'
+    +'<div class="frow"><div class="fg"><label>Oznaka (OB)</label><input id="fcQOb" value="'+_repEsc(c.qc.ob)+'"></div><div class="fg"><label>Klas. znak</label><input id="fcQKlas" value="'+_repEsc(c.qc.klas)+'"></div><div class="fg"><label>e-verzija</label><input id="fcQVer" value="'+_repEsc(c.qc.ver)+'"></div></div>'
+    +'<div style="margin:4px 0 8px">'+sec('fcQ','nonconf','Tabela neskladij',c.qc.sections.nonconf)+sec('fcQ','review','Pregled QC/ukrepi',c.qc.sections.review)+'</div>'
+    +'<button class="btn btn-a btn-sm" onclick="saveFormConfig()">Shrani formulacijo</button>';
+}
+function saveFormConfig(){
+  if(!requireRole('admin'))return;
+  var g=function(id){return ($i(id).value||'').trim();},b=function(id){return !!$i(id).checked;};
+  var before=JSON.parse(JSON.stringify(S.formConfig||{}));
+  S.formConfig={obPrefix:g('fcObPrefix'),
+    maint:{title:g('fcMTitle'),ob:g('fcMOb'),klas:g('fcMKlas'),ver:g('fcMVer'),sections:{daily:b('fcM_daily'),weekly:b('fcM_weekly'),monthly:b('fcM_monthly'),quarterly:b('fcM_quarterly')}},
+    qc:{title:g('fcQTitle'),ob:g('fcQOb'),klas:g('fcQKlas'),ver:g('fcQVer'),sections:{nonconf:b('fcQ_nonconf'),review:b('fcQ_review')}}};
+  _audit('update','settings','formConfig','Spremenjena formulacija obrazcev',before,S.formConfig,(currentOp()||{}).id||'system');
+  save();notify('Formulacija obrazcev shranjena','success');
+}
+/* ===== IDENTITETA LABORATORIJA (Več → Nastavitve, admin) ===== */
+function renderLabInfo(){
+  var card=$i('labInfoCard');if(!card)return;
+  var l=LAB();
+  card.innerHTML='<div class="card-title">&#127973; Identiteta laboratorija</div>'
+    +'<div class="muted" style="font-size:12px;margin-bottom:8px">Podatki se uporabljajo v glavi/nogi uradnih poročil in IVDR identifikaciji. Aplikacija je s tem uporabna tudi v drugih laboratorijih.</div>'
+    +'<div class="frow"><div class="fg"><label>Laboratorij</label><input id="liName" value="'+_repEsc(l.legalManufacturer||'')+'"></div><div class="fg"><label>Ustanova (alt logotipa)</label><input id="liOrg" value="'+_repEsc(l.org||'UKC Ljubljana')+'"></div></div>'
+    +'<div class="fg"><label>UDI-DI (interni identifikator)</label><input id="liUdi" value="'+_repEsc(l.udiDi||'')+'"></div>'
+    +'<div class="fg"><label>Kontakt</label><input id="liContact" value="'+_repEsc(l.contact||'')+'"></div>'
+    +'<div class="fg"><label>Logotip za poročila</label><div style="display:flex;gap:8px;align-items:center"><img id="liLogoPrev" src="'+(l.logoDataUri||KCLJ_LOGO)+'" style="height:34px;background:#fff;border:1px solid var(--border);border-radius:6px;padding:2px"><button class="btn btn-g btn-sm" onclick="$i(\'liLogoFile\').click()">Zamenjaj</button><button class="btn btn-g btn-sm" onclick="_liLogoClear()">Privzeti</button><input type="file" id="liLogoFile" accept="image/*" style="display:none" onchange="_liLogoPick(this)"></div></div>'
+    +'<button class="btn btn-a btn-sm" onclick="saveLabInfo()">Shrani identiteto</button>';
+}
+var _liLogoTmp=null;
+function _liLogoPick(input){
+  var f=input.files[0];if(!f)return;
+  var r=new FileReader();
+  r.onload=function(e){
+    var img=new Image();
+    img.onload=function(){
+      var h=Math.min(120,img.height),w=Math.round(img.width*h/img.height);
+      var cv=document.createElement('canvas');cv.width=w;cv.height=h;
+      cv.getContext('2d').drawImage(img,0,0,w,h);
+      _liLogoTmp=cv.toDataURL('image/png');
+      $i('liLogoPrev').src=_liLogoTmp;
+    };
+    img.src=e.target.result;
+  };
+  r.readAsDataURL(f);input.value='';
+}
+function _liLogoClear(){_liLogoTmp='';$i('liLogoPrev').src=KCLJ_LOGO;}
+function saveLabInfo(){
+  if(!requireRole('admin'))return;
+  var before=JSON.parse(JSON.stringify(S.labInfo||{}));
+  S.labInfo=Object.assign({},S.labInfo||{},{
+    legalManufacturer:($i('liName').value||'').trim(),
+    org:($i('liOrg').value||'').trim(),
+    udiDi:($i('liUdi').value||'').trim(),
+    contact:($i('liContact').value||'').trim()});
+  if(_liLogoTmp!==null){if(_liLogoTmp==='')delete S.labInfo.logoDataUri;else S.labInfo.logoDataUri=_liLogoTmp;_liLogoTmp=null;}
+  _audit('update','settings','labInfo','Spremenjena identiteta laboratorija',before,S.labInfo,(currentOp()||{}).id||'system');
+  save();notify('Identiteta laboratorija shranjena','success');
+}
+
 /* ===== EXPORT ===== */
 function exportCSV(){const hdr=['Datum','Čas','Inštrument','QC Material','Lot','Nivo','Preiskava','Rezultat SD','Zabeležka','Operater ID','Operater'];const rows=[hdr.join(',')];S.entries.forEach(e=>{const op=S.operators.find(o=>o.id===e.operatorId);const dt=new Date(e.datetime);if(!(e.results||[]).length){(e.levels||[]).forEach(lvl=>rows.push([dt.toLocaleDateString('sl-SI'),dt.toLocaleTimeString('sl-SI'),e.instrId,e.qcName,e.lot||'','Nivo '+lvl.replace('L',''),'–','ok','',e.operatorId,op?op.first+' '+op.last:''].map(v=>'"'+v+'"').join(',')));return;}(e.results||[]).forEach(r=>rows.push([dt.toLocaleDateString('sl-SI'),dt.toLocaleTimeString('sl-SI'),e.instrId,e.qcName,e.lot||'','Nivo '+r.level.replace('L',''),r.assay,r.sd||'ok',(r.note||'').replace(/,/g,' '),e.operatorId,op?op.first+' '+op.last:''].map(v=>'"'+v+'"').join(',')));});const blob=new Blob(['﻿'+rows.join('\r\n')],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='QC_'+new Date().toISOString().slice(0,10)+'.csv';a.click();notify('CSV izvožen','success');}
 
@@ -4513,7 +4598,7 @@ function buildQcXmlReportHtml(lot,matNameOvr){
   '<b>Nivo 1/2/3</b> = nizek/normalen/visok kontrolni material &nbsp;|&nbsp; '+
   '<b style="color:#5b21b6">krepko Mean ali SD</b> = lastna vrednost laboratorija (lastni Mean &plusmn; 2&times;lastni SD)'+
   '</div>'+
-  '<div class="foot">'+_repEsc(IVDR_INFO.udiDi)+' &nbsp;|&nbsp; Pripravljeno: '+today+' &nbsp;|&nbsp; Kontrola: '+_repEsc(matName)+' &nbsp;|&nbsp; Lot: '+_repEsc(lot)+'</div>'+
+  '<div class="foot">'+_repEsc(LAB().udiDi)+' &nbsp;|&nbsp; Pripravljeno: '+today+' &nbsp;|&nbsp; Kontrola: '+_repEsc(matName)+' &nbsp;|&nbsp; Lot: '+_repEsc(lot)+'</div>'+
   '<div class="sig"><h2>&#10003; Pregled in potrditev specialista</h2>'+
   '<p>Pregledal/a vrednosti QC kontrole ('+_repEsc(matName)+', lot '+_repEsc(lot)+') in potrdil/a, da so vrednosti Mean, SD in meje sprejemljive za vpeljavo v rutinsko delo.</p>'+
   '<div class="sig-row">'+
@@ -4832,15 +4917,16 @@ tbody.day-grp{page-break-inside:avoid;break-inside:avoid-page}
 `;
 
 function _reportDoc(title,inner){
-  var head='<div class="rhead"><div class="rtitle">'+title+'</div><img src="'+KCLJ_LOGO+'" alt="UKC"></div>';
+  var lab=LAB();var logo=lab.logoDataUri||KCLJ_LOGO;
+  var head='<div class="rhead"><div class="rtitle">'+title+'</div><img src="'+logo+'" alt="'+_repEsc(lab.org||'')+'"></div>';
   return '<!DOCTYPE html><html lang="sl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>'+REPORT_CSS+'</style></head><body>'+head+inner+'</body></html>';
 }
 function _reportFoot(everzija,klas,ob){
   return '<div class="rfoot2"><div class="row"><span class="l">e - verzija '+everzija+'</span>'
     +'<span class="c">klas. znak izpolnjenega obrazca: '+klas+'</span>'
-    +'<span class="c">OB KIKKB '+ob+'</span>'
+    +'<span class="c">'+_repEsc(FORMCFG().obPrefix)+' '+ob+'</span>'
     +'<span class="r pg"></span></div>'
-    +'<div class="row" style="margin-top:1px"><span class="l" style="font-size:6px;color:#666">Pripomoček (in-house, čl. 5(5) IVDR): '+IVDR_INFO.udiDi+'</span><span class="r"></span></div></div>';
+    +'<div class="row" style="margin-top:1px"><span class="l" style="font-size:6px;color:#666">Pripomoček (in-house, čl. 5(5) IVDR): '+LAB().udiDi+'</span><span class="r"></span></div></div>';
 }
 
 /* ---- VZDRŽEVANJE (OB KIKKB 213/64) ---- */
@@ -4908,18 +4994,19 @@ function buildMaintReportHtml(instrId,year,month){
   var moName=REP_MONTHS[month-1].toUpperCase()+' '+year;
   var aparat=instr.type==='l'?'Linija Abbott':'Alinity '+_repEsc(instr.id);
   var head='<div class="rhdr"><table class="meta"><tr><td class="k">ANALIZATOR/APARAT:</td><td>'+aparat+'</td><td class="k">MESEC/LETO:</td><td>'+moName+'</td><td class="k">Zap. št./oddelek:</td><td>&nbsp;</td></tr></table></div>';
+  var mcfg=FORMCFG().maint;
   var secs=[
-    _maintDailyTable(instr.id,instr.type,year,month),
-    _maintWeeklyTable(instr.id,instr.type,year,month),
-    _maintDatumTable(instr.id,instr.type,year,month,'monthly','Mesečno vzdrževanje'),
-    _maintDatumTable(instr.id,instr.type,year,month,'quarterly','3-mesečno vzdrževanje oz. po potrebi')
+    mcfg.sections.daily?_maintDailyTable(instr.id,instr.type,year,month):'',
+    mcfg.sections.weekly?_maintWeeklyTable(instr.id,instr.type,year,month):'',
+    mcfg.sections.monthly?_maintDatumTable(instr.id,instr.type,year,month,'monthly','Mesečno vzdrževanje'):'',
+    mcfg.sections.quarterly?_maintDatumTable(instr.id,instr.type,year,month,'quarterly','3-mesečno vzdrževanje oz. po potrebi'):''
   ].filter(Boolean).join('<div class="gap"></div>');
   /* legenda paraf: ime in priimek za vsako parafo v dnevni mreži */
   var opIds={};['daily','weekly','monthly','quarterly'].forEach(function(t){_maintRecordsFor(instr.id,t,year,month).forEach(function(r){if(r.operatorId&&!r.idle)opIds[r.operatorId]=1;});});
   var parList=Object.keys(opIds).map(function(id){return '<b>'+_opParafa(id)+'</b> = '+_repEsc(getOpName(id));}).join(' &middot; ');
   var legend='<div style="margin-top:6px;font-size:7px;color:#444">'+(parList?'Parafe (ime in priimek): '+parList+'<br>':'')+'M = aparat v mirovanju (ni obratoval) &middot; * = naknadni vnos (glej revizijsko sled)</div>';
-  var foot=_reportFoot('4.0','78431','213/64');
-  return _reportDoc('Evidenca periodičnega vzdrževanja opreme',head+secs+legend+foot);
+  var foot=_reportFoot(mcfg.ver,mcfg.klas,mcfg.ob);
+  return _reportDoc(_repEsc(mcfg.title),head+secs+legend+foot);
 }
 
 /* ---- NESKLADJA NOTRANJE QC (OB KIKKB 216/64) ---- */
@@ -4974,13 +5061,15 @@ function buildQcNonconfHtml(instrId,year,month){
   var legend='<div class="legend">Vzrok neskladja in ukrepi — Legenda: A – Ponovitev kontrole; B – Preventivna kalibracija; C – Menjava reagenta; D – Servis &middot; * = naknadni vnos (glej revizijsko sled)</div>';
   // Pregledi QC (podpis + ukrepi) v tem mesecu
   var revs=_qcReviewsForMonth(instrId,year,month);
+  var qcfg=FORMCFG().qc;
   var revSec='';
-  if(revs.length){
+  if(revs.length&&qcfg.sections.review!==false){
     var rrows=revs.map(function(r){return '<tr><td>'+_repEsc((r.toDate||''))+'</td><td>'+_repEsc((r.fromDate||'')+' – '+(r.toDate||''))+'</td><td>'+_repEsc(getOpName(r.reviewerId))+'</td><td>'+(r.actions?_repEsc(r.actions):'—')+'</td></tr>';}).join('');
     revSec='<div class="sechd">Pregled QC / izvedeni ukrepi</div><table class="grid datum"><thead><tr><th>Datum pregleda</th><th>Obdobje</th><th>Pregledal</th><th>Izvedeni ukrepi</th></tr></thead><tbody>'+rrows+'</tbody></table>';
   }
-  var foot=_reportFoot('3.0','7832','216/64');
-  return _reportDoc('Vodenje neskladij pri notranji kontroli kakovosti',head2+table+legend+revSec+foot);
+  if(qcfg.sections.nonconf===false){table='';legend='';}
+  var foot=_reportFoot(qcfg.ver,qcfg.klas,qcfg.ob);
+  return _reportDoc(_repEsc(qcfg.title),head2+table+legend+revSec+foot);
 }
 
 /* ---- ORKESTRACIJA: vrsta, samodejni sprožilec, čakalna vrsta ---- */
@@ -5743,12 +5832,12 @@ function renderVecAbout(){
   try{const qcSize=(localStorage.getItem('qclab_v2')||'').length;const pbSize=(localStorage.getItem('pregledBK_db')||'').length;$i('aboutStorage').textContent='Pomnilnik: qclab_v2 '+(qcSize/1024).toFixed(1)+' KB, pregledBK_db '+(pbSize/1024).toFixed(1)+' KB';}catch(e){}
   /* IVDR identifikacija pripomočka */
   try{
-    $i('aboutMfr').textContent=IVDR_INFO.legalManufacturer;
+    $i('aboutMfr').textContent=LAB().legalManufacturer;
     let ver=$i('aboutVersion').textContent||'';let build='';try{build=JSON.parse(AndroidBridge.getDeviceInfo()).appBuild||'';}catch(e){}
-    $i('aboutUdi').textContent=IVDR_INFO.udiDi+' · '+ver+(build?' (build '+build+')':'');
-    $i('aboutIntended').textContent=IVDR_INFO.intendedUse;
-    $i('aboutContact').textContent=IVDR_INFO.contact;
-    $i('aboutInhouse').innerHTML='&#127973; '+IVDR_INFO.inHouse;
+    $i('aboutUdi').textContent=LAB().udiDi+' · '+ver+(build?' (build '+build+')':'');
+    $i('aboutIntended').textContent=LAB().intendedUse;
+    $i('aboutContact').textContent=LAB().contact;
+    $i('aboutInhouse').innerHTML='&#127973; '+LAB().inHouse;
   }catch(e){}
 }
 /* ===== REVIZIJSKA SLED — prikaz + izvoz ===== */
