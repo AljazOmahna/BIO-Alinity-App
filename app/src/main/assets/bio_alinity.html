@@ -454,42 +454,7 @@ body.dark .notif{background:rgba(13,25,50,.95)}
 </div>
 
 <!-- ============ GTIN ============ -->
-<div class="page-main" id="main-gtins">
-  <div class="sec-hdr">
-    <div class="sec-title">&#127991; GTIN baza</div>
-    <button class="btn btn-g btn-sm" onclick="loadGtinDemo()">&#128229; Naloži privzete</button>
-    <button class="btn btn-g btn-sm" onclick="openImportGtin()">&#128218; Uvozi CSV</button>
-    <button class="btn btn-g btn-sm" onclick="openPkgIns()">&#128196; Package insert</button>
-    <button class="btn btn-a btn-sm" onclick="openGtinMo()">+ GTIN</button>
-  </div>
-  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
-    <button class="btn btn-g btn-sm" style="flex:1;border-color:#00a3ad;color:#00a3ad" onclick="importNarocGtins(false)">&#128218; Preveri naročilnico</button>
-    <button class="btn btn-sm" style="flex:1;background:#00a3ad;color:#fff" onclick="importNarocGtins(true)">&#10133; Uvozi naročilnico</button>
-  </div>
-  <div style="font-size:11px;color:var(--text3);margin-bottom:8px">&#128161; GTIN baza je skupna z Zebro (pregledBK_db). Spremembe so vidne na obeh napravah po sinhronizaciji. &middot; UDI dobavljenih pripomočkov se hrani elektronsko (čl. 24(8) IVDR) &mdash; <a href="javascript:void(0)" onclick="exportUdiCSV()" style="color:var(--abbott-teal);font-weight:600">&#128190; izvozi UDI evidenco</a></div>
-  <div class="fr">
-    <input type="text" id="gtinSrch" placeholder="&#128269; Išči naziv, GTIN..." oninput="renderGtins()">
-    <select id="gtinTypeFilter" onchange="renderGtins()">
-      <option value="">Vsi tipi</option>
-      <option value="calibrator">Kalibrator</option>
-      <option value="control">Kontrola</option>
-      <option value="reagent-bio">Reagent bio</option>
-      <option value="reagent-imuno">Reagent imuno</option>
-      <option value="consumable">Potrošni material</option>
-    </select>
-    <button class="btn btn-g btn-sm" onclick="exportGtinCSV()">&#128190; CSV</button>
-  </div>
-  <table style="width:100%;border-collapse:collapse;margin-top:8px">
-    <thead><tr style="border-bottom:2px solid var(--border)">
-      <th style="text-align:left;padding:6px 4px;font-size:11px">GTIN</th>
-      <th style="text-align:left;padding:6px 4px;font-size:11px">Naziv</th>
-      <th style="text-align:left;padding:6px 4px;font-size:11px">Tip</th>
-      <th style="text-align:left;padding:6px 4px;font-size:11px">Analizator</th>
-      <th style="padding:6px 4px;font-size:11px"></th>
-    </tr></thead>
-    <tbody id="gtinBody"></tbody>
-  </table>
-</div>
+<!-- GTIN knjižnica — preseljena v Več (vec-gtins) -->
 
 <!-- GTIN MODAL -->
 <div class="mo" id="moGtin">
@@ -637,7 +602,6 @@ body.dark .notif{background:rgba(13,25,50,.95)}
     <div class="tab" data-qc="ljmulti" onclick="navQc('ljmulti')">&#128201; Multi L-J</div>
     <div class="tab" data-qc="assays" onclick="navQc('assays')">&#129514; Preiskave</div>
     <div class="tab" data-qc="qcmaterials" onclick="navQc('qcmaterials')">&#129516; Materiali</div>
-    <div class="tab" data-qc="operators" onclick="navQc('operators')">&#128100; Operaterji</div>
     <div class="tab" data-qc="maintenance" onclick="navQc('maintenance')">&#128295; Vzdržev.</div>
     <div class="tab" data-qc="maint-review" onclick="navQc('maint-review')">&#128197; Pregled vzd.</div>
     <div class="tab" data-qc="notifications" onclick="navQc('notifications')">&#128276; Obvestila <span id="notifBadge" style="display:none;background:var(--red);color:#fff;border-radius:10px;font-size:10px;padding:1px 6px;margin-left:2px;font-weight:700;vertical-align:middle"></span></div>
@@ -862,18 +826,7 @@ body.dark .notif{background:rgba(13,25,50,.95)}
   </div>
 
   <!-- QC OPERATORS -->
-  <div class="page qc-page" id="page-operators">
-    <div class="sec-hdr"><div class="sec-title" style="font-size:16px">Operaterji</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap">
-        <button class="btn btn-g btn-sm" onclick="exportOperators()">&#8595; Izvoz</button>
-        <button class="btn btn-g btn-sm" onclick="$i('opImportFile').click()">&#8593; Uvoz</button>
-        <button class="btn btn-g btn-sm" onclick="msUploadOperators()">&#9729; V OneDrive</button>
-        <button class="btn btn-a btn-sm" onclick="openOperatorModal()">+ Nov</button>
-        <input type="file" id="opImportFile" accept=".json" style="display:none" onchange="importOperators(this)">
-      </div></div>
-    <div class="fr"><input id="opSearch" placeholder="&#128269; Ime, priimek, ID..." oninput="renderOperators()"></div>
-    <div class="card" style="padding:0"><div class="tbl-wrap"><table><thead><tr><th>ID</th><th>Ime</th><th>Priimek</th><th></th></tr></thead><tbody id="operatorBody"></tbody></table></div></div>
-  </div>
+  <!-- Operaterji preseljeni v Več (vec-operators) -->
 
   <!-- QC MAINTENANCE -->
   <div class="page qc-page" id="page-maintenance">
@@ -1146,8 +1099,19 @@ body.dark .notif{background:rgba(13,25,50,.95)}
 
 <!-- ============ VEČ ============ -->
 <div class="page-main" id="main-vec">
-  <div class="sec-hdr"><div class="sec-title">&#9776; Več</div></div>
+  <div class="qc-subnav" id="vecSubnav">
+    <div class="tab active" data-vec="sync" onclick="navVec('sync')">&#9729; Sinhronizacija</div>
+    <div class="tab" data-vec="reports" onclick="navVec('reports')">&#128196; Poro&#269;ila</div>
+    <div class="tab" data-vec="operators" onclick="navVec('operators')">&#128100; Operaterji</div>
+    <div class="tab" data-vec="gtins" onclick="navVec('gtins')">&#127991;&#65039; GTIN</div>
+    <div class="tab" data-vec="instruments" onclick="navVec('instruments')">&#129514; Analizatorji</div>
+    <div class="tab" data-vec="settings" onclick="navVec('settings')">&#9881;&#65039; Nastavitve</div>
+    <div class="tab" data-vec="about" onclick="navVec('about')">&#8505;&#65039; O aplikaciji</div>
+    <div class="tab" data-vec="audit" onclick="navVec('audit')">&#128220; Revizija</div>
+    <div class="tab" data-vec="data" onclick="navVec('data')">&#128190; Podatki</div>
+  </div>
 
+  <div class="page vec-page active" id="vec-sync">
   <div class="card">
     <div class="card-title">&#9729; OneDrive sinhronizacija</div>
     <div id="syncStatus" style="font-size:13px;margin-bottom:12px"></div>
@@ -1179,7 +1143,9 @@ body.dark .notif{background:rgba(13,25,50,.95)}
     </div>
     <div class="muted" style="font-size:11px;margin-top:6px">&#128194; »Uvozi iz datoteke« odpre .json, prejet prek Quick Share (mapa Prenosi) &ndash; samodejno zazna vrsto (zaloga/QC) in pametno združi.</div>
   </div>
+  </div><!-- /vec-sync -->
 
+  <div class="page vec-page" id="vec-reports">
   <div class="card">
     <div class="card-title">&#128196; Mesečna poročila (OneDrive)</div>
     <div class="muted" style="font-size:12px;margin-bottom:10px">Uradni obrazci se sestavijo iz vpisanega vzdrževanja in QC ter shranijo v OneDrive (DigiLab/Poročila). Ob koncu meseca se naredijo samodejno; tu jih lahko ustvariš tudi ročno.</div>
@@ -1188,7 +1154,10 @@ body.dark .notif{background:rgba(13,25,50,.95)}
     </div>
     <div id="reportsList" class="muted" style="font-size:12px">Še ni generiranih poročil.</div>
   </div>
+  <div class="card" id="formConfigCard"><!-- Formulacija obrazcev (Del 4) — vsebino izriše renderFormConfig() --></div>
+  </div><!-- /vec-reports -->
 
+  <div class="page vec-page" id="vec-data">
   <div class="card">
     <div class="card-title">&#128190; Lokalni izvoz / uvoz podatkov</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -1200,7 +1169,10 @@ body.dark .notif{background:rgba(13,25,50,.95)}
       <input type="file" id="pbImportFile" accept=".json" style="display:none" onchange="importJson(this,'pregledBK_db')">
     </div>
   </div>
+  </div><!-- /vec-data -->
 
+  <div class="page vec-page" id="vec-settings">
+  <div class="card" id="labInfoCard"><!-- Identiteta laboratorija (Del 6) — izriše renderLabInfo() --></div>
   <div class="card">
     <div class="card-title">&#9881;&#65039; Nastavitve</div>
     <div class="toggle-wrap" style="margin-bottom:14px"><label class="toggle"><input type="checkbox" id="darkToggle" onchange="toggleDark()"><span class="toggle-slider"></span></label><span style="font-size:13px">Temni način</span></div>
@@ -1210,16 +1182,67 @@ body.dark .notif{background:rgba(13,25,50,.95)}
     <div class="disabled-note">&#128683; Multi RFID &ndash; ni RFID čitalca</div>
     <div class="disabled-note">&#128683; Locate Tag &ndash; ni RFID čitalca</div>
   </div>
+  </div><!-- /vec-settings -->
 
-  <div class="card">
-    <div class="card-title">&#128100; Operaterji</div>
-    <div class="muted" style="font-size:12px;margin-bottom:10px">Dodaj, uredi ali odstrani operaterje. 5-mestna matična številka je PIN za podpis QC in vzdrževanja.</div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-      <button class="btn btn-a btn-sm" onclick="navMain('qc');navQc('operators')">&#9999;&#65039; Upravljaj operaterje</button>
-      <span class="muted" style="font-size:12px" id="vecOpCount"></span>
+  <div class="page vec-page" id="vec-operators">
+    <div class="sec-hdr"><div class="sec-title" style="font-size:16px">Operaterji</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn btn-g btn-sm" onclick="exportOperators()">&#8595; Izvoz</button>
+        <button class="btn btn-g btn-sm" onclick="$i('opImportFile').click()">&#8593; Uvoz</button>
+        <button class="btn btn-g btn-sm" onclick="msUploadOperators()">&#9729; V OneDrive</button>
+        <button class="btn btn-a btn-sm" onclick="openOperatorModal()">+ Nov</button>
+        <input type="file" id="opImportFile" accept=".json" style="display:none" onchange="importOperators(this)">
+      </div></div>
+    <div class="muted" style="font-size:12px;margin-bottom:8px">5-mestna matična številka je vpis in podpis. Vloge: Operater &middot; Napredni (urejanje za nazaj) &middot; Admin (nastavitve). <span id="vecOpCount"></span></div>
+    <div class="fr"><input id="opSearch" placeholder="&#128269; Ime, priimek, ID..." oninput="renderOperators()"></div>
+    <div class="card" style="padding:0"><div class="tbl-wrap"><table><thead><tr><th>ID</th><th>Ime</th><th>Priimek</th><th></th></tr></thead><tbody id="operatorBody"></tbody></table></div></div>
+  </div><!-- /vec-operators -->
+
+  <div class="page vec-page" id="vec-gtins">
+    <div class="sec-hdr">
+      <div class="sec-title" style="font-size:16px">&#127991; GTIN knjižnica</div>
+      <button class="btn btn-g btn-sm" onclick="loadGtinDemo()">&#128229; Naloži privzete</button>
+      <button class="btn btn-g btn-sm" onclick="openImportGtin()">&#128218; Uvozi CSV</button>
+      <button class="btn btn-g btn-sm" onclick="openPkgIns()">&#128196; Package insert</button>
+      <button class="btn btn-a btn-sm" onclick="openGtinMo()">+ GTIN</button>
     </div>
-  </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+      <button class="btn btn-g btn-sm" style="flex:1;border-color:#00a3ad;color:#00a3ad" onclick="importNarocGtins(false)">&#128218; Preveri naročilnico</button>
+      <button class="btn btn-sm" style="flex:1;background:#00a3ad;color:#fff" onclick="importNarocGtins(true)">&#10133; Uvozi naročilnico</button>
+    </div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:8px">&#128161; GTIN baza je skupna z Zebro (pregledBK_db). Spremembe so vidne na obeh napravah po sinhronizaciji. &middot; UDI dobavljenih pripomočkov se hrani elektronsko (čl. 24(8) IVDR) &mdash; <a href="javascript:void(0)" onclick="exportUdiCSV()" style="color:var(--abbott-teal);font-weight:600">&#128190; izvozi UDI evidenco</a></div>
+    <div class="fr">
+      <input type="text" id="gtinSrch" placeholder="&#128269; Išči naziv, GTIN..." oninput="renderGtins()">
+      <select id="gtinTypeFilter" onchange="renderGtins()">
+        <option value="">Vsi tipi</option>
+        <option value="calibrator">Kalibrator</option>
+        <option value="control">Kontrola</option>
+        <option value="reagent-bio">Reagent bio</option>
+        <option value="reagent-imuno">Reagent imuno</option>
+        <option value="consumable">Potrošni material</option>
+      </select>
+      <button class="btn btn-g btn-sm" onclick="exportGtinCSV()">&#128190; CSV</button>
+    </div>
+    <table style="width:100%;border-collapse:collapse;margin-top:8px">
+      <thead><tr style="border-bottom:2px solid var(--border)">
+        <th style="text-align:left;padding:6px 4px;font-size:11px">GTIN</th>
+        <th style="text-align:left;padding:6px 4px;font-size:11px">Naziv</th>
+        <th style="text-align:left;padding:6px 4px;font-size:11px">Tip</th>
+        <th style="text-align:left;padding:6px 4px;font-size:11px">Analizator</th>
+        <th style="padding:6px 4px;font-size:11px"></th>
+      </tr></thead>
+      <tbody id="gtinBody"></tbody>
+    </table>
+  </div><!-- /vec-gtins -->
 
+  <div class="page vec-page" id="vec-instruments">
+    <div class="sec-hdr"><div class="sec-title" style="font-size:16px">&#129514; Analizatorji</div>
+      <button class="btn btn-a btn-sm" onclick="openInstrMo()">+ Analizator</button></div>
+    <div class="muted" style="font-size:12px;margin-bottom:8px">Dodajanje/urejanje analizatorjev (admin). Upokojeni aparati ostanejo v zgodovini in poročilih, a se ne prikazujejo pri vnosu. DD Kontrole so vezane na strukturo Excel datotek in niso odvisne od tega seznama.</div>
+    <div class="card" style="padding:0"><div class="tbl-wrap"><table><thead><tr><th>ID</th><th>Naziv</th><th>Integracija</th><th>Tip</th><th>Status</th><th></th></tr></thead><tbody id="instrBody"></tbody></table></div></div>
+  </div><!-- /vec-instruments -->
+
+  <div class="page vec-page" id="vec-about">
   <div class="card">
     <div class="card-title">&#8505;&#65039; O aplikaciji &middot; identifikacija pripomočka (IVDR)</div>
     <div style="font-size:13px;line-height:1.8">
@@ -1235,7 +1258,9 @@ body.dark .notif{background:rgba(13,25,50,.95)}
       <div id="aboutInhouse" style="margin-top:10px;background:rgba(0,48,135,.06);border:1px solid rgba(0,48,135,.25);border-radius:8px;padding:8px 12px;font-size:12px;line-height:1.5">&#127973; &ndash;</div>
     </div>
   </div>
+  </div><!-- /vec-about -->
 
+  <div class="page vec-page" id="vec-audit">
   <div class="card">
     <div class="card-title">&#128220; Revizijska sled (ALCOA+)</div>
     <div class="muted" style="font-size:12px;margin-bottom:10px">Nespremenljiv dnevnik vseh sprememb (vnosi QC, pregledi, operaterji, loti, uradne vrednosti). Skladno z zahtevami celovitosti podatkov (IVDR / ISO 15189).</div>
@@ -1254,6 +1279,7 @@ body.dark .notif{background:rgba(13,25,50,.95)}
     </div>
     <div id="auditLogBody"></div>
   </div>
+  </div><!-- /vec-audit -->
 </div>
 
 <!-- ============ DOBAVNICE ============ -->
@@ -1358,7 +1384,6 @@ body.dark .notif{background:rgba(13,25,50,.95)}
   <div class="bn-item active" data-main="zaloga" onclick="navMain('zaloga')"><div class="bn-icon">&#128230;</div>Zaloga</div>
   <div class="bn-item" data-main="roki" onclick="navMain('roki')"><div class="bn-icon">&#128197;</div>Roki</div>
   <div class="bn-item" data-main="loti" onclick="navMain('loti')"><div class="bn-icon">&#129514;</div>Loti</div>
-  <div class="bn-item" data-main="gtins" onclick="navMain('gtins')"><div class="bn-icon">&#127991;&#65039;</div>GTIN</div>
   <div class="bn-item" data-main="narocila" onclick="navMain('narocila')"><div class="bn-icon">&#128722;</div>Naročila</div>
   <div class="bn-item" data-main="deliveries" onclick="navMain('deliveries')"><div class="bn-icon">&#128666;</div>Dobavnice</div>
   <div class="bn-item" data-main="servis" onclick="navMain('servis')"><div class="bn-icon">&#128295;</div>Servis</div>
@@ -1749,9 +1774,8 @@ function navMain(tab){
   if(tab==='zaloga') renderZaloga();
   if(tab==='roki') renderRoki();
   if(tab==='loti') renderLoti();
-  if(tab==='gtins') renderGtins();
   if(tab==='qc') navQc(currentQc||'dashboard');
-  if(tab==='vec') renderVec();
+  if(tab==='vec') navVec(currentVec||'sync');
   if(tab==='narocila') navOrd(currentOrd||'prepare');
   if(tab==='servis') navSrv(currentSrv||'entry');
   if(tab==='deliveries') renderDeliveries();
@@ -1774,7 +1798,6 @@ function navQc(page){
   if(page==='ljmulti') populateLjmSelects();
   if(page==='assays') renderAssays();
   if(page==='qcmaterials') renderQcMats();
-  if(page==='operators') renderOperators();
   if(page==='maintenance') setMaintType(maintState.type||'daily');
   if(page==='maint-review') renderMaintReview();
   if(page==='notifications') renderNotifications();
@@ -5605,9 +5628,26 @@ function exportMaintCSV(){const rows=[['Datum','Čas','Tip','Integracija','Anali
 /* ============================================================
    PART C — VEČ (sync, settings, export)
    ============================================================ */
-function renderVec(){
-  refreshSyncUI();
-  renderReportsList();
+let currentVec='sync';
+function navVec(page){
+  currentVec=page;
+  /* admin-only zavihki */
+  if((page==='instruments'||page==='settings')&&!requireRole('admin'))return;
+  document.querySelectorAll('#main-vec .vec-page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('#vecSubnav .tab').forEach(t=>t.classList.remove('active'));
+  const el=$i('vec-'+page);if(el)el.classList.add('active');
+  document.querySelector('#vecSubnav .tab[data-vec="'+page+'"]')?.classList.add('active');
+  if(page==='sync')refreshSyncUI();
+  if(page==='reports'){renderReportsList();try{renderFormConfig();}catch(e){}}
+  if(page==='operators'){renderOperators();const oc=$i('vecOpCount');if(oc)oc.textContent='&middot; Registriranih: '+(S.operators||[]).length;}
+  if(page==='gtins')renderGtins();
+  if(page==='instruments'){try{renderInstrList();}catch(e){}}
+  if(page==='settings'){try{renderLabInfo();}catch(e){}}
+  if(page==='about')renderVecAbout();
+  if(page==='audit')renderAuditLog();
+}
+function renderVec(){navVec(currentVec||'sync');}
+function renderVecAbout(){
   if(_hasBridge()){try{const info=JSON.parse(AndroidBridge.getDeviceInfo());
     $i('aboutDevice').textContent='Naprava: '+info.manufacturer+' '+info.model+' (Android '+info.release+', SDK '+info.sdk+')';
     if(info.appVersion){$i('aboutVersion').textContent='v'+info.appVersion;}
@@ -5624,12 +5664,10 @@ function renderVec(){
     $i('aboutContact').textContent=IVDR_INFO.contact;
     $i('aboutInhouse').innerHTML='&#127973; '+IVDR_INFO.inHouse;
   }catch(e){}
-  renderAuditLog();
-  const oc=$i('vecOpCount');if(oc)oc.textContent='Registriranih: '+(S.operators||[]).length;
 }
 /* ===== REVIZIJSKA SLED — prikaz + izvoz ===== */
-const _AU_ACT={create:{l:'Ustvarjeno',c:'badge-ok'},update:{l:'Urejeno',c:'badge-2sd'},delete:{l:'Izbrisano',c:'badge-3sd'}};
-const _AU_ENT={entry:'QC vnos',qcreview:'Pregled QC',operator:'Operater',lot:'Lot',qcvalue:'Uradne vrednosti'};
+const _AU_ACT={create:{l:'Ustvarjeno',c:'badge-ok'},update:{l:'Urejeno',c:'badge-2sd'},delete:{l:'Izbrisano',c:'badge-3sd'},login:{l:'Vpis',c:'badge-blue'},lock:{l:'Zaklep',c:'badge-blue'}};
+const _AU_ENT={entry:'QC vnos',qcreview:'Pregled QC',operator:'Operater',lot:'Lot',qcvalue:'Uradne vrednosti',session:'Seja',instrument:'Analizator',settings:'Nastavitve'};
 function _auditFiltered(){
   const fe=$i('auFilterEntity')?$i('auFilterEntity').value:'';const df=$i('auFilterFrom')?$i('auFilterFrom').value:'';const dt=$i('auFilterTo')?$i('auFilterTo').value:'';
   let logs=[...(S.auditLog||[])];
