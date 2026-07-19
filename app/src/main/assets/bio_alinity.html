@@ -1552,6 +1552,28 @@ body.dark .notif{background:rgba(13,25,50,.95)}
   </div>
 </div>
 
+<!-- INSTRUMENT MODAL -->
+<div class="mo" id="instrModal">
+  <div class="modal" style="max-width:440px">
+    <div class="mh"><h3 id="instrModalTitle">Analizator</h3><button class="mc" onclick="closeMo('instrModal')">&#10005;</button></div>
+    <div class="mb">
+      <div class="fg"><label>ID (npr. AL05 C1)</label><input id="inId" maxlength="20"></div>
+      <div class="frow">
+        <div class="fg"><label>Oznaka modula (npr. C1)</label><input id="inLabel" maxlength="10"></div>
+        <div class="fg"><label>Integracija (npr. AL05)</label><input id="inInteg" maxlength="10"></div>
+      </div>
+      <div class="fg"><label>Naziv (npr. Alinity c)</label><input id="inName" maxlength="40"></div>
+      <div class="fg"><label>Tip</label>
+        <select id="inType">
+          <option value="c">c &mdash; klinična kemija</option>
+          <option value="i">i &mdash; imunokemija</option>
+          <option value="l">l &mdash; linija</option>
+        </select></div>
+    </div>
+    <div class="mf"><button class="btn btn-g" onclick="closeMo('instrModal')">Prekliči</button><button class="btn btn-a" onclick="saveInstr()">Shrani</button></div>
+  </div>
+</div>
+
 <!-- LOT HISTORY MODAL -->
 <div class="mo" id="lotModal">
   <div class="modal" style="max-width:620px">
@@ -2916,7 +2938,9 @@ function exportGtinCSV(){
 /* ============================================================
    PART B — QC LAB (full functionality, key qclab_v2)
    ============================================================ */
-const INSTRUMENTS = [
+/* Privzeti analizatorji — dejanski seznam je v S.instruments (Več → Analizatorji, admin).
+   INSTR() = aktivni (za vnos/dropdowne); INSTR_ALL() = vsi vklj. upokojeni (za zgodovino/poročila). */
+const DEFAULT_INSTRUMENTS = [
   {id:'AL01 C1',label:'C1',name:'Alinity c',integration:'AL01',type:'c'},
   {id:'AL01 I2',label:'I2',name:'Alinity i',integration:'AL01',type:'i'},
   {id:'AL01 C3',label:'C3',name:'Alinity c',integration:'AL01',type:'c'},
@@ -2929,6 +2953,8 @@ const INSTRUMENTS = [
   {id:'AL04 C1',label:'C1',name:'Alinity c',integration:'AL04',type:'c'},
   {id:'ABTL L1',label:'L1',name:'Abbott linija',integration:'ABTL',type:'l'},
 ];
+function INSTR_ALL(){return (S.instruments&&S.instruments.length)?S.instruments:DEFAULT_INSTRUMENTS;}
+function INSTR(){return INSTR_ALL().filter(i=>!i.retired);}
 const DEFAULT_BIOCHEM = ['Glukoza','Kalij','Natrij','Klorid','Magnezij','Fosfat','CRP','Proteini','Albumini','CK','GGT','AST','ALT','Lipaza','Alkalna fosfataza','Amilaza','Bilirubin direktni','Bilirubin totalni','Kreatinin','Sečnina','Etanol','Digoksin','Teofilin','Vankomicin','Gentamicin','U-Albumin','Kalcij','U/CSF Proteini','HDL-Holesterol','Holesterol','LDL-Holesterol','Trigliceridi','Urati','LDH','Laktat','CO2','UIBC','Železo'];
 const DEFAULT_IMMUNO = ['Troponin','Mioglobin','PCT','Beta-HCG','NT-ProBNP','CK-MB','Feritin','GFAP','UCHL'];
 const DEFAULT_OPERATORS = [
@@ -3054,6 +3080,8 @@ function initState(){
   }
   S.operators.forEach(o=>{if(!o.role)o.role='operator';});
   if(!S.session)S.session=null;
+  /* Nastavljivi analizatorji (multi-lab): enkratna kopija privzetih v S.instruments */
+  if(!S.instruments||!S.instruments.length)S.instruments=JSON.parse(JSON.stringify(DEFAULT_INSTRUMENTS));
 }
 /* Idempotentna nadgradnja QC materialov na shemo z GTIN povezavo + ločenima GFAP/UCHL + Multichem U/Myo.
    Ne briše uporabniških dodatkov; ne dira S.entries (zgodovinski qcName ostane). */
@@ -3192,7 +3220,7 @@ function sdBadge(sd){if(!sd||sd==='ok')return '<span class="badge badge-ok">OK</
 function buildInstrMap(){
   const m=$i('instrumentMap');
   m.innerHTML=['AL01','AL02','AL03'].map((int,idx)=>{
-    const ii=INSTRUMENTS.filter(i=>i.integration===int);
+    const ii=INSTR().filter(i=>i.integration===int);
     const boxes=ii.map((i,j)=>'<div class="instr-box instr-'+i.type+'" onclick="navQc(\'entry\')"><span style="font-size:18px;font-weight:800">'+i.label+'</span><span class="instr-label-small">Alinity '+i.type.toUpperCase()+'</span><span class="instr-id-label">'+i.id+'</span><span class="instr-status"></span></div>'+(j<ii.length-1?'<div class="instr-divider"></div>':'')).join('');
     return '<div class="integration-block"><div class="integration-label">&#128279; '+int+'</div><div class="instruments">'+boxes+'</div><div style="margin-left:auto;font-size:11px;color:var(--text3);text-align:right"><div>Integracija '+(idx+1)+'</div><div style="color:var(--success);font-weight:600">&#9679; Online</div></div></div>';
   }).join('');
@@ -3218,10 +3246,10 @@ function renderDashboard(){
 }
 
 /* ===== ENTRY WIZARD ===== */
-function populateEntryInstruments(){$i('entryInstr').innerHTML='<option value="">-- Izberite --</option>'+INSTRUMENTS.map(i=>'<option value="'+i.id+'">'+i.id+' ('+i.name+')</option>').join('');}
+function populateEntryInstruments(){$i('entryInstr').innerHTML='<option value="">-- Izberite --</option>'+INSTR().map(i=>'<option value="'+i.id+'">'+i.id+' ('+i.name+')</option>').join('');}
 function compatibleQcs(instrType){return S.qcMaterials.filter(q=>q.type===instrType||(instrType==='c'&&q.type==='biochem')||(instrType==='i'&&q.type==='immuno')||q.type==='single'||q.type==='pool');}
 function populateEntryQcMaterials(){
-  const instrId=$i('entryInstr').value;const instr=INSTRUMENTS.find(i=>i.id===instrId);
+  const instrId=$i('entryInstr').value;const instr=INSTR_ALL().find(i=>i.id===instrId);
   const list=$i('qcMatCheckList');if(!list)return;
   const qcs=instr?compatibleQcs(instr.type):S.qcMaterials;
   list.innerHTML=qcs.map(q=>{const ri=S.qcMaterials.indexOf(q);const curLot=qcCurrentLot(q);
@@ -3273,7 +3301,7 @@ function wizardNext(from){
     const isLate=dtVal&&dtVal.slice(0,10)<today;
     let lateReason='';
     if(isLate){lateReason=($i('qcLateReason').value||'').trim();if(!lateReason){notify('Vpišite razlog za naknadni vnos','warning');return;}}
-    S.wiz={instrId,datetime:dtVal,instrType:INSTRUMENTS.find(i=>i.id===instrId).type,selectedQcs:cbs.map(cb=>({idx:parseInt(cb.value),name:cb.dataset.qcname,lot:cb.dataset.lot,levels:parseInt(cb.dataset.levels)||2,expiry:cb.dataset.expiry||'',daysLeft:(cb.dataset.daysleft===''||cb.dataset.daysleft==null?null:parseInt(cb.dataset.daysleft))})),lateReason:isLate?lateReason:''};
+    S.wiz={instrId,datetime:dtVal,instrType:INSTR_ALL().find(i=>i.id===instrId).type,selectedQcs:cbs.map(cb=>({idx:parseInt(cb.value),name:cb.dataset.qcname,lot:cb.dataset.lot,levels:parseInt(cb.dataset.levels)||2,expiry:cb.dataset.expiry||'',daysLeft:(cb.dataset.daysleft===''||cb.dataset.daysleft==null?null:parseInt(cb.dataset.daysleft))})),lateReason:isLate?lateReason:''};
     buildLevelPills();showWStep(1);
   }else if(from===1){
     const qcLevels={};S.wiz.selectedQcs.forEach(qc=>{qcLevels[qc.idx]=[...document.querySelectorAll('.lp-pill[data-qc="'+qc.idx+'"].selected-pill')].map(p=>p.dataset.level);});
@@ -3360,7 +3388,7 @@ function saveEntry(){
 
 /* ===== PREGLED QC — podpis + ukrepi ===== */
 let qcReviewState={instrId:null}; var qcRevPin='';
-function _qcInstrIds(){const ids=[...new Set((S.entries||[]).map(e=>e.instrId).filter(Boolean))];return ids.length?ids.sort():INSTRUMENTS.map(i=>i.id);}
+function _qcInstrIds(){const ids=[...new Set((S.entries||[]).map(e=>e.instrId).filter(Boolean))];return ids.length?ids.sort():INSTR().map(i=>i.id);}
 function _qcLastReview(instrId){const rs=(S.qcReviews||[]).filter(r=>r.instrId===instrId).sort((a,b)=>(b.toDate||'').localeCompare(a.toDate||''));return rs[0]||null;}
 function _qcReviewFrom(instrId){
   const last=_qcLastReview(instrId);
@@ -3468,7 +3496,7 @@ function computeAlerts(){
   const push=(key,sev,icon,title,detail,nav)=>{if(!_alertMuted(key))A.push({key,sev,icon,title,detail,nav});};
   /* 1-3: manjkajoče vzdrževanje po obdobjih */
   try{
-    INSTRUMENTS.forEach(ins=>{
+    INSTR().forEach(ins=>{
       if(hh>=10&&!_maintCurRec(ins.id,'daily')){
         push('maint_daily_'+ins.id,hh>=14?'crit':'warn','🔧','Dnevno vzdrževanje manjka: '+ins.id,'Danes še ni zabeleženo dnevno vzdrževanje (niti mirovanje).',"navMain('qc');navQc('maintenance')");
       }
@@ -3838,6 +3866,61 @@ function msUploadOperators(){if(!_hasBridge()){notify('Samo na napravi','warn');
 function saveOperator(){if(!requireRole('admin'))return;const id=$i('opId').value.trim(),first=$i('opFirst').value.trim(),last=$i('opLast').value.trim(),role=$i('opRole').value||'operator';if(!id||id.length!==5||isNaN(id)){notify('ID mora biti točno 5 številk','warning');return;}if(!first||!last){notify('Vnesite ime in priimek','warning');return;}const who=(currentOp()||{}).id||'system';if(S.editingOpIdx!=null){const b=S.operators[S.editingOpIdx];const before={id:b.id,first:b.first,last:b.last,role:b.role||'operator'};S.operators[S.editingOpIdx]={id,first,last,role};_audit('update','operator',id,'Urejen operater '+first+' '+last+' ('+id+')'+(before.role!==role?' · vloga '+before.role+'→'+role:''),before,{id,first,last,role},who);}else{if(S.operators.find(o=>o.id===id)){notify('ID že obstaja','error');return;}S.operators.push({id,first,last,role});_audit('create','operator',id,'Dodan operater '+first+' '+last+' ('+id+') · vloga '+role,null,{id,first,last,role},who);}save();closeMo('operatorModal');renderOperators();_autoSyncOps();notify('Operater shranjen','success');}
 function exportOperators(){const blob=new Blob([JSON.stringify(S.operators,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='operaterji.json';a.click();notify('Operaterji izvoženi','success');}
 function importOperators(input){const f=input.files[0];if(!f)return;const r=new FileReader();r.onload=e=>{try{const arr=JSON.parse(e.target.result);if(Array.isArray(arr)){let added=0;arr.forEach(o=>{if(!o.id)return;const norm={id:o.id,first:o.first||o.name||'',last:o.last||o.surname||''};if(!S.operators.find(x=>x.id===norm.id)){S.operators.push(norm);added++;}});save();renderOperators();notify('Uvoženih '+added+' operaterjev','success');}}catch(err){notify('Napaka pri uvozu','error');}};r.readAsText(f);input.value='';}
+
+/* ===== ANALIZATORJI (Več → Analizatorji, admin) ===== */
+let _editInstrIdx=null;
+function _instrInUse(id){return (S.entries||[]).some(e=>e.instrId===id)||(S.maintenanceLog||[]).some(m=>m.instrId===id);}
+function renderInstrList(){
+  const b=$i('instrBody');if(!b)return;
+  b.innerHTML=INSTR_ALL().map((ins,i)=>{
+    const st=ins.retired?'<span class="badge badge-2sd">Upokojen</span>':'<span class="badge badge-ok">Aktiven</span>';
+    const del=_instrInUse(ins.id)?'':' <button class="btn btn-d btn-sm" onclick="deleteInstr('+i+')">🗑️</button>';
+    return '<tr><td><span class="badge badge-blue">'+_repEsc(ins.id)+'</span></td><td>'+_repEsc(ins.name||'')+'</td><td>'+_repEsc(ins.integration||'')+'</td><td>'+_repEsc(ins.type||'')+'</td><td>'+st+'</td>'+
+      '<td style="white-space:nowrap"><button class="btn btn-outline btn-sm" onclick="openInstrMo('+i+')">✏️</button> <button class="btn btn-g btn-sm" onclick="toggleRetireInstr('+i+')">'+(ins.retired?'↩ Aktiviraj':'💤 Upokoji')+'</button>'+del+'</td></tr>';
+  }).join('')||'<tr><td colspan="6" class="empty">Ni analizatorjev.</td></tr>';
+}
+function openInstrMo(idx){
+  if(!requireRole('admin'))return;
+  _editInstrIdx=idx??null;
+  $i('instrModalTitle').textContent=idx!=null?'Uredi analizator':'Nov analizator';
+  if(idx!=null){const x=INSTR_ALL()[idx];$i('inId').value=x.id;$i('inLabel').value=x.label||'';$i('inInteg').value=x.integration||'';$i('inName').value=x.name||'';$i('inType').value=x.type||'c';}
+  else{$i('inId').value='';$i('inLabel').value='';$i('inInteg').value='';$i('inName').value='';$i('inType').value='c';}
+  showMo('instrModal');
+}
+function saveInstr(){
+  if(!requireRole('admin'))return;
+  const id=$i('inId').value.trim(),label=$i('inLabel').value.trim(),integ=$i('inInteg').value.trim(),name=$i('inName').value.trim(),type=$i('inType').value;
+  if(!id||!integ||!name){notify('Vnesite ID, integracijo in naziv','warning');return;}
+  const who=(currentOp()||{}).id||'system';
+  if(_editInstrIdx!=null){
+    const b=S.instruments[_editInstrIdx];const before={...b};
+    if(b.id!==id&&S.instruments.some((x,j)=>j!==_editInstrIdx&&x.id===id)){notify('ID že obstaja','error');return;}
+    S.instruments[_editInstrIdx]={...b,id,label,integration:integ,name,type};
+    _audit('update','instrument',id,'Urejen analizator '+id,before,S.instruments[_editInstrIdx],who);
+  }else{
+    if(S.instruments.some(x=>x.id===id)){notify('ID že obstaja','error');return;}
+    S.instruments.push({id,label,integration:integ,name,type});
+    _audit('create','instrument',id,'Dodan analizator '+id+' ('+name+')',null,{id,name,type},who);
+  }
+  save();closeMo('instrModal');renderInstrList();buildInstrMap();populateEntryInstruments();notify('Analizator shranjen','success');
+}
+function toggleRetireInstr(i){
+  if(!requireRole('admin'))return;
+  const ins=S.instruments[i];if(!ins)return;
+  ins.retired=!ins.retired;
+  _audit('update','instrument',ins.id,(ins.retired?'Upokojen':'Ponovno aktiviran')+' analizator '+ins.id,null,null,(currentOp()||{}).id||'system');
+  save();renderInstrList();buildInstrMap();populateEntryInstruments();
+  notify(ins.retired?'Analizator upokojen — zgodovina ostane':'Analizator aktiviran','success');
+}
+function deleteInstr(i){
+  if(!requireRole('admin'))return;
+  const ins=S.instruments[i];if(!ins)return;
+  if(_instrInUse(ins.id)){notify('Analizator ima vnose — uporabi Upokoji','error');return;}
+  if(!confirm('Izbriši analizator '+ins.id+'?'))return;
+  S.instruments.splice(i,1);
+  _audit('delete','instrument',ins.id,'Izbrisan analizator '+ins.id,ins,null,(currentOp()||{}).id||'system');
+  save();renderInstrList();buildInstrMap();populateEntryInstruments();notify('Analizator izbrisan');
+}
 
 /* ===== EXPORT ===== */
 function exportCSV(){const hdr=['Datum','Čas','Inštrument','QC Material','Lot','Nivo','Preiskava','Rezultat SD','Zabeležka','Operater ID','Operater'];const rows=[hdr.join(',')];S.entries.forEach(e=>{const op=S.operators.find(o=>o.id===e.operatorId);const dt=new Date(e.datetime);if(!(e.results||[]).length){(e.levels||[]).forEach(lvl=>rows.push([dt.toLocaleDateString('sl-SI'),dt.toLocaleTimeString('sl-SI'),e.instrId,e.qcName,e.lot||'','Nivo '+lvl.replace('L',''),'–','ok','',e.operatorId,op?op.first+' '+op.last:''].map(v=>'"'+v+'"').join(',')));return;}(e.results||[]).forEach(r=>rows.push([dt.toLocaleDateString('sl-SI'),dt.toLocaleTimeString('sl-SI'),e.instrId,e.qcName,e.lot||'','Nivo '+r.level.replace('L',''),r.assay,r.sd||'ok',(r.note||'').replace(/,/g,' '),e.operatorId,op?op.first+' '+op.last:''].map(v=>'"'+v+'"').join(',')));});const blob=new Blob(['﻿'+rows.join('\r\n')],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='QC_'+new Date().toISOString().slice(0,10)+'.csv';a.click();notify('CSV izvožen','success');}
@@ -4565,7 +4648,7 @@ function _maintCurRec(instrId,type){const key=_maintPeriodKey(type,new Date().to
 function _maintPeriodWord(type){return type==='daily'?'danes':type==='weekly'?'ta teden':'ta mesec';}
 function renderMaintContent(){
   const type=maintState.type;const wrap=$i('maintContent');
-  wrap.innerHTML=INSTRUMENTS.map(instr=>{
+  wrap.innerHTML=INSTR().map(instr=>{
     const steps=getMaintSteps(type,instr.type);const key=instr.id+'_'+type;const checked=maintState.checked[key]||{};const ti=MAINT_TYPES[type];
     const todayRec=_maintCurRec(instr.id,type);
     const isIdle=!!(todayRec&&todayRec.idle);
@@ -4597,21 +4680,21 @@ function renderMaintContent(){
   }).join('');
 }
 function toggleMaintStep(instrId,type,stepId,val){const key=instrId+'_'+type;if(!maintState.checked[key])maintState.checked[key]={};maintState.checked[key][stepId]=val;renderMaintContent();}
-function checkAllMaint(instrId,type,val){const instr=INSTRUMENTS.find(i=>i.id===instrId);const steps=getMaintSteps(type,instr?.type);const key=instrId+'_'+type;if(!maintState.checked[key])maintState.checked[key]={};const todayRec=_maintCurRec(instrId,type);const confirmed={};if(todayRec)todayRec.steps.forEach(s=>{if(s.done)confirmed[s.id]=true;});steps.forEach(s=>{if(!confirmed[s.id])maintState.checked[key][s.id]=val;});renderMaintContent();}
+function checkAllMaint(instrId,type,val){const instr=INSTR_ALL().find(i=>i.id===instrId);const steps=getMaintSteps(type,instr?.type);const key=instrId+'_'+type;if(!maintState.checked[key])maintState.checked[key]={};const todayRec=_maintCurRec(instrId,type);const confirmed={};if(todayRec)todayRec.steps.forEach(s=>{if(s.done)confirmed[s.id]=true;});steps.forEach(s=>{if(!confirmed[s.id])maintState.checked[key][s.id]=val;});renderMaintContent();}
 let maintPinVal='';
-function openMaintSign(instrId,type){const instr=INSTRUMENTS.find(i=>i.id===instrId);const steps=getMaintSteps(type,instr.type);const key=instrId+'_'+type;const checked=maintState.checked[key]||{};const ti=MAINT_TYPES[type];const pw=_maintPeriodWord(type);const todayRec=_maintCurRec(instrId,type);const confirmed={};if(todayRec)todayRec.steps.forEach(s=>{if(s.done)confirmed[s.id]=true;});const newCount=steps.filter(s=>!confirmed[s.id]&&!!checked[s.id]).length;const totalDone=steps.filter(s=>confirmed[s.id]||(!confirmed[s.id]&&!!checked[s.id])).length;maintState.pendingSign={instrId,type};maintPinVal=_prefillPinId();$i('maintSignTitle').textContent='Potrditev – '+instrId;const prevInfo=todayRec?'<div style="font-size:11px;color:var(--text3);margin-top:4px">Že potrjeno '+pw+': '+Object.keys(confirmed).length+' korakov</div>':'';$i('maintSignSummary').innerHTML='<div style="background:rgba(0,48,135,.05);border-radius:8px;padding:10px 14px"><div style="font-weight:600;font-size:14px;color:var(--abbott-blue);margin-bottom:6px">'+ti.icon+' '+ti.label+' – '+instrId+'</div><div style="font-size:13px">Novih: <strong>'+newCount+'</strong> &nbsp;|&nbsp; Skupno '+pw+': <strong>'+totalDone+' / '+steps.length+'</strong> '+(totalDone===steps.length?'<span class="badge badge-ok">Vse</span>':'<span class="badge badge-2sd">Ni popolno</span>')+'</div>'+prevInfo+'</div>';$i('maintSignNote').value='';updateMaintPinDisplay();buildMaintPinGrid();showMo('maintSignModal');}
+function openMaintSign(instrId,type){const instr=INSTR_ALL().find(i=>i.id===instrId);const steps=getMaintSteps(type,instr.type);const key=instrId+'_'+type;const checked=maintState.checked[key]||{};const ti=MAINT_TYPES[type];const pw=_maintPeriodWord(type);const todayRec=_maintCurRec(instrId,type);const confirmed={};if(todayRec)todayRec.steps.forEach(s=>{if(s.done)confirmed[s.id]=true;});const newCount=steps.filter(s=>!confirmed[s.id]&&!!checked[s.id]).length;const totalDone=steps.filter(s=>confirmed[s.id]||(!confirmed[s.id]&&!!checked[s.id])).length;maintState.pendingSign={instrId,type};maintPinVal=_prefillPinId();$i('maintSignTitle').textContent='Potrditev – '+instrId;const prevInfo=todayRec?'<div style="font-size:11px;color:var(--text3);margin-top:4px">Že potrjeno '+pw+': '+Object.keys(confirmed).length+' korakov</div>':'';$i('maintSignSummary').innerHTML='<div style="background:rgba(0,48,135,.05);border-radius:8px;padding:10px 14px"><div style="font-weight:600;font-size:14px;color:var(--abbott-blue);margin-bottom:6px">'+ti.icon+' '+ti.label+' – '+instrId+'</div><div style="font-size:13px">Novih: <strong>'+newCount+'</strong> &nbsp;|&nbsp; Skupno '+pw+': <strong>'+totalDone+' / '+steps.length+'</strong> '+(totalDone===steps.length?'<span class="badge badge-ok">Vse</span>':'<span class="badge badge-2sd">Ni popolno</span>')+'</div>'+prevInfo+'</div>';$i('maintSignNote').value='';updateMaintPinDisplay();buildMaintPinGrid();showMo('maintSignModal');}
 function buildMaintPinGrid(){const keys=[1,2,3,4,5,6,7,8,9,'',0,'⌫'];$i('maintPinGrid').innerHTML=keys.map(k=>'<div class="pin-key" onclick="maintPinPress(\''+k+'\')">'+k+'</div>').join('');}
 function maintPinPress(k){if(k===''||k==='undefined')return;if(k==='⌫')maintPinVal=maintPinVal.slice(0,-1);else if(maintPinVal.length<5)maintPinVal+=k;updateMaintPinDisplay();}
 function clearMaintPin(){maintPinVal='';updateMaintPinDisplay();}
 function updateMaintPinDisplay(){for(let i=0;i<5;i++)$i('mpd'+i)?.classList.toggle('filled',i<maintPinVal.length);const op=S.operators.find(o=>o.id===maintPinVal);$i('maintPinName').textContent=op?'✓ '+op.first+' '+op.last:(maintPinVal.length===5?'⚠ Operater ni najden':'');}
 /* ---- naknadni vnos vzdrževanja za nazaj / mirovanje ---- */
-function openMaintBack(){if(!requireRole('advanced'))return;const today=new Date().toISOString().slice(0,10);$i('mbInstr').innerHTML=INSTRUMENTS.map(i=>'<option value="'+i.id+'">'+i.id+' &ndash; '+i.name+'</option>').join('');$i('mbType').value=maintState.type==='triannual'?'quarterly':maintState.type;$i('mbDate').max=today;$i('mbDate').value=today;$i('mbMode').value='done';$i('mbNote').value='';$i('mbReason').value='';$i('mbOp').value=_prefillPinId();_maintBackOpName();_maintBackRenderSteps();showMo('maintBackModal');}
+function openMaintBack(){if(!requireRole('advanced'))return;const today=new Date().toISOString().slice(0,10);$i('mbInstr').innerHTML=INSTR().map(i=>'<option value="'+i.id+'">'+i.id+' &ndash; '+i.name+'</option>').join('');$i('mbType').value=maintState.type==='triannual'?'quarterly':maintState.type;$i('mbDate').max=today;$i('mbDate').value=today;$i('mbMode').value='done';$i('mbNote').value='';$i('mbReason').value='';$i('mbOp').value=_prefillPinId();_maintBackOpName();_maintBackRenderSteps();showMo('maintBackModal');}
 function _maintBackRenderSteps(){
   const instrId=$i('mbInstr').value,type=$i('mbType').value,date=$i('mbDate').value,mode=$i('mbMode').value;
   const today=new Date().toISOString().slice(0,10);const late=date&&date<today;
   $i('mbLateWarn').style.display=late?'block':'none';
   $i('mbReasonWrap').style.display=late?'block':'none';
-  const instr=INSTRUMENTS.find(i=>i.id===instrId);
+  const instr=INSTR_ALL().find(i=>i.id===instrId);
   const wrap=$i('mbStepsWrap');
   if(mode==='idle'){wrap.innerHTML='<div style="background:rgba(180,83,9,.06);border:1px solid #b45309;border-radius:7px;padding:10px 12px;font-size:13px;color:#b45309">💤 Aparat je bil na izbrani datum v mirovanju (ni obratoval). Koraki se ne beležijo.</div>';return;}
   const steps=getMaintSteps(type,instr?instr.type:'c');
@@ -4638,7 +4721,7 @@ function saveMaintBack(){
 function _maintFindIdx(instrId,type,forDate){const pk=_maintPeriodKey(type,forDate);return (S.maintenanceLog||[]).findIndex(m=>m.instrId===instrId&&m.type===type&&_maintPeriodKey(type,(m.forDate||(m.datetime||'').slice(0,10)))===pk);}
 /* jedrni zapis vzdrževanja — IVDR/ALCOA+: ločeno hrani datum dejanja (forDate→datetime) in realni čas vnosa (enteredAt); naknadni vnos označi (late) + razlog */
 function _commitMaint(o){
-  const instr=INSTRUMENTS.find(i=>i.id===o.instrId);if(!instr)return;
+  const instr=INSTR_ALL().find(i=>i.id===o.instrId);if(!instr)return;
   const steps=getMaintSteps(o.type,instr.type);
   if(!S.maintenanceLog)S.maintenanceLog=[];
   const today=new Date().toISOString().slice(0,10);
@@ -4666,7 +4749,7 @@ function _commitMaint(o){
 }
 function saveMaintenance(){if(maintPinVal.length<5){notify('Vpišite matično številko','warning');return;}const op=S.operators.find(o=>o.id===maintPinVal);if(!op){notify('Operater ni registriran','error');return;}const {instrId,type,idle}=maintState.pendingSign;const key=instrId+'_'+type;const checked=maintState.checked[key]||{};const note=$i('maintSignNote').value.trim();_commitMaint({instrId,type,forDate:new Date().toISOString().slice(0,10),checked,idle:!!idle,note,operatorId:maintPinVal});closeMo('maintSignModal');maintState.checked[key]={};renderMaintContent();notify(idle?'Mirovanje zabeleženo 💤':'Vzdrževanje potrjeno! ✓','success');}
 /* označi aparat v mirovanju za tekoče obdobje (sočasno) — preko istega PIN modala */
-function openMaintIdle(instrId,type){const instr=INSTRUMENTS.find(i=>i.id===instrId);const ti=MAINT_TYPES[type];const pw=_maintPeriodWord(type);maintState.pendingSign={instrId,type,idle:true};maintPinVal=_prefillPinId();$i('maintSignTitle').textContent='Mirovanje – '+instrId;$i('maintSignSummary').innerHTML='<div style="background:rgba(180,83,9,.07);border:1px solid var(--orange,#b45309);border-radius:8px;padding:10px 14px"><div style="font-weight:600;font-size:14px;color:#b45309;margin-bottom:4px">💤 Aparat v mirovanju</div><div style="font-size:13px">'+ti.icon+' '+ti.label+' – '+instrId+'<br>Beležite, da aparat <strong>'+pw+'</strong> ni obratoval, zato vzdrževanje ni bilo potrebno.</div></div>';$i('maintSignNote').value='';updateMaintPinDisplay();buildMaintPinGrid();showMo('maintSignModal');}
+function openMaintIdle(instrId,type){const instr=INSTR_ALL().find(i=>i.id===instrId);const ti=MAINT_TYPES[type];const pw=_maintPeriodWord(type);maintState.pendingSign={instrId,type,idle:true};maintPinVal=_prefillPinId();$i('maintSignTitle').textContent='Mirovanje – '+instrId;$i('maintSignSummary').innerHTML='<div style="background:rgba(180,83,9,.07);border:1px solid var(--orange,#b45309);border-radius:8px;padding:10px 14px"><div style="font-weight:600;font-size:14px;color:#b45309;margin-bottom:4px">💤 Aparat v mirovanju</div><div style="font-size:13px">'+ti.icon+' '+ti.label+' – '+instrId+'<br>Beležite, da aparat <strong>'+pw+'</strong> ni obratoval, zato vzdrževanje ni bilo potrebno.</div></div>';$i('maintSignNote').value='';updateMaintPinDisplay();buildMaintPinGrid();showMo('maintSignModal');}
 function getOpName(id){const op=S.operators.find(o=>o.id===id);return op?op.first+' '+op.last:id;}
 /* ---- urejevalnik opravil vzdrževanja ---- */
 function openMaintEdit(){$i('meType').value=maintState.type==='triannual'?'quarterly':maintState.type;renderMaintEdit();showMo('maintEditModal');}
@@ -4821,7 +4904,7 @@ function _maintDatumTable(instrId,instrType,year,month,type,heading){
 }
 
 function buildMaintReportHtml(instrId,year,month){
-  var instr=INSTRUMENTS.find(function(i){return i.id===instrId;})||{id:instrId,name:'',type:'c'};
+  var instr=INSTR_ALL().find(function(i){return i.id===instrId;})||{id:instrId,name:'',type:'c'};
   var moName=REP_MONTHS[month-1].toUpperCase()+' '+year;
   var aparat=instr.type==='l'?'Linija Abbott':'Alinity '+_repEsc(instr.id);
   var head='<div class="rhdr"><table class="meta"><tr><td class="k">ANALIZATOR/APARAT:</td><td>'+aparat+'</td><td class="k">MESEC/LETO:</td><td>'+moName+'</td><td class="k">Zap. št./oddelek:</td><td>&nbsp;</td></tr></table></div>';
@@ -4841,7 +4924,7 @@ function buildMaintReportHtml(instrId,year,month){
 
 /* ---- NESKLADJA NOTRANJE QC (OB KIKKB 216/64) ---- */
 function buildQcNonconfHtml(instrId,year,month){
-  var instr=INSTRUMENTS.find(function(i){return i.id===instrId;})||{id:instrId,type:'c'};
+  var instr=INSTR_ALL().find(function(i){return i.id===instrId;})||{id:instrId,type:'c'};
   var oddelek=instr.type==='i'?'Imunokemija':'Biokemija';
   var moName=REP_MONTHS[month-1].toUpperCase()+' '+year;
   var dim=_repDaysInMonth(year,month);
@@ -4921,7 +5004,7 @@ function _hasMonthData(year,month){
 var _repQueue=[],_repCurrent=null,_repBusy=false;
 function generateMonthlyReports(year,month,opts){
   opts=opts||{};
-  var instrs=opts.instrIds||INSTRUMENTS.map(function(i){return i.id;});
+  var instrs=opts.instrIds||INSTR().map(function(i){return i.id;});
   var types=opts.types||['vzdrzevanje','kontrole'];
   var jobs=[];
   instrs.forEach(function(id){types.forEach(function(t){jobs.push({instrId:id,year:year,month:month,type:t,filename:_reportFilename(id,year,month,t),subfolder:_reportSubfolder(t,year,month,id)});});});
@@ -4971,7 +5054,7 @@ function _repLast12(){var out=[];var now=new Date();for(var k=1;k<=12;k++){var d
 function openReportModal(){
   var sel=$i('repMonthSel');
   sel.innerHTML=_repLast12().map(function(o){return '<option value="'+o.y+'-'+_rp2(o.m)+'">'+REP_MONTHS[o.m-1]+' '+o.y+'</option>';}).join('');
-  $i('repInstrList').innerHTML=INSTRUMENTS.map(function(i){return '<label style="display:flex;align-items:center;gap:7px;font-size:13px;background:var(--bg2);border:1px solid var(--border);border-radius:7px;padding:6px 8px"><input type="checkbox" class="repInstr" value="'+i.id+'" checked style="width:16px;height:16px"> '+i.id+' ('+_repEsc(i.name)+')</label>';}).join('');
+  $i('repInstrList').innerHTML=INSTR().map(function(i){return '<label style="display:flex;align-items:center;gap:7px;font-size:13px;background:var(--bg2);border:1px solid var(--border);border-radius:7px;padding:6px 8px"><input type="checkbox" class="repInstr" value="'+i.id+'" checked style="width:16px;height:16px"> '+i.id+' ('+_repEsc(i.name)+')</label>';}).join('');
   showMo('reportModal');
 }
 function repSelectAll(v){document.querySelectorAll('#repInstrList .repInstr').forEach(function(c){c.checked=v;});}
@@ -5026,8 +5109,8 @@ function retryPendingReports(){
    SERVIS / NAPAKE — vpis napak, servisna poročila, statistika
    ============================================================ */
 const GLP_MODULES=['IOM-1','IOM-2','IOM-3','TAC','BM-1','BM-2','AM','DM','CM-1','CM-2','RM','REM','SM-1','SM-2','LINIJA'];
-const SERVICE_DEVICES=[...INSTRUMENTS.map(i=>i.id),...GLP_MODULES];
-function srvDeviceGroup(dev){const ins=INSTRUMENTS.find(i=>i.id===dev);return ins?ins.integration:'GLP linija';}
+function SERVICE_DEVICES(){return [...INSTR().map(i=>i.id),...GLP_MODULES];}
+function srvDeviceGroup(dev){const ins=INSTR_ALL().find(i=>i.id===dev);return ins?ins.integration:'GLP linija';}
 function srvStatus(e){if(e.fixedAt)return 'fixed';if(e.notifiedAt)return 'notified';return 'open';}
 const SRV_STATUS_LABEL={open:'<span class="badge badge-3sd">🔴 Odprta</span>',notified:'<span class="badge badge-2sd">🟠 Servis obveščen</span>',fixed:'<span class="badge badge-ok">🟢 Odpravljena</span>'};
 function _fmtDur(ms){if(ms==null||ms<0)return '–';const h=ms/3600000;if(h<1)return Math.round(ms/60000)+' min';if(h<48)return h.toFixed(1)+' h';return Math.floor(h/24)+' d '+Math.round(h%24)+' h';}
@@ -5047,7 +5130,7 @@ function navSrv(page){
   if(page==='abbott')renderAbbott();
 }
 function srvInitSelects(){
-  const opts=SERVICE_DEVICES.map(d=>'<option value="'+d+'">'+d+'</option>').join('');
+  const opts=SERVICE_DEVICES().map(d=>'<option value="'+d+'">'+d+'</option>').join('');
   $i('sfDevice').innerHTML='<option value="">— izberi —</option>'+opts;
   $i('slDevice').innerHTML='<option value="">Vse naprave</option>'+opts;
   $i('ssMonth').value=new Date().toISOString().slice(0,7);
