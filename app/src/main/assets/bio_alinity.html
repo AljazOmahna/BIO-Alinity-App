@@ -362,8 +362,8 @@ body.dark .notif{background:rgba(13,25,50,.95)}
 <!-- HEADER -->
 <header class="hdr">
   <div>
-    <div class="hdr-logo">BIO ALINITY</div>
-    <div class="hdr-sub">Laboratorij BK &middot; Abbott Alinity</div>
+    <div class="hdr-logo" id="hdrLogo">DigiLab</div>
+    <div class="hdr-sub" id="hdrSub">Laboratorij BK &middot; Abbott Alinity</div>
   </div>
   <div class="hdr-spacer"></div>
   <div class="hdr-stat"><div class="hdr-stat-num" id="hs-tot">0</div><div class="hdr-stat-lbl">Kos</div></div>
@@ -371,6 +371,7 @@ body.dark .notif{background:rgba(13,25,50,.95)}
   <div class="hdr-stat"><div class="hdr-stat-num" style="color:var(--orange)" id="hs-14">0</div><div class="hdr-stat-lbl">14d</div></div>
   <div class="hdr-sync" id="alertBell" onclick="openAlertModal()" style="position:relative">&#128276;<span id="alertBadge" style="display:none;position:absolute;top:-6px;right:-8px;background:var(--red);color:#fff;border-radius:10px;font-size:10px;padding:1px 5px;font-weight:700"></span></div>
   <div class="hdr-sync" id="syncChip" onclick="openSyncModal()">&#9729; Sync</div>
+  <div id="opChip" onclick="lockNow()" style="display:none;margin-left:8px;background:var(--abbott-blue);color:#fff;border-radius:20px;padding:5px 13px;font-size:12px;font-weight:700;white-space:nowrap;cursor:pointer" title="Tapni za zaklep / menjavo operaterja"></div>
 </header>
 
 <div class="app-body">
@@ -859,32 +860,69 @@ body.dark .notif{background:rgba(13,25,50,.95)}
   <div class="page qc-page" id="page-ddqc">
     <div class="sec-hdr"><div class="sec-title" style="font-size:16px">&#128203; DD Kontrole &mdash; statistika CV</div>
       <span style="display:flex;gap:6px;flex-wrap:wrap">
-        <button class="btn btn-g btn-sm" onclick="openDdConfig()">&#128193; Poveži datoteke</button>
+        <button class="btn btn-g btn-sm" onclick="navDdSection('stats')">&#128202; Statistika</button>
+        <button class="btn btn-g btn-sm" onclick="navDdSection('reviews')">&#128203; Pregled uvozov</button>
+        <button class="btn btn-g btn-sm" onclick="openDdCategoryAdmin()">&#9881;&#65039; Kategorije</button>
         <button class="btn btn-a btn-sm" onclick="updateDdqc()">&#128260; Posodobi</button>
       </span>
     </div>
+    <div class="qc-subnav" id="ddCatTabs" style="margin-bottom:8px"></div>
     <input type="file" id="ddFileInput" accept=".xls,.xlsx" multiple style="display:none" onchange="ddFilesChosen(this)">
-    <div id="ddqcBody" style="padding:4px"></div>
+    <div id="ddSectionStats"><div id="ddqcBody" style="padding:4px"></div></div>
+    <div id="ddSectionReviews" style="display:none"><div id="ddReviewsBody" style="padding:4px"></div></div>
   </div>
 </div>
 
-<!-- DD CONFIG MODAL -->
-<div class="mo" id="ddConfigModal">
-  <div class="modal" style="max-width:520px">
-    <div class="mh"><h3>&#128193; DD Kontrole &mdash; povezava datotek</h3><button class="mc" onclick="closeMo('ddConfigModal')">&#10005;</button></div>
+<!-- DD KATEGORIJE — ADMIN SEZNAM -->
+<div class="mo" id="ddCategoryAdminModal">
+  <div class="modal" style="max-width:640px">
+    <div class="mh"><h3>&#9881;&#65039; DD Kontrole &mdash; kategorije</h3><button class="mc" onclick="closeMo('ddCategoryAdminModal')">&#10005;</button></div>
     <div class="mb">
-      <div style="font-size:12px;color:var(--text3);margin-bottom:10px">Datoteke naj bodo v mapi OneDrive <b>DigiLab/<span id="ddFolderLbl">BIO/DD_Kontrole</span></b>. Ob „Posodobi" se preberejo najnovejši vnosi. Na PC/brskalniku brez OneDrive lahko datoteke naložiš ročno.</div>
-      <div class="fg"><label>Mapa (v DigiLab)</label><input type="text" id="ddFolder" value="BIO/DD_Kontrole"></div>
-      <div class="fg"><label>BIO datoteka</label><input type="text" id="ddFileBio" placeholder="Alinity DD BIO Template.xls"></div>
-      <div class="fg"><label>IMUNO datoteka</label><input type="text" id="ddFileImuno" placeholder="Alinity DD IMUNO Template.xls"></div>
-      <div class="fg"><label>URIN datoteka</label><input type="text" id="ddFileUrin" placeholder="Alinity DD URIN Template.xls"></div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
-        <button class="btn btn-g btn-sm" onclick="ddAutodetect()">&#128269; Samodejno zaznaj (.xls v mapi)</button>
-        <button class="btn btn-g btn-sm" onclick="$i('ddFileInput').click()">&#128194; Naloži ročno (brskalnik)</button>
-      </div>
-      <div id="ddAutodetectHint" style="font-size:11px;color:var(--text3);margin-top:6px"></div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:10px">Vsaka kategorija ima svojo OneDrive mapo in seznam Excel datotek (lahko več let/verzij — podatki se ob "Posodobi" mergajo v zgodovino, ne prepišejo).</div>
+      <button class="btn btn-a btn-sm" style="margin-bottom:8px" onclick="openDdCategoryEdit(null)">&#10133; Nova kategorija</button>
+      <table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>
+        <th style="text-align:left;padding:5px">Naziv</th><th style="text-align:left;padding:5px">Mapa</th><th style="padding:5px">Datoteke</th><th></th>
+      </tr></thead><tbody id="ddCategoryListBody"></tbody></table>
     </div>
-    <div class="mf"><button class="btn btn-g" onclick="closeMo('ddConfigModal')">Prekliči</button><button class="btn btn-a" onclick="saveDdConfig()">Shrani</button></div>
+    <div class="mf"><button class="btn btn-g" onclick="closeMo('ddCategoryAdminModal')">Zapri</button></div>
+  </div>
+</div>
+
+<!-- DD KATEGORIJA — UREJANJE -->
+<div class="mo" id="ddCategoryEditModal">
+  <div class="modal" style="max-width:480px">
+    <div class="mh"><h3>Kategorija DD kontrol</h3><button class="mc" onclick="closeMo('ddCategoryEditModal')">&#10005;</button></div>
+    <div class="mb">
+      <div class="fg"><label>ID (brez presledkov)</label><input type="text" id="ddCatId" placeholder="npr. hema"></div>
+      <div class="fg"><label>Naziv</label><input type="text" id="ddCatLabel" placeholder="npr. XN Sysmex HEMA"></div>
+      <div class="fg"><label>Mapa (v DigiLab)</label>
+        <div style="display:flex;gap:6px"><input type="text" id="ddCatFolder" placeholder="BIO/DD_Kontrole/hema" style="flex:1">
+        <button type="button" class="btn btn-outline btn-sm" onclick="openDdFolderPick()">&#128193; Prebrskaj</button></div>
+      </div>
+      <div class="fg"><label>Datoteke (lahko več let)</label>
+        <div id="ddCatFilesList" style="display:flex;flex-direction:column;gap:4px;margin-bottom:6px"></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button type="button" class="btn btn-outline btn-sm" onclick="openDdFilePick()">&#128196; Dodaj datoteke iz OneDrive</button>
+          <button type="button" class="btn btn-outline btn-sm" onclick="ddCatFilesAddManual()">&#9999;&#65039; Dodaj ročno</button>
+        </div>
+      </div>
+    </div>
+    <div class="mf"><button class="btn btn-g" onclick="closeMo('ddCategoryEditModal')">Prekliči</button><button class="btn btn-a" onclick="saveDdCategoryEdit()">Shrani</button></div>
+  </div>
+</div>
+
+<!-- DD IZBIRNIK MAPE/DATOTEKE V ONEDRIVE -->
+<div class="mo" id="ddPickModal">
+  <div class="modal" style="max-width:480px">
+    <div class="mh"><h3 id="ddPickTitle">Izberi</h3><button class="mc" onclick="closeMo('ddPickModal')">&#10005;</button></div>
+    <div class="mb">
+      <div id="ddPickPathLbl" style="font-size:11px;color:var(--text3);margin-bottom:8px;word-break:break-all"></div>
+      <div id="ddPickBody" style="max-height:320px;overflow-y:auto"></div>
+    </div>
+    <div class="mf"><button class="btn btn-g" onclick="closeMo('ddPickModal')">Prekliči</button>
+      <button class="btn btn-a" id="ddPickConfirmBtn" onclick="ddPickConfirmFolder()" style="display:none">Izberi to mapo</button>
+      <button class="btn btn-a" id="ddPickSaveBtn" onclick="ddPickSaveSelected()" style="display:none">Shrani izbrane</button>
+    </div>
   </div>
 </div>
 
@@ -1140,8 +1178,12 @@ body.dark .notif{background:rgba(13,25,50,.95)}
       <button class="btn btn-teal btn-sm" onclick="$i('qsImportFile').click()">&#128194; Uvozi iz datoteke</button>
       <input type="file" id="qsImportFile" accept=".json,application/json" style="display:none" onchange="importSharedFile(this)">
       <button class="btn btn-blue btn-sm" id="msSignBtn" onclick="msSignIn()">Prijava OneDrive</button>
-      <button class="btn btn-d btn-sm" onclick="msSignOut()">Odjava</button>
+      <button class="btn btn-outline btn-sm" onclick="msCancelSignIn()">Prekliči prijavo</button>
+      <button class="btn btn-outline btn-sm" onclick="msChangeAccount()">&#128100; Zamenjaj račun</button>
+      <button class="btn btn-outline btn-sm" onclick="msEnsureFolders()">&#128193; Pripravi mape v OneDrive</button>
+      <button class="btn btn-d btn-sm" onclick="msSignOut()">Izbriši račun (odjava)</button>
     </div>
+    <div id="msDeviceCodeBox" class="muted" style="font-size:12px;margin-top:8px;display:none;padding:8px;border:1px solid var(--abbott-teal);border-radius:6px"></div>
     <div class="muted" style="font-size:11px;margin-top:6px">&#128194; »Uvozi iz datoteke« odpre .json, prejet prek Quick Share (mapa Prenosi) &ndash; samodejno zazna vrsto (zaloga/QC) in pametno združi.</div>
   </div>
   </div><!-- /vec-sync -->
@@ -1406,8 +1448,6 @@ body.dark .notif{background:rgba(13,25,50,.95)}
   <div id="loginLockedInfo" style="font-size:11px;color:var(--text3);margin-top:10px;max-width:300px;text-align:center"></div>
 </div>
 
-<!-- Prijavljen operater — plavajoči chip -->
-<div id="opChip" onclick="lockNow()" style="display:none;position:fixed;top:8px;right:10px;z-index:500;background:var(--abbott-blue);color:#fff;border-radius:20px;padding:5px 13px;font-size:12px;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.25);cursor:pointer" title="Tapni za zaklep / menjavo operaterja"></div>
 
 <!-- PRINT AREA (en kategorijski obrazec naenkrat) -->
 <div id="orderPrintArea"></div>
@@ -1832,24 +1872,27 @@ function navQc(page){
    Zamenja VBA makre: povprečni CV/odklon na preiskavo/kanal,
    primerjava s CILJ (CVb/2); opozorilo ko avg > CILJ.
    ============================================================ */
-/* Postavitev potrjena iz predlog: CILJ list je drugi (indeks 1),
-   preiskave stolpec A, cilj stolpec B; dnevni listi od indeksa 2,
-   kanali = "Odklon %" (C/E/G/I/K/M), skupni CV% = P (BIO/URIN) / J (IMUNO).
-   0-based indeksi: A=0,C=2,E=4,G=6,I=8,K=10,M=12,J=9,P=15; vrstica3→idx2. */
-var DD_TYPES={
-  bio:{label:'BIO', ciljSheet:1, rowStart:2, rowEnd:32, nameCol:0, ciljCol:1, overallCol:15,
-    channels:[{n:'AL01 C1',c:2},{n:'AL01 C3',c:4},{n:'AL02 C1',c:6},{n:'AL02 C3',c:8},{n:'AL03 C1',c:10},{n:'AL03 C3',c:12}],
-    rawCols:[1,3,5,7,9,11],
-    exclude:['Template','CILJ%','Statistika CV','AL01 I CV','AL02 I CV','AL03 I CV','AL01 C1 CV','AL01 C3 CV','AL02 C1 CV','AL02 C3 CV','AL03 C1 CV','AL03 C3 CV']},
-  imuno:{label:'IMUNO', ciljSheet:1, rowStart:2, rowEnd:8, nameCol:0, ciljCol:1, overallCol:9,
-    channels:[{n:'AL01 I',c:2},{n:'AL02 I',c:4},{n:'AL03 I',c:6}],
-    rawCols:[1,3,5],
-    exclude:['Template','CILJ%','Statistika CV','AL01 I CV','AL02 I CV','AL03 I CV']},
-  urin:{label:'URIN', ciljSheet:1, rowStart:2, rowEnd:14, nameCol:0, ciljCol:1, overallCol:15,
-    channels:[{n:'AL01 C1',c:2},{n:'AL01 C3',c:4},{n:'AL02 C1',c:6},{n:'AL02 C3',c:8},{n:'AL03 C1',c:10},{n:'AL03 C3',c:12}],
-    rawCols:[1,3,5,7,9,11],
-    exclude:['Template','CILJ%','Statistika CV','AL01 I CV','AL02 I CV','AL03 I CV','AL01 C1 CV','AL01 C3 CV','AL02 C1 CV','AL02 C3 CV','AL03 C1 CV','AL03 C3 CV']}
-};
+/* Generični parser (nadomešča stare trdo-kodirane DD_TYPES indekse).
+   Vse kategorije sledijo isti obliki: list "Template" (preskoči), list "CILJ%"
+   (ciljne vrednosti po preiskavi), nato en list na dan poimenovan "DD.MM.YYYY".
+   Postavitev kanalov (št./imena) se izlušči iz glave vsakega lista (vrstici 0/1),
+   zato deluje za poljubno število preiskav/analizatorjev brez spremembe kode. */
+
+/* Privzete kategorije kontrol — admin jih lahko ureja (Več → Nastavitve → DD kategorije). */
+var DD_CATEGORIES_DEFAULT=[
+  {id:'bio',label:'Alinity BIO',folder:'BIO/DD_Kontrole/bio',files:['Alinity DD BIO 2025.xls','Alinity DD BIO 2026.xls']},
+  {id:'imuno',label:'Alinity IMUNO',folder:'BIO/DD_Kontrole/imuno',files:['Alinity DD IMUNO 2025.xls','Alinity DD IMUNO 2026.xls']},
+  {id:'urin',label:'Alinity URIN',folder:'BIO/DD_Kontrole/urin',files:['Alinity DD URIN 2025.xls','Alinity DD URIN 2026.xls']},
+  {id:'rapidlab',label:'RapidLab (plinska analiza)',folder:'BIO/DD_Kontrole/rapidlab',files:['RapiLab DD 2025.xls']},
+  {id:'koag_norm_aptc',label:'KOAG Normalna APTČ',folder:'BIO/DD_Kontrole/koag_norm_aptc',files:['Sysmex CS DD KOAG Normalna APTČ 2025.xls']},
+  {id:'koag_norm_pc',label:'KOAG Normalna PČ',folder:'BIO/DD_Kontrole/koag_norm_pc',files:['Sysmex CS DD KOAG Normalna PČ 2025.xls']},
+  {id:'koag_pat_aptc',label:'KOAG Patološka APTČ',folder:'BIO/DD_Kontrole/koag_pat_aptc',files:['Sysmex CS DD KOAG Patološka APTČ 2025.xls']},
+  {id:'koag_pat_pc',label:'KOAG Patološka PČ',folder:'BIO/DD_Kontrole/koag_pat_pc',files:['Sysmex CS DD KOAG Patološka PČ 2025.xls']},
+  {id:'hema',label:'XN Sysmex HEMA',folder:'BIO/DD_Kontrole/hema',files:['XN Sysmex DD HEMA 2025.xls']}
+];
+var currentDdCategory='bio';
+var _ddDateFrom='',_ddDateTo='';
+
 function _ddNum(ws,r,c){var cell=ws[XLSX.utils.encode_cell({r:r,c:c})];var v=cell&&cell.v;return (typeof v==='number'&&isFinite(v))?v:null;}
 function _ddStr(ws,r,c){var cell=ws[XLSX.utils.encode_cell({r:r,c:c})];return (cell&&cell.v!=null)?String(cell.v).trim():'';}
 /* Ekstrahira število iz celice: številka ali tekst kot "<4,5", ">5", "pod 5". */
@@ -1863,7 +1906,7 @@ function _ddNumOrSign(ws,r,c){
   }
   return null;
 }
-/* Izračuna CV% iz surovih meritev ko je P-stolpec error (vse vrednosti tekst). */
+/* Izračuna CV% iz surovih meritev ko je CV%-stolpec error (vse vrednosti tekst). */
 function _ddCvFromRaw(ws,r,rawCols){
   var vals=rawCols.map(function(c){return _ddNumOrSign(ws,r,c);}).filter(function(v){return v!=null&&v>0;});
   if(vals.length<2)return null;
@@ -1878,183 +1921,465 @@ function _ddCvFromRaw(ws,r,rawCols){
    dnevi pred začetkom vodenja); pravi izmerjeni CV% nikoli ni točno 7.000000. */
 var DD_PLACEHOLDER=7;
 function _ddAvgPos(arr){
-  /* x>=0: vključimo 0% CV ki nastane ko so vse meritve tekst (<x, pod x) —
-     VBA AVERAGEIF(">0") bi jih izpustil ker P=error, a tu jih izrecno dodamo. */
   var p=arr.filter(function(x){return typeof x==='number'&&x>=0&&x!==DD_PLACEHOLDER;});
   return {avg:p.length?(p.reduce(function(a,b){return a+b;},0)/p.length):null, n:p.length};
 }
-function _ddCompute(wb,cfg){
+
+/* Ime lista "DD.MM.YYYY" -> ISO "YYYY-MM-DD" (null ce ne ustreza — varno preskoci
+   "Template","CILJ%","Statistika CV", morebitne "ListN"/cache-liste dodane z VBA makrom). */
+function _ddDayDate(sheetName){
+  var m=/^([0-3]\d)\.([01]\d)\.(\d{4})$/.exec((sheetName||'').trim());
+  if(!m)return null;
+  return m[3]+'-'+m[2]+'-'+m[1];
+}
+/* Izlušči postavitev kanalov iz glave lista (vrstica 0 = ime kanala, vrstica 1 =
+   "Odklon %" pod njim); najde tudi skupni CV%-stolpec in prvi CILJ (CVb/2) stolpec
+   za njim. Deluje ne glede na stevilo/imena kanalov (BIO/HEMA/RapidLab/KOAG ...). */
+function _ddDetectLayout(ws){
+  var maxCol=60,channels=[],overallCol=null,ciljCol=null;
+  for(var c=1;c<=maxCol;c++){
+    var h1=_ddStr(ws,1,c);
+    if(h1==='Odklon %'){var nm=_ddStr(ws,0,c-1);if(nm)channels.push({n:nm,c:c});}
+    else if(h1==='CV%'&&overallCol==null){overallCol=c;}
+    else if(h1==='CVb /2'&&overallCol!=null&&ciljCol==null){ciljCol=c;}
+  }
+  return {channels:channels,overallCol:overallCol,ciljCol:ciljCol,rawCols:channels.map(function(ch){return ch.c-1;})};
+}
+function _ddDetectCiljCol(ws){for(var c=1;c<=10;c++){if(_ddStr(ws,1,c)==='CVb /2')return c;}return null;}
+
+/* Parsira celoten delovni zvezek: vrne ciljMap (preiskava->cilj), dayRecords
+   (preiskava->ISO datum->{channels,overall}) in vrstni red preiskav. Namesto
+   enega agregata (staro) shrani VSAK dan posebej — omogoca zgodovino/merge
+   cez leta in kasnejsi izracun statistike za poljubno izbrano obdobje. */
+function _ddParseWorkbook(wb){
   var names=wb.SheetNames;
-  var ciljName=names.indexOf('CILJ%')>=0?'CILJ%':names[cfg.ciljSheet];
+  var ciljName=names.indexOf('CILJ%')>=0?'CILJ%':names[1];
   var cs=wb.Sheets[ciljName];if(!cs)return null;
-  var excl={};cfg.exclude.forEach(function(n){excl[n]=1;});
-  var dayNames=names.filter(function(n,i){return i>=2&&!excl[n]&&n!=='Template'&&n!=='CILJ%';});
-  var assays=[],flagged=0;
-  for(var r=cfg.rowStart;r<=cfg.rowEnd;r++){
-    var nm=_ddStr(cs,r,cfg.nameCol);if(!nm)continue;
-    var cilj=_ddNum(cs,r,cfg.ciljCol);
-    var ch={};
-    cfg.channels.forEach(function(k){ch[k.n]=_ddAvgPos(dayNames.map(function(dn){return _ddNum(wb.Sheets[dn],r,k.c);})).avg;});
-    var ov;
-    if(cfg.overallCol!=null){
-      var ovVals=dayNames.map(function(dn){
-        var ws=wb.Sheets[dn];
-        var v=_ddNum(ws,r,cfg.overallCol);
-        /* P-stolpec je error (t='e') ko so vse meritve tekst (<x, pod x) —
-           Excel AVERAGE() vrne #DIV/0!. Izračunamo CV% sami iz rawCols. */
-        if(v===null&&cfg.rawCols){v=_ddCvFromRaw(ws,r,cfg.rawCols);}
-        return v;
-      });
-      ov=_ddAvgPos(ovVals);
-    } else {
-      ov={avg:null,n:0};
-    }
-    var flag=(ov.avg!=null&&cilj!=null&&ov.avg>cilj);
+  var ciljCol=_ddDetectCiljCol(cs);
+  var r=2,analytes=[];
+  while(true){var nm=_ddStr(cs,r,0);if(!nm)break;analytes.push({row:r,name:nm});r++;if(r>250)break;}
+  var ciljMap={};
+  analytes.forEach(function(x){ciljMap[x.name]={cilj:ciljCol!=null?_ddNum(cs,x.row,ciljCol):null};});
+  var dayEntries=[];
+  names.forEach(function(n){var iso=_ddDayDate(n);if(iso)dayEntries.push({iso:iso,name:n});});
+  var dayRecords={},layout=null;
+  dayEntries.forEach(function(de){
+    var ws=wb.Sheets[de.name];if(!ws)return;
+    if(!layout)layout=_ddDetectLayout(ws);
+    analytes.forEach(function(x){
+      var chVals={};
+      layout.channels.forEach(function(ch){var v=_ddNum(ws,x.row,ch.c);if(v!=null)chVals[ch.n]=v;});
+      var ov=null;
+      if(layout.overallCol!=null){
+        ov=_ddNum(ws,x.row,layout.overallCol);
+        if(ov===null&&layout.rawCols.length)ov=_ddCvFromRaw(ws,x.row,layout.rawCols);
+      }
+      if(ov==null&&!Object.keys(chVals).length)return; /* prazen dan/preiskava — ne shrani */
+      if(!dayRecords[x.name])dayRecords[x.name]={};
+      dayRecords[x.name][de.iso]={channels:chVals,overall:ov};
+    });
+  });
+  return {ciljMap:ciljMap,dayRecords:dayRecords,layout:layout,nDays:dayEntries.length,analyteOrder:analytes.map(function(a){return a.name;})};
+}
+
+/* Zdruzi (union po ISO datumu) na novo parsane dnevne zapise v obstojeco
+   zgodovino S.ddRecords[categoryId] — nikoli ne prepise vseh podatkov, le doda/
+   dopolni. Vrne seznam NA NOVO dodanih ISO datumov po preiskavi (za Del 6). */
+function _ddMergeRecords(categoryId,parsed){
+  if(!S.ddRecords)S.ddRecords={};
+  if(!S.ddRecords[categoryId])S.ddRecords[categoryId]={};
+  if(!S.ddCilj)S.ddCilj={};
+  if(!S.ddAnalyteOrder)S.ddAnalyteOrder={};
+  if(!S.ddChannels)S.ddChannels={};
+  var target=S.ddRecords[categoryId];
+  /* Prvi (osnovni) uvoz kategorije — vzpostavi zgodovino tiho, brez pregleda:
+     cela arhivska zgodovina (100+ dni) ni "nova" v smislu operaterjevega
+     pregleda, sicer bi prvi klik na "Posodobi" ustvaril pregled s tisoci vrsticami. */
+  var isBaseline=Object.keys(target).length===0;
+  var newDates={};
+  Object.keys(parsed.dayRecords).forEach(function(analyte){
+    if(!target[analyte])target[analyte]={};
+    Object.keys(parsed.dayRecords[analyte]).forEach(function(iso){
+      if(!target[analyte][iso]&&!isBaseline){(newDates[analyte]=newDates[analyte]||[]).push(iso);}
+      target[analyte][iso]=parsed.dayRecords[analyte][iso];
+    });
+  });
+  S.ddCilj[categoryId]=parsed.ciljMap;
+  S.ddAnalyteOrder[categoryId]=parsed.analyteOrder;
+  if(parsed.layout)S.ddChannels[categoryId]=parsed.layout.channels.map(function(c){return c.n;});
+  return newDates;
+}
+
+/* Statistika (povprecje/CV%, zastavica) za kategorijo v izbranem obdobju
+   [dateFrom,dateTo] (ISO nizi, prazno = brez omejitve na tej strani). */
+function _ddComputeStats(categoryId,dateFrom,dateTo){
+  var recs=(S.ddRecords&&S.ddRecords[categoryId])||{};
+  var cilj=(S.ddCilj&&S.ddCilj[categoryId])||{};
+  var order=(S.ddAnalyteOrder&&S.ddAnalyteOrder[categoryId])||Object.keys(recs);
+  var assays=[],flagged=0,nDaysMax=0;
+  order.forEach(function(name){
+    var days=recs[name]||{};
+    var isoList=Object.keys(days).filter(function(iso){return (!dateFrom||iso>=dateFrom)&&(!dateTo||iso<=dateTo);});
+    var chAgg={};
+    isoList.forEach(function(iso){
+      var d=days[iso];
+      Object.keys(d.channels||{}).forEach(function(cn){(chAgg[cn]=chAgg[cn]||[]).push(d.channels[cn]);});
+    });
+    var chAvg={};
+    Object.keys(chAgg).forEach(function(cn){chAvg[cn]=_ddAvgPos(chAgg[cn]).avg;});
+    var ov=_ddAvgPos(isoList.map(function(iso){return days[iso].overall;}));
+    var ciljVal=cilj[name]?cilj[name].cilj:null;
+    var flag=(ov.avg!=null&&ciljVal!=null&&ov.avg>ciljVal);
     if(flag)flagged++;
-    assays.push({name:nm,cilj:cilj,ch:ch,overall:ov.avg,n:ov.n,flag:flag});
-  }
-  return {assays:assays,nDays:dayNames.length,flagged:flagged};
+    if(isoList.length>nDaysMax)nDaysMax=isoList.length;
+    assays.push({name:name,cilj:ciljVal,ch:chAvg,overall:ov.avg,n:ov.n,flag:flag});
+  });
+  return {assays:assays,flagged:flagged,nDays:nDaysMax,channels:(S.ddChannels&&S.ddChannels[categoryId])||[]};
 }
-function _ddParse(data,type,dtype){
-  if(typeof XLSX==='undefined'){notify('Excel modul (SheetJS) ni naložen','error');return null;}
-  var cfg=DD_TYPES[type];if(!cfg)return null;
-  var opt={sheetRows:cfg.rowEnd+2,cellStyles:false,cellHTML:false,cellFormula:false};
-  opt.type=dtype;
-  var wb=XLSX.read(data,opt);
-  var res=_ddCompute(wb,cfg);
-  if(res){res.type=type;res.updatedAt=new Date().toISOString();}
-  return res;
+
+/* ---- Kategorije: seznam + admin urejanje ---- */
+function ddCategories(){return S.ddCategories&&S.ddCategories.length?S.ddCategories:DD_CATEGORIES_DEFAULT;}
+function ddCategoryById(id){return ddCategories().filter(function(c){return c.id===id;})[0]||null;}
+function navDdCategory(id){currentDdCategory=id;renderDdCatTabs();renderDdqc();}
+function renderDdCatTabs(){
+  var box=$i('ddCatTabs');if(!box)return;
+  box.innerHTML=ddCategories().map(function(c){
+    return '<div class="tab'+(c.id===currentDdCategory?' active':'')+'" onclick="navDdCategory(\''+c.id+'\')">'+_repEsc(c.label)+'</div>';
+  }).join('');
 }
-/* ---- Config modal ---- */
-function openDdConfig(){
-  var c=(S.ddConfig||{});var f=c.files||{};
-  $i('ddFolder').value=c.folder||'BIO/DD_Kontrole';
-  $i('ddFileBio').value=f.bio||'';$i('ddFileImuno').value=f.imuno||'';$i('ddFileUrin').value=f.urin||'';
-  $i('ddAutodetectHint').textContent='';
-  showMo('ddConfigModal');
+function openDdCategoryAdmin(){if(!requireRole('admin'))return;renderDdCategoryList();showMo('ddCategoryAdminModal');}
+function renderDdCategoryList(){
+  var body=$i('ddCategoryListBody');if(!body)return;
+  body.innerHTML=ddCategories().map(function(c,i){
+    return '<tr><td>'+_repEsc(c.label)+'</td><td style="font-size:11px;color:var(--text3)">'+_repEsc(c.folder)+'</td>'+
+      '<td style="font-size:11px">'+ (c.files||[]).length+' datotek</td>'+
+      '<td><button class="btn btn-outline btn-sm" onclick="openDdCategoryEdit('+i+')">✏️</button> '+
+      '<button class="btn btn-d btn-sm" onclick="deleteDdCategory('+i+')">🗑️</button></td></tr>';
+  }).join('')||'<tr><td colspan="4" class="empty">Ni kategorij.</td></tr>';
 }
-function saveDdConfig(){
-  S.ddConfig={folder:($i('ddFolder').value||'BIO/DD_Kontrole').trim(),
-    files:{bio:($i('ddFileBio').value||'').trim(),imuno:($i('ddFileImuno').value||'').trim(),urin:($i('ddFileUrin').value||'').trim()}};
-  save();closeMo('ddConfigModal');renderDdqc();notify('DD nastavitev shranjena','ok');
+var _ddEditIdx=null;
+var _ddCatFilesList=[];
+function openDdCategoryEdit(idx){
+  if(!requireRole('admin'))return;
+  _ddEditIdx=(idx==null)?null:idx;
+  var c=(idx!=null)?ddCategories()[idx]:{id:'',label:'',folder:'BIO/DD_Kontrole/nova',files:[]};
+  $i('ddCatId').value=c.id||'';$i('ddCatLabel').value=c.label||'';$i('ddCatFolder').value=c.folder||'';
+  _ddCatFilesList=(c.files||[]).slice();
+  _renderDdCatFilesList();
+  showMo('ddCategoryEditModal');
 }
-var _ddAutoList=null;
-function ddAutodetect(){
-  if(!(_hasBridge()&&AndroidBridge.msListFolder)){notify('Samodejno zaznavanje le na napravi (OneDrive)','warning');return;}
-  var folder=($i('ddFolder').value||'BIO/DD_Kontrole').trim();
-  _msListCtx='dd';_ddAutoFolder=folder;
-  $i('ddAutodetectHint').textContent='Iščem .xls v '+folder+'…';
-  try{AndroidBridge.msListFolder(folder);}catch(e){notify('Napaka: '+e,'error');}
+function _renderDdCatFilesList(){
+  var box=$i('ddCatFilesList');if(!box)return;
+  box.innerHTML=_ddCatFilesList.map(function(f,i){
+    return '<div style="display:flex;justify-content:space-between;align-items:center;background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px">'+
+      '<span>&#128196; '+_repEsc(f)+'</span><button type="button" class="btn btn-d btn-sm" onclick="ddCatFilesRemove('+i+')">&#10005;</button></div>';
+  }).join('')||'<div class="muted" style="font-size:11px">Ni izbranih datotek.</div>';
 }
-var _ddAutoFolder='BIO/DD_Kontrole';
-function _ddOnFolderListed(json){
-  var data;try{data=JSON.parse(json);}catch(e){$i('ddAutodetectHint').textContent='Napaka branja mape';return;}
-  var files=(data.value||[]).map(function(f){return f.name||'';}).filter(function(n){return /\.xlsx?$/i.test(n);});
-  var pick=function(kw){return files.filter(function(n){return n.toUpperCase().indexOf(kw)>=0;})[0]||'';};
-  if(pick('BIO'))$i('ddFileBio').value=pick('BIO');
-  if(pick('IMUNO'))$i('ddFileImuno').value=pick('IMUNO');
-  if(pick('URIN'))$i('ddFileUrin').value=pick('URIN');
-  $i('ddAutodetectHint').textContent=files.length?('Najdenih '+files.length+' datotek. Preveri ujemanje in shrani.'):'Ni .xls datotek v mapi '+_ddAutoFolder;
+function ddCatFilesRemove(i){_ddCatFilesList.splice(i,1);_renderDdCatFilesList();}
+function ddCatFilesAddManual(){
+  var name=prompt('Ime datoteke (npr. Alinity DD BIO 2027.xls):');
+  if(name&&name.trim()&&_ddCatFilesList.indexOf(name.trim())<0){_ddCatFilesList.push(name.trim());_renderDdCatFilesList();}
 }
-/* ---- Posodobi: OneDrive binarni prenos ali ročno ---- */
+function saveDdCategoryEdit(){
+  if(!requireRole('admin'))return;
+  var id=($i('ddCatId').value||'').trim().toLowerCase().replace(/[^a-z0-9_]/g,'_');
+  var label=($i('ddCatLabel').value||'').trim();
+  var folder=($i('ddCatFolder').value||'').trim();
+  var files=_ddCatFilesList.slice();
+  if(!id||!label||!folder){notify('Izpolni ID, naziv in mapo','warning');return;}
+  if(!S.ddCategories)S.ddCategories=JSON.parse(JSON.stringify(DD_CATEGORIES_DEFAULT));
+  var entry={id:id,label:label,folder:folder,files:files};
+  if(_ddEditIdx!=null)S.ddCategories[_ddEditIdx]=entry;else S.ddCategories.push(entry);
+  save();closeMo('ddCategoryEditModal');renderDdCategoryList();renderDdCatTabs();
+  notify('Kategorija shranjena','success');
+}
+function deleteDdCategory(idx){
+  if(!requireRole('admin'))return;
+  if(!confirm('Izbriši kategorijo (podatki v zgodovini ostanejo)?'))return;
+  if(!S.ddCategories)S.ddCategories=JSON.parse(JSON.stringify(DD_CATEGORIES_DEFAULT));
+  S.ddCategories.splice(idx,1);save();renderDdCategoryList();renderDdCatTabs();
+}
+
+/* ---- Izbirnik mape/datoteke v OneDrive za DD kategorijo (isti vzorec kot openDocPick) ---- */
+var _ddPickMode=null,_ddPickPath='',_ddPickItems=[],_ddPickSelected=[];
+function openDdFolderPick(){
+  _ddPickMode='folder';_ddPickPath=($i('ddCatFolder').value||'BIO/DD_Kontrole').trim();
+  $i('ddPickTitle').textContent='Izberi mapo';
+  $i('ddPickConfirmBtn').style.display='inline-block';
+  $i('ddPickSaveBtn').style.display='none';
+  showMo('ddPickModal');_ddPickList();
+}
+function openDdFilePick(){
+  var folder=($i('ddCatFolder').value||'').trim();
+  if(!folder){notify('Najprej vpiši ali izberi mapo','warning');return;}
+  _ddPickMode='file';_ddPickPath=folder;_ddPickSelected=[];
+  $i('ddPickTitle').textContent='Izberi datoteke (.xls/.xlsx)';
+  $i('ddPickConfirmBtn').style.display='none';
+  $i('ddPickSaveBtn').style.display='inline-block';
+  showMo('ddPickModal');_ddPickList();
+}
+function _ddPickList(){
+  if(!(_hasBridge()&&AndroidBridge.msListFolder)){$i('ddPickBody').innerHTML='<div class="empty">Brskanje deluje le na napravi/PC z OneDrive prijavo.</div>';return;}
+  if(!(AndroidBridge.msIsSignedIn&&AndroidBridge.msIsSignedIn())){$i('ddPickBody').innerHTML='<div class="empty">Najprej se prijavi v OneDrive (Sinhronizacija).</div>';return;}
+  $i('ddPickPathLbl').textContent='DigiLab/'+_ddPickPath;
+  $i('ddPickBody').innerHTML='<div class="empty">Nalagam…</div>';
+  _msListCtx='ddpick';
+  try{AndroidBridge.msListFolder(_ddPickPath);}catch(e){$i('ddPickBody').innerHTML='<div class="empty">Napaka: '+e.message+'</div>';}
+}
+function _ddOnPickListed(json,msg){
+  if(!json){$i('ddPickBody').innerHTML='<div class="empty">'+(msg||'Mape ni mogoče prebrati')+'</div>';return;}
+  var obj;try{obj=JSON.parse(json);}catch(e){$i('ddPickBody').innerHTML='<div class="empty">Neveljaven odgovor</div>';return;}
+  _ddPickItems=obj.value||[];_ddRenderPick();
+}
+function _ddRenderPick(){
+  var folders=_ddPickItems.filter(function(f){return f&&f.folder;});
+  var files=_ddPickItems.filter(function(f){return f&&!f.folder&&/\.xlsx?$/i.test(f.name||'');});
+  var h='',parts=_ddPickPath.split('/').filter(Boolean);
+  if(parts.length){h+='<div class="assay-pick-item" onclick="_ddPickUp()">&#8593; .. (nazaj)</div>';}
+  folders.forEach(function(f){h+='<div class="assay-pick-item" onclick="_ddPickInto(\''+_ge(f.name).replace(/'/g,"\\'")+'\')">&#128193; '+_repEsc(f.name)+'</div>';});
+  if(_ddPickMode==='file'){
+    files.forEach(function(f){
+      var nEsc=_ge(f.name).replace(/'/g,"\\'");
+      var checked=_ddPickSelected.indexOf(f.name)>=0;
+      h+='<label class="assay-pick-item" style="cursor:pointer"><input type="checkbox" style="margin-right:6px"'+(checked?' checked':'')+' onchange="_ddPickToggle(\''+nEsc+'\',this.checked)"> &#128196; '+_repEsc(f.name)+'</label>';
+    });
+    if(!folders.length&&!files.length)h+='<div class="empty">Ni podmap ali .xls/.xlsx datotek.</div>';
+  } else if(!folders.length){h+='<div class="empty">Ni podmap — klikni "Izberi to mapo" za trenutno pot.</div>';}
+  $i('ddPickBody').innerHTML=h;
+}
+function _ddPickInto(name){_ddPickPath=(_ddPickPath?_ddPickPath+'/':'')+name;_ddPickList();}
+function _ddPickUp(){var parts=_ddPickPath.split('/').filter(Boolean);parts.pop();_ddPickPath=parts.join('/');_ddPickList();}
+function _ddPickToggle(name,checked){
+  var i=_ddPickSelected.indexOf(name);
+  if(checked&&i<0)_ddPickSelected.push(name);
+  else if(!checked&&i>=0)_ddPickSelected.splice(i,1);
+}
+function ddPickSaveSelected(){
+  if(!_ddPickSelected.length){notify('Izberi vsaj eno datoteko (kljukica)','warning');return;}
+  _ddPickSelected.forEach(function(name){if(_ddCatFilesList.indexOf(name)<0)_ddCatFilesList.push(name);});
+  if(($i('ddCatFolder').value||'').trim()!==_ddPickPath)$i('ddCatFolder').value=_ddPickPath;
+  _renderDdCatFilesList();
+  closeMo('ddPickModal');
+  notify('Dodanih '+_ddPickSelected.length+' datotek','ok');
+}
+function ddPickConfirmFolder(){$i('ddCatFolder').value=_ddPickPath;closeMo('ddPickModal');}
+
+/* ---- Posodobi: prenos vseh datotek trenutne kategorije iz OneDrive (Graph),
+   z DD_CSV predpomnilnikom (glej Del 5) — ce se izvorna xls ni spremenila, se
+   ponovno naloži samo pretvorjen JSON namesto celega Excela. ---- */
 var _ddPending=null;
+var _ddMetaWait=null;
+var _ddAwaitingCache=false;
 function updateDdqc(){
-  var c=S.ddConfig;
-  if(!c||!c.files||!(c.files.bio||c.files.imuno||c.files.urin)){
-    notify('Najprej poveži datoteke (📁)','warning');openDdConfig();return;
-  }
+  if(_ddPending){notify('Posodobitev je že v teku — počakaj, da se konča','warning');return;}
+  var cat=ddCategoryById(currentDdCategory);
+  if(!cat||!cat.files||!cat.files.length){notify('Kategorija nima povezanih datotek — uredi jo (⚙️)','warning');return;}
   if(!(_hasBridge()&&AndroidBridge.msDownloadBinary)){
     notify('Prenos iz OneDrive le na napravi/PC — uporabi ročno nalaganje','warning');$i('ddFileInput').click();return;
   }
-  var folder=c.folder||'BIO/DD_Kontrole';
-  _ddPending={queue:[],done:0,total:0,results:{}};
-  ['bio','imuno','urin'].forEach(function(t){if(c.files[t])_ddPending.queue.push({type:t,rel:folder+'/'+c.files[t]});});
-  _ddPending.total=_ddPending.queue.length;
-  if(!_ddPending.total){notify('Ni povezanih datotek','warning');return;}
-  notify('Prenašam '+_ddPending.total+' DD datotek…','ok');
+  if(AndroidBridge.msListFolder){
+    _ddMetaWait={categoryId:cat.id,folder:cat.folder,label:cat.label,files:cat.files.slice()};
+    _msListCtx='ddmeta';
+    notify('Preverjam spremembe datotek…','ok');
+    try{AndroidBridge.msListFolder(cat.folder);}catch(e){_ddMetaWait=null;_ddStartQueue(cat,cat.files.map(function(f){return {filename:f,mode:'binary'};}));}
+  } else {
+    _ddStartQueue(cat,cat.files.map(function(f){return {filename:f,mode:'binary'};}));
+  }
+}
+/* Odgovor msListFolder na mapo kategorije — primerja lastModifiedDateTime proti
+   shranjenemu S.ddFileMeta, da se nespremenjene datoteke naložijo iz DD_CSV
+   predpomnilnika namesto ponovnega prenosa+parsanja celega Excela (Del 5). */
+function _ddOnMetaListed(json){
+  var mw=_ddMetaWait;_ddMetaWait=null;
+  if(!mw)return;
+  var cat=ddCategoryById(mw.categoryId);if(!cat)return;
+  var data;try{data=JSON.parse(json);}catch(e){data=null;}
+  var metaByName={};
+  if(data&&data.value)data.value.forEach(function(f){if(f.lastModifiedDateTime)metaByName[f.name]=f.lastModifiedDateTime;});
+  if(!S.ddFileMeta)S.ddFileMeta={};
+  if(!S.ddFileMeta[cat.id])S.ddFileMeta[cat.id]={};
+  var jobs=mw.files.map(function(fname){
+    var lm=metaByName[fname]||'';
+    var prev=S.ddFileMeta[cat.id][fname];
+    return (lm&&prev&&prev===lm)?{filename:fname,mode:'cache',categoryId:cat.id,folder:cat.folder}:{filename:fname,mode:'binary',lastModified:lm,categoryId:cat.id,folder:cat.folder};
+  });
+  _ddStartQueue(cat,jobs);
+}
+function _ddStartQueue(cat,jobs){
+  jobs.forEach(function(j){j.categoryId=cat.id;j.folder=cat.folder;});
+  _ddPending={categoryId:cat.id,folder:cat.folder,queue:jobs,total:jobs.length,newDatesAll:{}};
+  var nCache=jobs.filter(function(j){return j.mode==='cache';}).length;
+  notify('Posodabljam '+_ddPending.total+' DD datotek ('+cat.label+(nCache?', '+nCache+' iz predpomnilnika':'')+')…','ok');
   _ddDownloadNext();
 }
 function _ddDownloadNext(){
   if(!_ddPending)return;
   if(!_ddPending.queue.length){
-    S.ddStats=S.ddStats||{};
-    Object.keys(_ddPending.results).forEach(function(t){S.ddStats[t]=_ddPending.results[t];});
-    S.ddStats.updatedAt=new Date().toISOString();
-    save();_ddPending=null;renderDdqc();notify('DD statistika posodobljena ✓','success');
+    var catId=_ddPending.categoryId,newDates=_ddPending.newDatesAll;
+    var reviewsBefore=(S.ddReviews||[]).length;
+    _ddPending=null;save();renderDdqc();
+    _ddCreateReviewIfNeeded(catId,newDates);
+    var madeReview=(S.ddReviews||[]).length>reviewsBefore;
+    notify(madeReview?'DD kontrole posodobljene ✓ — na voljo nov pregled uvoza':'DD kontrole posodobljene ✓ (ni novih dni za pregled od zadnjič)','success');
     try{if(_hasMsSignedIn())msUpload('qclab_v2');}catch(e){}
     return;
   }
   var job=_ddPending.queue.shift();_ddCurJob=job;
-  try{AndroidBridge.msDownloadBinary(job.rel);}catch(e){_ddDownloadNext();}
+  if(job.mode==='cache'&&AndroidBridge.msDownloadText){
+    var csvName=job.filename.replace(/\.(xlsx?|xlsm)$/i,'')+'.json';
+    _ddAwaitingCache=true;
+    try{AndroidBridge.msDownloadText('DD_CSV/'+job.categoryId+'/'+csvName);}
+    catch(e){_ddAwaitingCache=false;_ddFallbackBinary(job);}
+  } else {
+    try{AndroidBridge.msDownloadBinary(job.folder+'/'+job.filename);}catch(e){_ddDownloadNext();}
+  }
+}
+function _ddFallbackBinary(job){
+  job.mode='binary';
+  try{AndroidBridge.msDownloadBinary(job.folder+'/'+job.filename);}catch(e){_ddDownloadNext();}
 }
 var _ddCurJob=null;
+/* Zdruzi/arhivira glede na job.categoryId (zajet ob dispecuranju posla), NE glede
+   na trenutni _ddPending.categoryId — prepreci navzkrizno mesanje kategorij, ce
+   uporabnik med prenosom preklopi na drug zavihek in sprozi nov "Posodobi". */
+function _ddMergeParsedAndArchive(parsed,job){
+  var nd=_ddMergeRecords(job.categoryId,parsed);
+  Object.keys(nd).forEach(function(a){
+    (_ddPending.newDatesAll[a]=_ddPending.newDatesAll[a]||[]).push.apply(_ddPending.newDatesAll[a],nd[a]);
+  });
+  if(job.lastModified){
+    if(!S.ddFileMeta)S.ddFileMeta={};
+    if(!S.ddFileMeta[job.categoryId])S.ddFileMeta[job.categoryId]={};
+    S.ddFileMeta[job.categoryId][job.filename]=job.lastModified;
+  }
+  /* Arhiv DD_CSV: nalozi pretvorjen JSON nazaj v oblak, da naslednjic ni treba znova parsati */
+  try{
+    if(AndroidBridge.msUploadRaw){
+      var csvName=job.filename.replace(/\.(xlsx?|xlsm)$/i,'')+'.json';
+      var payload=JSON.stringify({dayRecords:parsed.dayRecords,ciljMap:parsed.ciljMap,analyteOrder:parsed.analyteOrder,
+        channels:parsed.layout?parsed.layout.channels.map(function(c){return c.n;}):[],sourceFile:job.filename,parsedAt:new Date().toISOString()});
+      AndroidBridge.msUploadRaw('DD_CSV/'+job.categoryId+'/'+csvName,payload,'application/json');
+    }
+  }catch(e){}
+}
 function onMsBinaryFile(rel,b64,msg){
   var job=_ddCurJob;_ddCurJob=null;
+  if(!_ddPending){return;} /* prenos ni bil za DD (npr. DD Excel izbirnik drugje) */
   if(job&&b64){
-    try{var res=_ddParse(b64,job.type,'base64');if(res)_ddPending.results[job.type]=res;}
-    catch(e){notify('Napaka branja '+job.type+': '+e.message,'error');}
-  } else if(job){notify('Prenos '+job.type+' ni uspel: '+(msg||''),'warn');}
+    try{
+      var opt={type:'base64',cellStyles:false,cellHTML:false,cellFormula:false};
+      var wb=XLSX.read(b64,opt);
+      var parsed=_ddParseWorkbook(wb);
+      if(parsed)_ddMergeParsedAndArchive(parsed,job);
+    }catch(e){notify('Napaka branja '+job.filename+': '+e.message,'error');}
+  } else if(job){notify('Prenos '+job.filename+' ni uspel: '+(msg||''),'warn');}
   _ddDownloadNext();
 }
+/* Ustvari nov "Pregled uvozov" vnos ce so se pojavili novi dnevi (Del 6). */
+function _ddCreateReviewIfNeeded(categoryId,newDatesByAnalyte){
+  var analytes=Object.keys(newDatesByAnalyte);
+  if(!analytes.length)return;
+  var allIso=[];analytes.forEach(function(a){allIso=allIso.concat(newDatesByAnalyte[a]);});
+  allIso.sort();
+  var dateFrom=allIso[0],dateTo=allIso[allIso.length-1];
+  var cilj=(S.ddCilj&&S.ddCilj[categoryId])||{};
+  var recs=(S.ddRecords&&S.ddRecords[categoryId])||{};
+  var items=[];
+  analytes.forEach(function(a){
+    newDatesByAnalyte[a].forEach(function(iso){
+      var d=recs[a]&&recs[a][iso];if(!d)return;
+      var ciljVal=cilj[a]?cilj[a].cilj:null;
+      var outOfRange=(d.overall!=null&&ciljVal!=null&&d.overall>ciljVal);
+      items.push({analyte:a,date:iso,overall:d.overall,cilj:ciljVal,outOfRange:outOfRange,reviewed:false});
+    });
+  });
+  if(!items.length)return;
+  if(!S.ddReviews)S.ddReviews=[];
+  S.ddReviews.push({id:Date.now().toString(),categoryId:categoryId,importedAt:new Date().toISOString(),
+    dateFrom:dateFrom,dateTo:dateTo,status:'pending',items:items});
+  save();
+}
+
 function ddFilesChosen(input){
   var files=input.files;if(!files||!files.length)return;
-  var remaining=files.length,got={};
+  var cat=ddCategoryById(currentDdCategory);
+  if(!cat){notify('Izberi kategorijo','warning');return;}
+  var remaining=files.length,newDatesAll={};
   Array.prototype.forEach.call(files,function(file){
-    var t=_ddGuessType(file.name);
     var reader=new FileReader();
     reader.onload=function(e){
-      try{if(t){var res=_ddParse(new Uint8Array(e.target.result),t,'array');if(res)got[t]=res;}}
-      catch(err){notify('Napaka '+file.name+': '+err.message,'error');}
+      try{
+        var wb=XLSX.read(new Uint8Array(e.target.result),{type:'array',cellStyles:false,cellHTML:false,cellFormula:false});
+        var parsed=_ddParseWorkbook(wb);
+        if(parsed){
+          var nd=_ddMergeRecords(cat.id,parsed);
+          Object.keys(nd).forEach(function(a){(newDatesAll[a]=newDatesAll[a]||[]).push.apply(newDatesAll[a],nd[a]);});
+        }
+      }catch(err){notify('Napaka '+file.name+': '+err.message,'error');}
       if(--remaining===0){
-        S.ddStats=S.ddStats||{};Object.keys(got).forEach(function(k){S.ddStats[k]=got[k];});
-        S.ddStats.updatedAt=new Date().toISOString();save();renderDdqc();
-        var n=Object.keys(got).length;notify(n?('Naloženih '+n+' DD datotek ✓'):'Datoteke niso prepoznane (BIO/IMUNO/URIN v imenu)',n?'success':'warning');
+        save();renderDdqc();_ddCreateReviewIfNeeded(cat.id,newDatesAll);
+        notify('DD datoteke naložene ✓','success');
       }
     };
     reader.readAsArrayBuffer(file);
   });
   input.value='';
 }
-function _ddGuessType(name){var n=(name||'').toUpperCase();if(n.indexOf('IMUNO')>=0)return 'imuno';if(n.indexOf('URIN')>=0)return 'urin';if(n.indexOf('BIO')>=0)return 'bio';return null;}
+
+/* ---- Preklop Statistika / Pregled uvozov ---- */
+function navDdSection(section){
+  var st=$i('ddSectionStats'),rv=$i('ddSectionReviews');
+  if(!st||!rv)return;
+  if(section==='reviews'){st.style.display='none';rv.style.display='block';renderDdReviews();}
+  else{st.style.display='block';rv.style.display='none';renderDdqc();}
+}
 /* ---- Render ---- */
 function renderDdqc(){
+  renderDdCatTabs();
   var body=$i('ddqcBody');if(!body)return;
-  var st=S.ddStats||{};
-  var any=['bio','imuno','urin'].some(function(t){return st[t];});
-  if(!any){
-    body.innerHTML='<div class="card empty" style="padding:32px 16px;text-align:center;color:var(--text3)">Ni podatkov DD kontrol.<br><small>1) 📁 Poveži datoteke (BIO/IMUNO/URIN) &nbsp; 2) 🔄 Posodobi</small></div>';
+  var cat=ddCategoryById(currentDdCategory);
+  if(!cat){body.innerHTML='<div class="card empty" style="padding:32px 16px;text-align:center;color:var(--text3)">Ni izbrane kategorije.</div>';return;}
+  var st=_ddComputeStats(cat.id,_ddDateFrom||null,_ddDateTo||null);
+  var haveAny=(S.ddRecords&&S.ddRecords[cat.id]&&Object.keys(S.ddRecords[cat.id]).length);
+  if(!haveAny){
+    body.innerHTML='<div class="card empty" style="padding:32px 16px;text-align:center;color:var(--text3)">Ni podatkov za "'+_repEsc(cat.label)+'".<br><small>1) ⚙️ Uredi kategorijo/datoteke &nbsp; 2) 🔄 Posodobi</small></div>';
     return;
   }
-  var totalFlag=0;['bio','imuno','urin'].forEach(function(t){if(st[t])totalFlag+=(st[t].flagged||0);});
   var h='';
-  h+='<div style="font-size:11px;color:var(--text3);margin-bottom:10px">Zadnja posodobitev: '+(st.updatedAt?new Date(st.updatedAt).toLocaleString('sl-SI'):'—')+'</div>';
-  if(totalFlag>0){
+  h+='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">'+
+     '<label style="font-size:11px;color:var(--text3)">Od <input type="date" id="ddDateFrom" value="'+(_ddDateFrom||'')+'" style="font-size:11px"></label>'+
+     '<label style="font-size:11px;color:var(--text3)">Do <input type="date" id="ddDateTo" value="'+(_ddDateTo||'')+'" style="font-size:11px"></label>'+
+     '<button class="btn btn-outline btn-sm" onclick="ddApplyDateRange()">Uporabi</button>'+
+     '<button class="btn btn-outline btn-sm" onclick="ddClearDateRange()">Vse obdobje</button>'+
+     '</div>';
+  if(st.flagged>0){
     h+='<div style="display:flex;gap:8px;align-items:flex-start;background:var(--rbg,#fef2f2);border:1px solid var(--red);border-radius:8px;padding:10px 12px;margin-bottom:12px">'+
       '<span style="color:var(--red);font-size:16px">&#9888;</span>'+
-      '<span style="font-size:12px;color:var(--red);font-weight:700;line-height:1.4">'+totalFlag+' preisk'+(totalFlag===1?'ava odstopa':'av odstopa')+' (CV &gt; CILJ) &mdash; priporočena dodatna kalibracija ali ukrep.</span></div>';
+      '<span style="font-size:12px;color:var(--red);font-weight:700;line-height:1.4">'+st.flagged+' preisk'+(st.flagged===1?'ava odstopa':'av odstopa')+' (CV &gt; CILJ) &mdash; priporočena dodatna kalibracija ali ukrep.</span></div>';
   } else {
     h+='<div style="display:flex;gap:8px;align-items:center;background:var(--gbg);border:1px solid var(--green);border-radius:8px;padding:10px 12px;margin-bottom:12px">'+
       '<span style="color:var(--green);font-size:16px">&#10003;</span><span style="font-size:12px;color:var(--green);font-weight:700">Vse preiskave znotraj cilja (CV &le; CILJ).</span></div>';
   }
-  ['bio','imuno','urin'].forEach(function(t){if(st[t])h+=_ddRenderTable(t,st[t]);});
+  h+=_ddRenderTable(cat.label,st);
   body.innerHTML=h;
 }
-function _ddRenderTable(type,res){
-  var cfg=DD_TYPES[type];
+function ddApplyDateRange(){_ddDateFrom=$i('ddDateFrom').value||'';_ddDateTo=$i('ddDateTo').value||'';renderDdqc();}
+function ddClearDateRange(){_ddDateFrom='';_ddDateTo='';renderDdqc();}
+function _ddRenderTable(label,res){
   var fmt=function(v){return v==null?'':(Math.round(v*100)/100).toFixed(2);};
   var h='<div class="card" style="margin-bottom:12px;overflow-x:auto">';
-  h+='<div class="card-title" style="justify-content:space-between"><span>'+cfg.label+'</span>'+
+  h+='<div class="card-title" style="justify-content:space-between"><span>'+_repEsc(label)+'</span>'+
      '<span style="font-size:11px;font-weight:400;color:var(--text3)">'+(res.nDays||0)+' dni'+(res.flagged?' &middot; <span style="color:var(--red);font-weight:700">'+res.flagged+' odstopa</span>':'')+'</span></div>';
-  if(!res.nDays){h+='<div class="empty" style="padding:16px;font-size:12px;color:var(--text3)">Datoteka nima dnevnih listov (samo predloga). Ko LIS napolni dneve, posodobi.</div></div>';return h;}
+  if(!res.assays.length){h+='<div class="empty" style="padding:16px;font-size:12px;color:var(--text3)">Ni podatkov za izbrano obdobje.</div></div>';return h;}
   h+='<table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr>'+
      '<th style="text-align:left;padding:5px 6px;position:sticky;left:0;background:var(--bg3)">Preiskava</th>';
-  cfg.channels.forEach(function(k){h+='<th style="padding:5px 4px">'+k.n+'</th>';});
+  res.channels.forEach(function(n){h+='<th style="padding:5px 4px">'+_repEsc(n)+'</th>';});
   h+='<th style="padding:5px 4px">CV%</th><th style="padding:5px 4px">CILJ</th><th style="padding:5px 4px">n dni</th></tr></thead><tbody>';
   res.assays.forEach(function(a){
     h+='<tr style="border-top:1px solid var(--border)">';
     h+='<td style="text-align:left;padding:5px 6px;font-weight:600;position:sticky;left:0;background:var(--bg2)">'+_repEsc(a.name)+'</td>';
-    cfg.channels.forEach(function(k){
-      var v=a.ch[k.n];var over=(v!=null&&a.cilj!=null&&v>a.cilj);
+    res.channels.forEach(function(n){
+      var v=a.ch[n];var over=(v!=null&&a.cilj!=null&&v>a.cilj);
       h+='<td style="padding:5px 4px;text-align:center'+(over?';background:var(--rbg,#fef2f2);color:var(--red);font-weight:700':'')+'">'+fmt(v)+'</td>';
     });
     var oOver=a.flag;
@@ -2064,9 +2389,84 @@ function _ddRenderTable(type,res){
     h+='</tr>';
   });
   h+='</tbody></table>';
-  h+='<div style="font-size:10px;color:var(--text3);margin-top:6px">Stolpci kanalov = povprečni odklon %; CV% = povprečni skupni CV (izračunan iz dejansko izpolnjenih dni — n); CILJ = CVb/2. Rdeče = nad ciljem.</div>';
+  h+='<div style="font-size:10px;color:var(--text3);margin-top:6px">Stolpci kanalov = povprečni odklon %; CV% = povprečni skupni CV (izračunan iz dejansko izpolnjenih dni v izbranem obdobju — n); CILJ = CVb/2. Rdeče = nad ciljem.</div>';
   h+='</div>';
   return h;
+}
+
+/* ---- Del 6: Pregled/potrditev novo uvoženih DD rezultatov (kopija Dobavnic) ---- */
+function _ddReviewStatus(r){
+  var items=r.items||[];
+  var totRev=items.filter(function(it){return it.reviewed;}).length;
+  if(totRev<=0)return r.status==='skipped'?'skipped':'pending';
+  if(totRev>=items.length)return 'done';
+  return 'delno';
+}
+function renderDdReviews(){
+  var body=$i('ddReviewsBody');if(!body)return;
+  if(!S.ddReviews)S.ddReviews=[];
+  S.ddReviews.forEach(function(r){if(r.status!=='skipped')r.status=_ddReviewStatus(r);});
+  var active=S.ddReviews.filter(function(r){return r.status==='pending'||r.status==='delno';});
+  var done=S.ddReviews.filter(function(r){return r.status==='done'||r.status==='skipped';});
+  var h='';
+  if(!S.ddReviews.length){h='<div class="empty" style="padding:24px;text-align:center;color:var(--text3)">Ni uvozov za pregled.</div>';}
+  else{
+    active.forEach(function(r){h+=_renderDdReviewCard(r,true);});
+    if(done.length){
+      h+='<details style="margin-top:10px"><summary style="cursor:pointer;font-size:12px;color:var(--text3)">Zaključeni pregledi ('+done.length+')</summary>';
+      done.forEach(function(r){h+=_renderDdReviewCard(r,false);});
+      h+='</details>';
+    }
+  }
+  body.innerHTML=h;
+}
+function _renderDdReviewCard(r,canConfirm){
+  var cat=ddCategoryById(r.categoryId);
+  var items=r.items||[];
+  var totRev=items.filter(function(it){return it.reviewed;}).length;
+  var badge=r.status==='done'?'<span class="badge badge-2sd" style="background:var(--green)">&#10003; Pregledano</span>'
+    :r.status==='delno'?'<span class="badge" style="background:var(--orange);color:#fff">&#9680; Delno</span>'
+    :r.status==='skipped'?'<span class="badge" style="background:var(--text3);color:#fff">Preskočeno</span>'
+    :'<span class="badge badge-blue">Čaka pregled</span>';
+  var outCount=items.filter(function(it){return it.outOfRange;}).length;
+  var h='<div class="card" style="margin-bottom:10px">';
+  h+='<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">'+
+     '<div><b>'+(cat?_repEsc(cat.label):r.categoryId)+'</b> <span class="muted" style="font-size:11px">'+r.dateFrom+' – '+r.dateTo+' &middot; '+items.length+' vnosov</span></div>'+
+     badge+'</div>';
+  if(outCount>0){
+    h+='<div style="font-size:11px;color:var(--red);margin-top:6px">&#9888; '+outCount+' rezultat'+(outCount===1?'':'ov')+' nad ciljem (CV &gt; CILJ) &mdash; poglej spodaj.</div>';
+  }
+  h+='<div style="font-size:11px;color:var(--text3);margin:6px 0">Pregledano: '+totRev+'/'+items.length+'</div>';
+  h+='<div style="max-height:220px;overflow-y:auto">';
+  items.forEach(function(it,idx){
+    var icon=it.reviewed?'✓':'○';
+    h+='<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-top:1px solid var(--border);font-size:11px'+(it.outOfRange?';color:var(--red)':'')+'">'+
+       '<span>'+icon+' '+_repEsc(it.analyte)+' <span class="muted">('+it.date+')</span> '+(it.outOfRange?'&#9888;':'')+'</span>'+
+       '<span>'+(it.overall!=null?it.overall.toFixed(2):'—')+' / cilj '+(it.cilj!=null?it.cilj.toFixed(2):'—')+
+       (canConfirm?' <button class="btn btn-outline btn-sm" onclick="ddReviewItemToggle(\''+r.id+'\','+idx+')">'+(it.reviewed?'Prekliči':'Sprejmi')+'</button>':'')+'</span></div>';
+  });
+  h+='</div>';
+  if(canConfirm){
+    h+='<div style="display:flex;gap:6px;margin-top:8px;justify-content:flex-end">'+
+       '<button class="btn btn-outline btn-sm" onclick="ddReviewAcceptAll(\''+r.id+'\')">Sprejmi vse</button>'+
+       '<button class="btn btn-a btn-sm" onclick="confirmDdReview(\''+r.id+'\')">✓ Potrdi pregled</button></div>';
+  }
+  h+='</div>';
+  return h;
+}
+function ddReviewItemToggle(reviewId,idx){
+  var r=(S.ddReviews||[]).filter(function(x){return x.id===reviewId;})[0];if(!r)return;
+  r.items[idx].reviewed=!r.items[idx].reviewed;save();renderDdReviews();
+}
+function ddReviewAcceptAll(reviewId){
+  var r=(S.ddReviews||[]).filter(function(x){return x.id===reviewId;})[0];if(!r)return;
+  r.items.forEach(function(it){it.reviewed=true;});save();renderDdReviews();
+}
+function confirmDdReview(reviewId){
+  var r=(S.ddReviews||[]).filter(function(x){return x.id===reviewId;})[0];if(!r)return;
+  r.status=_ddReviewStatus(r);
+  _audit('update','dd_review',reviewId,'Potrjen pregled DD kontrol ('+r.categoryId+', '+r.dateFrom+'–'+r.dateTo+')',null,null,(currentOp()||{}).id||'system');
+  save();renderDdReviews();notify('Pregled DD kontrol shranjen','success');
 }
 
 /* ============================================================
@@ -3028,6 +3428,7 @@ function defaultQcMaterials(){return [
 /* Privzeta identiteta laboratorija — dejanske vrednosti v S.labInfo (Več → Nastavitve, admin) */
 const IVDR_DEFAULTS={
   deviceName:'BIO Alinity',
+  subtitle:'Laboratorij BK · Abbott Alinity',
   legalManufacturer:'UKC Ljubljana — 24-urni laboratorij',
   intendedUse:'Programska podpora notranji kontroli kakovosti (QC) in vodenju zaloge reagentov/kontrol na analizatorjih Abbott Alinity. Za profesionalno uporabo s strani usposobljenega laboratorijskega osebja.',
   inHouse:'In-house pripomoček, izdelan in uporabljen znotraj zdravstvene ustanove (čl. 5(5) Uredbe (EU) 2017/746). Ni namenjen prodaji ali dajanju na trg.',
@@ -3035,6 +3436,8 @@ const IVDR_DEFAULTS={
   contact:'Oddelek za laboratorijsko diagnostiko, UKC Ljubljana'
 };
 function LAB(){return Object.assign({},IVDR_DEFAULTS,S.labInfo||{});}
+/* Naslov aplikacije ("DigiLab") je fiksen; podnaslov je po laboratoriju nastavljiv (Več → Nastavitve). */
+function _applyHdrIdentity(){const s=$i('hdrSub');if(s)s.textContent=LAB().subtitle||'';}
 /* Privzeta formulacija mesečnih obrazcev — urejljiva v Več → Poročila (admin) */
 const FORM_DEFAULTS={
   maint:{title:'Evidenca periodičnega vzdrževanja opreme',ob:'213/64',klas:'78431',ver:'4.0',
@@ -3060,10 +3463,27 @@ function initState(){
   if(!S.qcReviews)S.qcReviews=[];
   if(!S.reklamacije)S.reklamacije=[];
   if(!S.alertMute)S.alertMute={};
-  if(!S.ddConfig)S.ddConfig={folder:'BIO/DD_Kontrole',files:{bio:'',imuno:'',urin:''}};
-  /* Migracija sheme B: stara plocata mapa 'DD_Kontrole' -> 'BIO/DD_Kontrole' */
-  else if(S.ddConfig.folder==='DD_Kontrole')S.ddConfig.folder='BIO/DD_Kontrole';
-  if(!S.ddStats)S.ddStats={};
+  /* DD Kontrole: kategorije + zgodovinski zapisi (nadomesca staro S.ddConfig/S.ddStats).
+     Enkratna migracija starega enojnega BIO/IMUNO/URIN nastavitve v S.ddCategories,
+     ce uporabnik ze ima povezane datoteke iz prejsnje sheme. */
+  if(!S.ddCategories){
+    S.ddCategories=JSON.parse(JSON.stringify(DD_CATEGORIES_DEFAULT));
+    if(S.ddConfig&&S.ddConfig.files){
+      var of=S.ddConfig.files,folder=S.ddConfig.folder||'BIO/DD_Kontrole';
+      ['bio','imuno','urin'].forEach(function(t){
+        if(of[t]){
+          var cat=S.ddCategories.filter(function(c){return c.id===t;})[0];
+          if(cat){cat.folder=folder+'/'+t;if(cat.files.indexOf(of[t])<0)cat.files.unshift(of[t]);}
+        }
+      });
+    }
+  }
+  if(!S.ddRecords)S.ddRecords={};
+  if(!S.ddCilj)S.ddCilj={};
+  if(!S.ddAnalyteOrder)S.ddAnalyteOrder={};
+  if(!S.ddChannels)S.ddChannels={};
+  if(!S.ddReviews)S.ddReviews=[];
+  if(!S.ddFileMeta)S.ddFileMeta={};
   if(!S.auditLog)S.auditLog=[];
   if(!S.notifications)S.notifications=[];
   if(!S.reports)S.reports=[];
@@ -3086,14 +3506,18 @@ function initState(){
   if(!S.qcPanels)S.qcPanels=[];
   if(!S.operators.length) S.operators=DEFAULT_OPERATORS;
   /* Vloge operaterjev: admin / advanced / operator (privzeto).
-     Enkratna migracija po imenih (ID-ji lahko variirajo med napravami). */
-  if(S.rolesSchema!==1){
-    const _roleByName={'OMAHNA|ALJAŽ':'admin','BOMBEK|DOMEN':'advanced','RADOŠ|NEŽA':'advanced',
-      'OTOREPEC ČERNE|IZA':'advanced','ŠTEBIH|MAŠA':'advanced','ŠPENDAL|NEJC':'advanced'};
-    S.operators.forEach(o=>{if(!o.role)o.role=_roleByName[(o.last||'').toUpperCase()+'|'+(o.first||'').toUpperCase()]||'operator';});
-    S.rolesSchema=1;
-  }
-  S.operators.forEach(o=>{if(!o.role)o.role='operator';});
+     Samodejno-celjenje po imenih ob vsakem initState (ne le enkrat): OneDrive
+     sinhronizacija lahko S.operators v celoti prepiše s starejšo kopijo brez
+     polja role (drug operater ali starejsa naprava) — brez tega bi popravek
+     izginil ob naslednjem prenosu. ID-ji lahko variirajo med napravami, zato
+     ujemanje po imenu/priimku. */
+  const _roleByName={'OMAHNA|ALJAŽ':'admin','BOMBEK|DOMEN':'advanced','RADOŠ|NEŽA':'advanced',
+    'OTOREPEC ČERNE|IZA':'advanced','ŠTEBIH|MAŠA':'advanced','ŠPENDAL|NEJC':'advanced'};
+  S.operators.forEach(o=>{
+    const _r=_roleByName[(o.last||'').toUpperCase()+'|'+(o.first||'').toUpperCase()];
+    if(_r)o.role=_r; else if(!o.role)o.role='operator';
+  });
+  S.rolesSchema=2;
   if(!S.session)S.session=null;
   /* Nastavljivi analizatorji (multi-lab): enkratna kopija privzetih v S.instruments */
   if(!S.instruments||!S.instruments.length)S.instruments=JSON.parse(JSON.stringify(DEFAULT_INSTRUMENTS));
@@ -3179,6 +3603,14 @@ function showLogin(mode){
   $i('opChip').style.display='none';
 }
 function hideLogin(){$i('loginScreen').style.display='none';updateOpChip();}
+/* Omogoci vpis matične s fizicno/zaslonsko tipkovnico (ne le tap na PIN gumbe) —
+   koristno na PC-ju in tabličnih napravah s prikljuceno tipkovnico/skenerjem crtne kode. */
+document.addEventListener('keydown',function(e){
+  const scr=$i('loginScreen');
+  if(!scr||scr.style.display!=='flex')return;
+  if(e.key>='0'&&e.key<='9'){loginPress(e.key);e.preventDefault();}
+  else if(e.key==='Backspace'){loginPress('⌫');e.preventDefault();}
+});
 function lockNow(){
   if(S.session){S.session.locked=true;save();_audit('lock','session',S.session.opId,'Zaklep (ročno)',null,null,S.session.opId);}
   showLogin('lock');
@@ -3972,6 +4404,7 @@ function renderLabInfo(){
   card.innerHTML='<div class="card-title">&#127973; Identiteta laboratorija</div>'
     +'<div class="muted" style="font-size:12px;margin-bottom:8px">Podatki se uporabljajo v glavi/nogi uradnih poročil in IVDR identifikaciji. Aplikacija je s tem uporabna tudi v drugih laboratorijih.</div>'
     +'<div class="frow"><div class="fg"><label>Laboratorij</label><input id="liName" value="'+_repEsc(l.legalManufacturer||'')+'"></div><div class="fg"><label>Ustanova (alt logotipa)</label><input id="liOrg" value="'+_repEsc(l.org||'UKC Ljubljana')+'"></div></div>'
+    +'<div class="fg"><label>Podnaslov v glavi aplikacije</label><input id="liSubtitle" value="'+_repEsc(l.subtitle||'')+'" placeholder="npr. Laboratorij BK · Abbott Alinity"></div>'
     +'<div class="fg"><label>UDI-DI (interni identifikator)</label><input id="liUdi" value="'+_repEsc(l.udiDi||'')+'"></div>'
     +'<div class="fg"><label>Kontakt</label><input id="liContact" value="'+_repEsc(l.contact||'')+'"></div>'
     +'<div class="fg"><label>Logotip za poročila</label><div style="display:flex;gap:8px;align-items:center"><img id="liLogoPrev" src="'+(l.logoDataUri||KCLJ_LOGO)+'" style="height:34px;background:#fff;border:1px solid var(--border);border-radius:6px;padding:2px"><button class="btn btn-g btn-sm" onclick="$i(\'liLogoFile\').click()">Zamenjaj</button><button class="btn btn-g btn-sm" onclick="_liLogoClear()">Privzeti</button><input type="file" id="liLogoFile" accept="image/*" style="display:none" onchange="_liLogoPick(this)"></div></div>'
@@ -4001,11 +4434,13 @@ function saveLabInfo(){
   S.labInfo=Object.assign({},S.labInfo||{},{
     legalManufacturer:($i('liName').value||'').trim(),
     org:($i('liOrg').value||'').trim(),
+    subtitle:($i('liSubtitle').value||'').trim(),
     udiDi:($i('liUdi').value||'').trim(),
     contact:($i('liContact').value||'').trim()});
   if(_liLogoTmp!==null){if(_liLogoTmp==='')delete S.labInfo.logoDataUri;else S.labInfo.logoDataUri=_liLogoTmp;_liLogoTmp=null;}
   _audit('update','settings','labInfo','Spremenjena identiteta laboratorija',before,S.labInfo,(currentOp()||{}).id||'system');
   save();notify('Identiteta laboratorija shranjena','success');
+  _applyHdrIdentity();
 }
 
 /* ===== EXPORT ===== */
@@ -4080,9 +4515,51 @@ function storeQcValues(parsed,source,xmlRaw){
   save();
   return {lot:parsed.lot,control:parsed.control,assays:assayCount};
 }
+/* Nekateri dobavitelji kontrol (npr. Techno-Path za Multichem) izvozijo XML v isti
+   Abbott shemi, a brez nekaterih atributov na <ControlLevel>, ki jih Alinity
+   pricakuje (ManufacturerMean, ManufacturerStandardDeviation, DefaultDilution,
+   IsCalculateMeanSdChecked), in z "Version="*"" namesto stevilke — analizator
+   tak XML tiho ne prepozna/uvozi. Dopolnimo manjkajoce atribute na privzete
+   vrednosti (isti vzorec kot v pravih Abbott datotekah) pred shranjevanjem, da
+   je vsak kasneje generiran (buildAdjustedQcXml) izvod skladen. */
+function _qcNormalizeSourceXml(xmlText){
+  try{
+    const doc=new DOMParser().parseFromString(xmlText,'text/xml');
+    if(doc.getElementsByTagName('parsererror').length)return xmlText;
+    let changed=false;
+    Array.from(doc.getElementsByTagName('Assay')).forEach(a=>{
+      if(a.getAttribute('Version')==='*'){a.setAttribute('Version','1');changed=true;}
+      /* Nekateri dobavitelji (npr. Techno-Path) pripnejo svojo interno kodo in
+         zaporedno stevilko imenu preiskave (npr. "Ferritin {7P65} 68") — prava
+         Abbott datoteka ima samo golo ime ("Ferritin"). Odstrani "{...} <stevilka>" na koncu. */
+      const nm=a.getAttribute('Name')||'';
+      const nmClean=nm.replace(/\s*\{[^}]+\}\s*\d*\s*$/,'').trim();
+      if(nmClean&&nmClean!==nm){a.setAttribute('Name',nmClean);changed=true;}
+    });
+    Array.from(doc.getElementsByTagName('DataUnit')).forEach(du=>{
+      /* Pravi Abbott izvoz: Code in UCUM sta vedno prazna; Unit je plain ASCII
+         (npr. "ug/L", ne mikro-znak "µg/L") — dobaviteljski XML-i to pogosto
+         kršijo, kar Alinity lahko povzroci da preiskave/datoteke ne prepozna. */
+      if(du.getAttribute('Code')){du.setAttribute('Code','');changed=true;}
+      if(du.getAttribute('UCUM')){du.setAttribute('UCUM','');changed=true;}
+      const u=du.getAttribute('Unit')||'';
+      const uClean=u.replace(/[µμ]/g,'u');
+      if(uClean!==u){du.setAttribute('Unit',uClean);changed=true;}
+    });
+    Array.from(doc.getElementsByTagName('ControlLevel')).forEach(cl=>{
+      const defaults={ManufacturerMean:'',ManufacturerStandardDeviation:'',DefaultDilution:'1',
+        IsCalculateMeanSdChecked:(cl.getAttribute('Mean')?'True':'False')};
+      Object.keys(defaults).forEach(k=>{
+        if(cl.getAttribute(k)==null){cl.setAttribute(k,defaults[k]);changed=true;}
+      });
+    });
+    return changed?new XMLSerializer().serializeToString(doc):xmlText;
+  }catch(e){return xmlText;}
+}
 /* uvozi XML besedilo (parsiraj+shrani) — skupna pot za ročni in samodejni uvoz */
 function importQcXmlText(xmlText,source){
-  const parsed=parseAbbottQcXml(xmlText);return storeQcValues(parsed,source,xmlText);
+  const normalized=_qcNormalizeSourceXml(xmlText);
+  const parsed=parseAbbottQcXml(normalized);return storeQcValues(parsed,source,normalized);
 }
 /* razreši uradno vrednost za (material, app-preiskava, nivo) prek preslikav */
 function resolveQcValue(q,assay,level){
@@ -4135,8 +4612,111 @@ function _qcXmlMatName(){return qcXmlPrepIdx!=null&&S.qcMaterials[qcXmlPrepIdx]?
 /* aktivni filter naših preiskav (ali null = obdrži vse) */
 function _qcXmlUsedFilter(){if(!_qcXmlOnlyUsed)return null;return qcUsedAssays(_qcXmlMatName());}
 /* zgradi analizatorski XML iz izvornega (xmlRaw): spremeni le SD/Low/High; če je filter aktiven, obdrži le naše preiskave/enote */
+/* Znani analizatorski paneli, kjer izvorna (proizvajalčeva) XML datoteka
+   strukturno/poimenovalno ne ustreza temu, kar Alinity dejansko pricakuje
+   (glej primerjavo z resnicnim izvozom analizatorja za lot 035812250,
+   MULTI IMM panel). Namesto popravljanja tuje strukture (patch pristop
+   spodaj, ki ostane za lote z ze pravilno izvorno strukturo — npr. BIO),
+   za te znane panele zgeneriramo XML POPOLNOMA NA NOVO po fiksni predlogi,
+   ki je bila potrjena z resnicnim izvozom iz analizatorja. Vrstni red
+   seznama JE vrstni red izpisa v datoteki. */
+const QC_ANALYSER_TEMPLATES={
+  imm:{
+    controlName:'MULTI IMM',
+    copyrightInfo:'Copyrights (c) 2020 Abbott Laboratories',
+    assays:[
+      {num:'68', name:'Ferritin',    version:'3', onboardStability:'120', unit:'ug/L'},
+      {num:'272',name:'Myo STAT',    version:'2', onboardStability:'72',  unit:'ug/L'},
+      {num:'414',name:'NT-proBNP',   version:'2', onboardStability:null,  unit:'ng/L'},
+      {num:'468',name:'hsTnI STAT',  version:'4', onboardStability:'120', unit:'ng/L'},
+      {num:'658',name:'B-hCG',       version:'8', onboardStability:'120', unit:'IU/L'},
+      {num:'392',name:'CK-MB STAT',  version:'2', onboardStability:'120', unit:'ng/mL'}
+    ]
+  }
+};
+/* Ugotovi, kateri znani panel (ce sploh) ustreza naboru Assay-Numberjev v
+   uvoženih vrednostih za lot — panel se prepozna po Number, ne po imenu, saj
+   dobaviteljska imena/verzije v izvorni datoteki niso zanesljiva. */
+function _qcMatchAnalyserTemplate(lot){
+  const v=S.qcValues&&S.qcValues[lot];if(!v)return null;
+  const nums=Object.keys(v.assays||{});
+  for(const key in QC_ANALYSER_TEMPLATES){
+    const tmpl=QC_ANALYSER_TEMPLATES[key];
+    if(tmpl.assays.every(a=>nums.indexOf(a.num)>=0))return tmpl;
+  }
+  return null;
+}
+/* Abbottov izvoz formatira stevila na 5 decimalk, vecja od 1000 pa z vejico
+   kot locilom tisocic (npr. "3,091.00000") — toLocaleString to natancno
+   replicira. */
+function _qcFmtAbbott(v){
+  if(!isFinite(v))return '';
+  return v.toLocaleString('en-US',{minimumFractionDigits:5,maximumFractionDigits:5});
+}
+/* Poisce izvorne (proizvajalceve) mean/sdMfr/low/high za (lot,num,lv) ne
+   glede na to, pod katero enoto so bile shranjene ob uvozu (izvorna datoteka
+   ima lahko napacno/neskladno enoto — mi jo ob izpisu vsilimo iz predloge). */
+function _qcRawLevel(lot,num,lv){
+  const v=S.qcValues&&S.qcValues[lot];if(!v)return null;
+  const a=v.assays&&v.assays[num];if(!a)return null;
+  const levelData=a.levels&&a.levels[lv];if(!levelData)return null;
+  const unitKeys=Object.keys(levelData.units||{});if(!unitKeys.length)return null;
+  return levelData.units[unitKeys[0]];
+}
+/* Zgradi XML po fiksni, z analizatorjem potrjeni predlogi. MD5Key NAMENOMA
+   ne generiramo — v kodi ni (in ni bilo) algoritma, s katerim bi lahko
+   dokazljivo izracunali pravi Abbottov kljuc, zato atributa raje sploh ne
+   vstavimo kot da bi vstavili izmisljeno/tujo vrednost. Klicatelj (exportQcXml)
+   uporabnika izrecno opozori in datoteke ne oznaci kot "pripravljeno za uvoz". */
+function buildTemplatedQcXml(lot,tmpl){
+  const today=_qcToday();
+  let body='';
+  tmpl.assays.forEach(cfg=>{
+    let ob=cfg.onboardStability!=null?(' OnboardStability="'+cfg.onboardStability+'"'):'';
+    body+='    <Assay Number="'+cfg.num+'" Name="'+cfg.name+'" Version="'+cfg.version+'"'+ob+'>\n';
+    body+='      <DataUnit Unit="'+cfg.unit+'" Code="" UCUM="">\n';
+    for(let lv=1;lv<=3;lv++){
+      const raw=_qcRawLevel(lot,cfg.num,String(lv));
+      if(!raw){body+='        <!-- manjka nivo '+lv+' za preiskavo '+cfg.name+' (št. '+cfg.num+') -->\n';continue;}
+      const mean=raw.mean,sdMfr=raw.sdMfr;
+      const hasSd=isFinite(sdMfr);
+      /* Prevzemi SUROVE (proizvajalčeve) vrednosti brez naše 2/3-SD prilagoditve —
+         primerjava z resnicnim izvozom analizatorja (ročno vnesen lot) potrjuje, da
+         so LowRangeValue/HighRangeValue tam izracunani kot mean ± 2×SD iz surovega SD,
+         ne iz nase zozene meje (ki se uporablja drugje v aplikaciji za BIO/druge lote). */
+      const sdOut=hasSd?_qcFmtAbbott(sdMfr):'';
+      const low=hasSd?(mean-2*sdMfr):(isFinite(raw.low)?raw.low:null);
+      const high=hasSd?(mean+2*sdMfr):(isFinite(raw.high)?raw.high:null);
+      const lowOut=low!=null?_qcFmtAbbott(low):'';
+      const highOut=high!=null?_qcFmtAbbott(high):'';
+      body+='        <ControlLevel Name="'+lv+'" Mean="'+_qcFmtAbbott(mean)+'" StandardDeviation="'+sdOut+
+        '" ManufacturerMean="" ManufacturerStandardDeviation="" LowRangeValue="'+lowOut+'" HighRangeValue="'+highOut+
+        '" DefaultDilution="1" IsCalculateMeanSdChecked="'+(hasSd?'True':'False')+'" />\n';
+    }
+    body+='      </DataUnit>\n';
+    body+='    </Assay>\n';
+  });
+  const v=S.qcValues[lot];
+  const xml='<?xml version="1.0" encoding="utf-8"?>\n'+
+    '<Header xmlns="http://www.abbott.com/ADD/Architect/QC" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" FileCreationDate="'+today+'" FileProviderName="Abbott Laboratories" FileVersionNumber="v1.0">\n'+
+    '  <Control Name="'+tmpl.controlName+'" LotNumber="'+lot+'" CopyrightInfo="'+tmpl.copyrightInfo+'" ExpirationDate="'+(v.expiry||'')+'">\n'+
+    body+
+    '  </Control>\n'+
+    '</Header>';
+  return xml;
+}
 function buildAdjustedQcXml(lot){
-  const v=S.qcValues&&S.qcValues[lot];if(!v||!v.xmlRaw)throw new Error('Ni izvornega XML za lot '+lot+' (najprej uvozite uradni XML)');
+  const v=S.qcValues&&S.qcValues[lot];if(!v)throw new Error('Ni uvoženih vrednosti za lot '+lot+' (najprej uvozite uradni XML)');
+  /* Znani problematicni paneli (npr. MULTI IMM) — zgradi po fiksni, potrjeni predlogi. */
+  const tmpl=_qcMatchAnalyserTemplate(lot);
+  if(tmpl){
+    _qcLastXmlMd5Warning=true;
+    return buildTemplatedQcXml(lot,tmpl);
+  }
+  _qcLastXmlMd5Warning=false;
+  /* Splosni pristop (obstojeci, deluje za lote katerih izvorna struktura je ze skladna, npr. BIO):
+     samo popravi Mean/SD/Low/High v izvirnem xmlRaw, strukture se ne dotika. */
+  if(!v.xmlRaw)throw new Error('Ni izvornega XML za lot '+lot+' (najprej uvozite uradni XML)');
   const doc=new DOMParser().parseFromString(v.xmlRaw,'text/xml');
   if(doc.getElementsByTagName('parsererror').length)throw new Error('Izvorni XML neveljaven');
   const used=_qcXmlUsedFilter();
@@ -4161,6 +4741,7 @@ function buildAdjustedQcXml(lot){
   });
   return new XMLSerializer().serializeToString(doc);
 }
+var _qcLastXmlMd5Warning=false;
 function _qcSlug(s){return String(s||'').replace(/[^A-Za-z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0,40);}
 function _qcToday(){const d=new Date();return d.getFullYear()+'-'+_rp2(d.getMonth()+1)+'-'+_rp2(d.getDate());}
 
@@ -4491,6 +5072,11 @@ function _qcXmlResetRow(num,unit,lot){
 function exportQcXml(lot){
   if(!lot){notify('Ni aktualnega lota','warn');return;}
   let xml;try{xml=buildAdjustedQcXml(lot);}catch(e){notify('Napaka XML: '+e.message,'error');return;}
+  if(_qcLastXmlMd5Warning){
+    const ok=confirm('Ta datoteka NIMA izračunanega MD5Key (v aplikaciji ni algoritma za veljaven Abbott MD5Key, zato ga nismo izmislili). Datoteka NI potrjena kot pripravljena za uvoz — pred zanašanjem nanjo preveri prepoznavo na analizatorju.\n\nNadaljuj z izvozom?');
+    if(!ok){notify('Izvoz preklican','warn');return;}
+    notify('Pozor: XML brez MD5Key — preveri prepoznavo na analizatorju','warn');
+  }
   const q=qcXmlPrepIdx!=null?S.qcMaterials[qcXmlPrepIdx]:null;
   const slug=_qcSlug(q?q.name:((S.qcValues&&S.qcValues[lot]&&S.qcValues[lot].control)||lot));
   const filename=slug+'_'+lot+'_lab.xml';
@@ -5891,7 +6477,18 @@ function refreshSyncUI(){
   const btn=$i('msSignBtn');if(btn)btn.textContent=signedIn?'Ponovna prijava':'Prijava OneDrive';
 }
 function msSignIn(){if(!_hasBridge()){notify('Samo na napravi','warn');return;}try{AndroidBridge.msSignIn();}catch(e){notify('Napaka prijave','err');}}
-function msSignOut(){if(!_hasBridge()){notify('Samo na napravi','warn');return;}try{AndroidBridge.msSignOut();}catch(e){}}
+function msSignOut(){if(!_hasBridge()){notify('Samo na napravi','warn');return;}try{AndroidBridge.msSignOut();}catch(e){}_hideDeviceCodeBox();}
+function msCancelSignIn(){if(!_hasBridge()){notify('Samo na napravi','warn');return;}try{AndroidBridge.msCancelSignIn&&AndroidBridge.msCancelSignIn();}catch(e){}_hideDeviceCodeBox();notify('Prijava preklicana','ok');}
+function msEnsureFolders(){if(!_hasBridge()||!AndroidBridge.msEnsureFolders){notify('Ni na voljo na tej napravi','warn');return;}notify('Pripravljam mape v OneDrive…','ok');try{AndroidBridge.msEnsureFolders();}catch(e){notify('Napaka priprave map','err');}}
+function onMsFoldersReady(ok,msg){notify(ok?'Mape v OneDrive pripravljene':(msg||'Napaka priprave map'),ok?'ok':'err');}
+function msChangeAccount(){
+  if(!_hasBridge()){notify('Samo na napravi','warn');return;}
+  if(AndroidBridge.msChangeAccount){try{AndroidBridge.msChangeAccount();}catch(e){notify('Napaka spremembe računa','err');}return;}
+  /* Tablica (MSAL/device code) nima ločene metode — odjava + takoj nova prijava = nov račun. */
+  try{AndroidBridge.msSignOut();}catch(e){}
+  try{AndroidBridge.msSignIn();}catch(e){notify('Napaka prijave','err');}
+}
+function _hideDeviceCodeBox(){const b=$i('msDeviceCodeBox');if(b){b.style.display='none';b.innerHTML='';}}
 function msUpload(key){if(!_hasBridge()){notify('Samo na napravi','warn');return;}try{const data=_exportPayload(key);notify('Nalagam '+key+'…','ok');AndroidBridge.msUpload(key,data);}catch(e){notify('Napaka nalaganja','err');}}
 function msDownload(key){if(!_hasBridge()){notify('Samo na napravi','warn');return;}try{notify('Prenašam '+key+'…','ok');AndroidBridge.msDownload(key);}catch(e){notify('Napaka prenosa','err');}}
 /* ---- Quick Share (Nearby) ---- */
@@ -5977,15 +6574,50 @@ function importSharedFile(input){
   r.readAsText(f);input.value='';
 }
 /* Callbacks from Android */
-function onMsDeviceCode(userCode,verUri,message){notify('Koda: '+userCode+' na '+(verUri||'microsoft.com/devicelogin'),'ok');}
-function onMsSignedIn(account){notify('Prijavljen: '+(account||'OneDrive'),'ok');refreshSyncUI();setTimeout(retryPendingReports,400);setTimeout(autoFetchQcValues,800);}
-function onMsSignedOut(){notify('Odjavljen iz OneDrive','ok');refreshSyncUI();}
-function onMsError(msg){notify(msg||'Napaka OneDrive','err');refreshSyncUI();}
+function onMsDeviceCode(userCode,verUri,message){
+  const uri=verUri||'https://microsoft.com/link';
+  const b=$i('msDeviceCodeBox');
+  if(b){b.style.display='block';b.innerHTML='&#128273; Pojdi na <b>'+uri+'</b> in vnesi kodo: <b style="font-size:15px;letter-spacing:1px">'+userCode+'</b><br>Brskalnik se je odprl samodejno &ndash; če ne, odpri povezavo ročno.';}
+  notify('Vnesi kodo '+userCode+' na '+uri,'ok');
+}
+function onMsSignedIn(account){_hideDeviceCodeBox();notify('Prijavljen: '+(account||'OneDrive'),'ok');refreshSyncUI();setTimeout(retryPendingReports,400);setTimeout(autoFetchQcValues,800);}
+function onMsSignedOut(){_hideDeviceCodeBox();notify('Odjavljen iz OneDrive','ok');refreshSyncUI();}
+function onMsError(msg){_hideDeviceCodeBox();notify(msg||'Napaka OneDrive','err');refreshSyncUI();}
 function onMsUploadDone(ok,msg){notify(msg||(ok?'Naloženo':'Napaka'),ok?'ok':'err');refreshSyncUI();}
+/* Ključ za dedup/union elementov v seznamih qclab_v2 (entries, serviceLog, deliveries, ...).
+   Prednost: id > (name+type+lot) > (filename+at) > cel JSON kot zadnja rešitev. */
+function _qclabItemKey(x){
+  if(x&&x.id!=null)return 'id:'+x.id;
+  if(x&&x.name!=null)return 'nm:'+x.name+'|'+(x.type||'')+'|'+(x.lot||'');
+  if(x&&x.filename!=null)return 'fn:'+x.filename+'|'+(x.at||'');
+  return 'json:'+JSON.stringify(x);
+}
+function _mergeArrByKey(localArr,cloudArr){
+  var seen={};localArr.forEach(function(x){seen[_qclabItemKey(x)]=true;});
+  var added=0;
+  cloudArr.forEach(function(x){var k=_qclabItemKey(x);if(!seen[k]){localArr.push(x);seen[k]=true;added++;}});
+  return added;
+}
+/* Rekurzivno, nedestruktivno združevanje: seznami se združijo po _qclabItemKey (unija, nič se
+   ne izbriše), gnezdeni objekti (npr. ddRecords.bio.<analit>.<datum>) se združijo rekurzivno,
+   skalarji (nastavitve/UI stanje) ostanejo lokalni razen če lokalno manjka. Enak princip kot
+   mergePregledDB() za pregledBK_db — le da tu deluje splošno na celotni qclab_v2 objekt. */
+function _deepMergeQclab(local,cloud){
+  if(!cloud||typeof cloud!=='object')return local;
+  Object.keys(cloud).forEach(function(k){
+    var lv=local[k],cv=cloud[k];
+    if(lv===undefined){local[k]=cv;return;}
+    if(Array.isArray(lv)&&Array.isArray(cv)){_mergeArrByKey(lv,cv);return;}
+    if(lv&&cv&&typeof lv==='object'&&typeof cv==='object'&&!Array.isArray(lv)&&!Array.isArray(cv)){_deepMergeQclab(lv,cv);return;}
+    if(lv===''||lv===null||(typeof lv==='number'&&isNaN(lv)))local[k]=cv;
+  });
+  return local;
+}
+function mergeQclab(cloud){_deepMergeQclab(S,cloud||{});}
 function onMsDownloadDone(key,json,msg){
   if(json===null||json===undefined||json===''){notify(msg||'Ni podatkov v OneDrive','warn');return;}
   try{
-    if(key==='qclab_v2'){const cloud=JSON.parse(json);Object.assign(S,cloud);delete S.exportedAt;save();initState();notify('QC podatki združeni','ok');navQc(currentQc);}
+    if(key==='qclab_v2'){const cloud=JSON.parse(json);mergeQclab(cloud);delete S.exportedAt;save();initState();notify('QC podatki združeni','ok');navQc(currentQc);}
     else if(key==='pregledBK_db'){const cloud=JSON.parse(json);const r=mergePregledDB(cloud);savePregledDB();notify('Zaloga združena: +'+r.received+' sprejem, +'+r.lots+' lotov','ok');renderZaloga();}
     else if(key==='servis_abbott'){_abbottData=JSON.parse(json);_abbottBuildFilters();renderAbbott();notify('Abbott poročila posodobljena','ok');}
     refreshSyncUI();
@@ -6077,18 +6709,42 @@ function mergePregledDB(cloud){
     if(!lc){db.consumed.push(cc);locC[k]=cc;stats.consumed++;}
     else if(!lc.restoredAt&&cc.restoredAt){lc.restoredAt=cc.restoredAt;}
   });
-  /* Inventory reconcile: consumed[] določa končno stanje zaloge */
+  /* Inventory reconcile: consumed[] določa končno stanje zaloge.
+     POMEMBNO: brisati/vračati je treba SAMO porabljene enote (po SN/EPC), NIKOLI cele
+     gtin+lot vrstice — sicer se ob naslednjem mergePregledDB() izbriše tudi kos, ki je
+     bil medtem znova sprejet (isti gtin+lot, druga fizična enota). */
   invMap={};db.inventory.forEach(i=>{invMap[invKey(i)]=i;});
   db.consumed.forEach(c=>{
     if(!c)return;
     const k=invKey(c);
+    const li=invMap[k];
+    const cSns=c.serials||[],cEpcs=c.rfidEpcs||[];
     if(!c.restoredAt){
-      if(invMap[k]){db.inventory=db.inventory.filter(i=>invKey(i)!==k);delete invMap[k];}
+      if(!li)return;
+      if(li.units&&li.units.length&&(cSns.length||cEpcs.length)){
+        li.units=li.units.filter(u=>!((u.epc&&cEpcs.indexOf(u.epc)>=0)||(u.sn&&cSns.indexOf(u.sn)>=0)));
+        li.serials=li.units.map(u=>u.sn).filter(Boolean);
+        li.rfidEpcs=li.units.map(u=>u.epc).filter(Boolean);
+        li.qty=li.units.length;
+      }else{
+        li.qty=Math.max(0,(li.qty||0)-(c.qty||1));
+      }
+      if(li.qty<=0){db.inventory=db.inventory.filter(i=>invKey(i)!==k);delete invMap[k];}
     }else{
-      if(!invMap[k]){
+      const addUnits=cSns.length||cEpcs.length?cSns.map((s,idx)=>({sn:s,epc:cEpcs[idx]||''})):null;
+      if(!li){
         const r={gtin:c.gtin,lot:c.lot,name:c.name,type:c.type,qty:c.qty||1,
-          serials:c.serials||[],rfidEpcs:c.rfidEpcs||[],expiry:c.expiry||''};
+          serials:cSns,rfidEpcs:cEpcs,expiry:c.expiry||'',units:addUnits||[]};
         db.inventory.push(r);invMap[k]=r;
+      }else if(addUnits){
+        if(!li.units)li.units=(li.serials||[]).map(s=>({sn:s,epc:''}));
+        addUnits.forEach(u=>{
+          const exists=li.units.some(x=>(u.epc&&x.epc===u.epc)||(u.sn&&x.sn===u.sn));
+          if(!exists)li.units.push(u);
+        });
+        li.serials=li.units.map(u=>u.sn).filter(Boolean);
+        li.rfidEpcs=li.units.map(u=>u.epc).filter(Boolean);
+        li.qty=li.units.length;
       }
     }
   });
@@ -6556,41 +7212,102 @@ function salusCheckNew(){
 var _msListCtx='salus';
 function onMsFolderListed(json,msg){
   if(_msListCtx==='docpick'){_msListCtx='salus';onDocPickListed(json,msg);return;}
-  if(_msListCtx==='dd'){_msListCtx='salus';_ddOnFolderListed(json);return;}
-  if(!json){notify('Napaka OneDrive: '+(msg||''),'error');return;}
+  if(_msListCtx==='ddmeta'){_msListCtx='salus';_ddOnMetaListed(json);return;}
+  if(_msListCtx==='ddpick'){_msListCtx='salus';_ddOnPickListed(json,msg);return;}
+  if(!json){notify('Napaka OneDrive (mapa ni najdena?): '+(msg||''),'error');return;}
   var data;try{data=JSON.parse(json);}catch(e){return;}
   var files=data.value||[];
+  var salusFiles=files.filter(function(f){return (f.name||'').indexOf('.salus.json')>=0;});
+  var pdfFiles=files.filter(function(f){return /\.pdf$/i.test(f.name||'');});
+  var sidecarBase={};salusFiles.forEach(function(f){sidecarBase[(f.name||'').replace('.salus.json','')]=true;});
   var known={};(S.deliveries||[]).forEach(function(d){known[d.file]=true;});
   _salusQueue=[];
-  files.forEach(function(f){
+  salusFiles.forEach(function(f){
     var n=f.name||'';
-    if(n.indexOf('.salus.json')<0)return;
     var pdf=n.replace('.salus.json','.pdf');
     if(known[pdf])return;
-    _salusQueue.push(n);
+    _salusQueue.push({type:'json',name:n});
   });
-  if(_salusQueue.length===0){notify('Ni novih dobavnic Salus','ok');return;}
-  notify('Nalagam '+_salusQueue.length+' dobavnic…','ok');
+  pdfFiles.forEach(function(f){
+    var n=f.name||'';
+    var base=n.replace(/\.pdf$/i,'');
+    if(sidecarBase[base])return; /* ze ima sidecar — obdelano zgoraj */
+    if(known[n])return;
+    _salusQueue.push({type:'pdf',name:n});
+  });
+  if(_salusQueue.length===0){
+    if(files.length===0)notify('Mapa Salus_Dobavnice v OneDrive je prazna','warn');
+    else notify('Najdenih '+(salusFiles.length+pdfFiles.length)+' dobavnic — vse že uvožene','ok');
+    return;
+  }
+  _salusQueueTotal=_salusQueue.length;
+  notify('Nalagam '+_salusQueue.length+' dobavnic… (lahko traja nekaj minut, PDF-ji se prenašajo in berejo enega po enega)','ok');
   _salusDownloadNext();
 }
+var _salusQueueTotal=0;
 function _salusDownloadNext(){
   if(_salusQueue.length===0){
     save();
     var pg=$i('main-deliveries');if(pg&&pg.classList.contains('active'))renderDeliveries();
-    notify('Dobavnice Salus posodobljene','ok');return;
+    notify('Dobavnice Salus posodobljene ('+_salusQueueTotal+'/'+_salusQueueTotal+')','ok');return;
   }
-  var name=_salusQueue.shift();
-  try{AndroidBridge.msDownloadText('Salus_Dobavnice/'+name);}catch(e){_salusDownloadNext();}
+  var doneCount=_salusQueueTotal-_salusQueue.length;
+  if(_salusQueueTotal>5&&doneCount>0&&doneCount%5===0){notify('Obdelanih '+doneCount+'/'+_salusQueueTotal+' dobavnic…','ok');}
+  var item=_salusQueue.shift();
+  try{
+    if(item.type==='pdf'){
+      if(!AndroidBridge.msExtractPdfText){_salusDownloadNext();return;}
+      AndroidBridge.msExtractPdfText('Salus_Dobavnice/'+item.name);
+    }else{
+      AndroidBridge.msDownloadText('Salus_Dobavnice/'+item.name);
+    }
+  }catch(e){_salusDownloadNext();}
+}
+function _salusAddDelivery(file,pages,fetchedAt){
+  var items=parseSalusText(pages);
+  enrichDeliveryItems(items);
+  if(!S.deliveries)S.deliveries=[];
+  S.deliveries.push({id:Date.now().toString(),file:file,supplier:'Salus',
+    fetchedAt:fetchedAt||new Date().toISOString(),status:'pending',items:items});
+}
+/* PDF brez sidecar JSON: besedilo izlusceno v oblaku (Graph -> pdf-parse), brez lokalne datoteke.
+   Rezultat shranimo v dobavnice IN nalozimo generiran sidecar nazaj v OneDrive, da se naslednjic
+   ze najde kot .salus.json (hitreje, brez ponovne ekstrakcije). */
+function onMsPdfTextExtracted(relPath,text,msg){
+  if(!text){_salusDownloadNext();return;}
+  var name=(relPath||'').split('/').pop();
+  var fetchedAt=new Date().toISOString();
+  _salusAddDelivery(name,[text],fetchedAt);
+  try{
+    if(AndroidBridge.msUploadRaw){
+      var sidecarName=name.replace(/\.pdf$/i,'.salus.json');
+      var payload=JSON.stringify({file:name,supplier:'Salus',fetchedAt:fetchedAt,pages:[text]});
+      AndroidBridge.msUploadRaw('Salus_Dobavnice/'+sidecarName,payload,'application/json');
+    }
+  }catch(e){}
+  _salusDownloadNext();
 }
 function onMsTextFile(json,msg){
+  if(_ddAwaitingCache){
+    _ddAwaitingCache=false;
+    var job=_ddCurJob;
+    if(!json){ /* predpomnilnik manjka/napaka — pade nazaj na poln prenos+parsanje */ if(job)_ddFallbackBinary(job);else _ddDownloadNext();return; }
+    try{
+      var cached=JSON.parse(json);
+      var parsedLike={dayRecords:cached.dayRecords||{},ciljMap:cached.ciljMap||{},analyteOrder:cached.analyteOrder||[],
+        layout:{channels:(cached.channels||[]).map(function(n){return {n:n};})}};
+      /* Datoteka se ni spremenila (cache hit) — samo zagotovi da je zgodovina
+         napolnjena ob prvem branju iz DD_CSV; novih datumov tu ni za pregled.
+         job.categoryId (ne _ddPending.categoryId!) — glej opombo pri _ddMergeParsedAndArchive. */
+      _ddMergeRecords(job.categoryId,parsedLike);
+    }catch(e){}
+    _ddDownloadNext();
+    return;
+  }
   if(!json){_salusDownloadNext();return;}
   var data;try{data=JSON.parse(json);}catch(e){_salusDownloadNext();return;}
   if(data.supplier==='Salus'&&Array.isArray(data.pages)){
-    var items=parseSalusText(data.pages);
-    enrichDeliveryItems(items);
-    if(!S.deliveries)S.deliveries=[];
-    S.deliveries.push({id:Date.now().toString(),file:data.file,supplier:data.supplier,
-      fetchedAt:data.fetchedAt||new Date().toISOString(),status:'pending',items:items});
+    _salusAddDelivery(data.file,data.pages,data.fetchedAt);
   }
   _salusDownloadNext();
 }
@@ -6801,6 +7518,7 @@ function importDeliveriesJson(e){
 loadPregledDB();
 loadOrd();
 initState();
+_applyHdrIdentity();
 buildInstrMap();
 populateEntryInstruments();
 buildPinGrid();
