@@ -181,15 +181,18 @@ class GraphSync {
   // Osnovna mapna struktura ob prvi prijavi na (nov) racun — shema B (BIO/, PBK/ predpone).
   // Instrument-specificne podmape (npr. BIO/Arhiv/QC/AL01/AL01 C1/2026/07) se ustvarijo
   // samodejno ob prvem poroci lu/prenosu (Graph PUT :/content ustvari manjkajoce nadrejene mape).
-  async ensureFolderStructure() {
+  // extraFolders: dodatne poti (npr. trenutno konfigurirane S.ddCategories[].folder
+  // iz renderer-ja) — omogoca da se ob "Pripravi mape" ustvarijo tudi uporabnikove
+  // DD kategorije/podmape, ne le fiksni osnovni seznam spodaj.
+  async ensureFolderStructure(extraFolders) {
     const folders = [
       'BIO', 'BIO/Arhiv', 'BIO/Arhiv/Vzdrzevanje', 'BIO/Arhiv/QC',
-      'BIO/DD_Kontrole', 'BIO/DD_CSV', 'BIO/Obvestila', 'BIO/QC_vrednosti',
+      'BIO/DD_Kontrole', 'BIO/DD_Kontrole/DD_CSV', 'BIO/Obvestila', 'BIO/QC_vrednosti',
       'BIO/Reagencni_Listi', 'BIO/Varnostni_Listi',
       'PBK', 'PBK/Arhiv',
       'Salus_Dobavnice',
-      'Abbott_Servis'
-    ];
+      'Abbott_Servis', 'Abbott_Servis/_cache'
+    ].concat(Array.isArray(extraFolders) ? extraFolders.filter(Boolean) : []);
     for (const f of folders) {
       const r = await this.ensureFolder(f);
       if (!r.ok) return r;
@@ -226,7 +229,11 @@ class GraphSync {
     const at = await this._freshAccessToken();
     if (!at) return { ok: false, json: null, msg: 'Niste prijavljeni' };
     const rp = (relPath || '').replace(/^\/+/, '');
-    const url = `https://graph.microsoft.com/v1.0/me/drive/root:/${MS_FOLDER}/${rp}:/children?$select=name,size,lastModifiedDateTime,folder,file&$top=500`;
+    // Ce je rp prazen (uporabnik je z "nazaj" prisel do korena DigiLab), pot NE
+    // sme imeti odvecnega "/" pred zakljucnim ":" — Graph tak path zavrne kot
+    // neveljaven (404), tudi ce mapa DigiLab dejansko obstaja.
+    const path = rp ? `${MS_FOLDER}/${rp}` : MS_FOLDER;
+    const url = `https://graph.microsoft.com/v1.0/me/drive/root:/${path}:/children?$select=name,size,lastModifiedDateTime,folder,file,webUrl&$top=500`;
     const r = await fetch(url, { headers: { Authorization: 'Bearer ' + at } });
     if (r.status === 200) return { ok: true, json: await r.text(), msg: 'ok' };
     if (r.status === 404) return { ok: true, json: null, msg: 'Mape ni v OneDrive' };

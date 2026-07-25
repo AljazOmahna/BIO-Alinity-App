@@ -59,6 +59,7 @@ input,select,textarea,button{accent-color:var(--abbott-teal)}
 .vec-page{display:none}.vec-page.active{display:block}
 .ord-page{display:none}.ord-page.active{display:block}
 .srv-page{display:none}.srv-page.active{display:block}
+.zal-page{display:none}.zal-page.active{display:block}
 
 /* BOTTOM NAV */
 .bottom-nav{position:fixed;bottom:0;left:0;right:0;height:62px;background:var(--nav-bg);
@@ -379,6 +380,14 @@ body.dark .notif{background:rgba(13,25,50,.95)}
 
 <!-- ============ ZALOGA ============ -->
 <div class="page-main active" id="main-zaloga">
+  <div class="qc-subnav" id="zalSubnav">
+    <div class="tab active" data-zal="stock" onclick="navZal('stock')">&#128230; Zaloga</div>
+    <div class="tab" data-zal="poraba" onclick="navZal('poraba')">&#128683; Poraba</div>
+    <div class="tab" data-zal="prejeto" onclick="navZal('prejeto')">&#128230; Prejeto</div>
+    <div class="tab" data-zal="opened" onclick="navZal('opened')">&#129380; Odprta embalaža</div>
+  </div>
+
+  <div class="page zal-page active" id="zal-stock">
   <div class="sec-hdr"><div class="sec-title">&#128230; Zaloga</div>
     <span class="muted" style="font-size:12px">Samo za branje &middot; vir: Pregled BK</span></div>
   <div class="fr">
@@ -396,6 +405,8 @@ body.dark .notif{background:rgba(13,25,50,.95)}
       <option value="name">Razvrsti: Naziv</option>
       <option value="qty">Razvrsti: Količina</option>
     </select>
+    <button class="btn btn-g btn-sm" onclick="printZaloga()">&#128424;&#65039; Natisni</button>
+    <button class="btn btn-g btn-sm" onclick="openBkPrep()">&#129534; Pripravi Pregled BK</button>
   </div>
   <div class="card" style="padding:0">
     <div style="max-height:44vh;overflow:auto;-webkit-overflow-scrolling:touch;border-radius:10px"><table>
@@ -403,24 +414,56 @@ body.dark .notif{background:rgba(13,25,50,.95)}
       <tbody id="zalogaBody"></tbody>
     </table></div>
   </div>
+  </div><!-- /zal-stock -->
 
-  <div class="sec-hdr" style="margin-top:14px"><div class="sec-title">&#128683; Poraba</div>
+  <div class="page zal-page" id="zal-poraba">
+  <div class="sec-hdr"><div class="sec-title">&#128683; Poraba</div>
     <span class="muted" style="font-size:12px">Porabljeni artikli (zaprte seje)</span></div>
   <div class="card" style="padding:0">
-    <div style="max-height:26vh;overflow:auto;-webkit-overflow-scrolling:touch;border-radius:10px"><table>
+    <div style="max-height:62vh;overflow:auto;-webkit-overflow-scrolling:touch;border-radius:10px"><table>
       <thead style="position:sticky;top:0;background:var(--bg2);z-index:1"><tr><th>Naziv</th><th>Lot</th><th>Porabljeno</th><th>Kos</th></tr></thead>
       <tbody id="consumedBody"></tbody>
     </table></div>
   </div>
+  </div><!-- /zal-poraba -->
 
-  <div class="sec-hdr" style="margin-top:14px"><div class="sec-title">&#128230; Prejeto</div>
+  <div class="page zal-page" id="zal-prejeto">
+  <div class="sec-hdr"><div class="sec-title">&#128230; Prejeto</div>
     <span class="muted" style="font-size:12px">Podrobnosti prejetih kosov</span></div>
   <div class="card" style="padding:0">
-    <div style="max-height:30vh;overflow:auto;-webkit-overflow-scrolling:touch;border-radius:10px"><table>
+    <div style="max-height:62vh;overflow:auto;-webkit-overflow-scrolling:touch;border-radius:10px"><table>
       <thead style="position:sticky;top:0;background:var(--bg2);z-index:1"><tr><th>Naziv</th><th>Lot</th><th>Rok</th><th>Serial</th><th>RFID</th><th>Sprejeto</th></tr></thead>
       <tbody id="receivedBody"></tbody>
     </table></div>
   </div>
+  </div><!-- /zal-prejeto -->
+
+  <div class="page zal-page" id="zal-opened">
+    <div class="sec-hdr"><div class="sec-title">&#129380; Odprta embalaža</div>
+      <span style="display:flex;gap:6px">
+        <button class="btn btn-a btn-sm" onclick="openPkgModal()">&#10133; Zabeleži odprtje</button>
+        <button class="btn btn-g btn-sm" onclick="printOpenedPkg()">&#128424;&#65039; Natisni</button>
+      </span></div>
+    <div class="fr">
+      <input id="opSearch" placeholder="&#128269; Naziv, lot, GTIN..." oninput="renderOpenedPkg()">
+      <select id="opType" onchange="renderOpenedPkg()">
+        <option value="">Vsi tipi</option>
+        <option value="reagent-bio">Reagent biokemija</option>
+        <option value="reagent-imuno">Reagent imunologija</option>
+        <option value="calibrator">Kalibrator</option>
+        <option value="control">Kontrola</option>
+        <option value="consumable">Potrošni material</option>
+      </select>
+      <select id="opStatus" onchange="renderOpenedPkg()">
+        <option value="open">Odprte (aktivne)</option>
+        <option value="soon">Poteka kmalu</option>
+        <option value="exp">Poteklo</option>
+        <option value="closed">Zavržene / arhiv</option>
+        <option value="">Vse</option>
+      </select>
+    </div>
+    <div id="openedPkgBody"></div>
+  </div><!-- /zal-opened -->
 </div>
 
 <!-- ============ ROKI ============ -->
@@ -505,6 +548,15 @@ body.dark .notif{background:rgba(13,25,50,.95)}
         </div>
       </div>
       <div class="fg"><label>Opomba</label><input type="text" id="gtinNote"></div>
+      <div id="gtinPkgRow" style="display:none">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text3);margin:10px 0 6px;letter-spacing:.5px">&#129380; Odprta embalaža</div>
+        <div class="fr" style="gap:8px">
+          <div class="fg" style="flex:1" id="gtinStabWrap"><label>Stabilnost po odprtju (dni)</label>
+            <input type="number" id="gtinStabilityDays" min="0" max="3650" placeholder="privzeto za tip"></div>
+          <div class="fg" style="flex:1" id="gtinVialsWrap"><label>Št. stekleničk / alikvotov v škatli</label>
+            <input type="number" id="gtinVialsPerBox" min="0" max="200" placeholder="0"></div>
+        </div>
+      </div>
       <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin:4px 0">
         <input type="checkbox" id="gtinLotNotify" style="width:18px;height:18px;flex-shrink:0">
         Opozorilo ob novem lotu
@@ -513,6 +565,66 @@ body.dark .notif{background:rgba(13,25,50,.95)}
     <div class="mf">
       <button class="btn btn-g" onclick="closeMo('moGtin')">Prekliči</button>
       <button class="btn btn-a" onclick="saveGtin()">Shrani</button>
+    </div>
+  </div>
+</div>
+
+<!-- PREGLED BK — potrditev pripravljavca -->
+<div class="mo" id="moBkSign">
+  <div class="modal" style="max-width:400px">
+    <div class="mh"><h3 id="bkSignT">Pripravi Pregled BK</h3><button class="mc" onclick="closeMo('moBkSign')">&#10005;</button></div>
+    <div class="mb">
+      <div class="muted" style="font-size:12px;margin-bottom:10px">Evidenca zaloge in lotov kontrolnega ter kalibracijskega materiala (BK). Seznam se sestavi iz <b>GTIN kataloga</b> &mdash; vsaka definirana kontrola in kalibrator se izpiše, tudi brez zaloge (prečrtana vrstica).</div>
+      <div class="fg"><label>Pripravil (operater)</label><select id="bkSignOp"></select></div>
+    </div>
+    <div class="mf"><button class="btn btn-g" onclick="closeMo('moBkSign')">Prekliči</button>
+      <button class="btn btn-a" onclick="_bkConfirmSign()">&#10003; Potrdi</button></div>
+  </div>
+</div>
+
+<!-- PREGLED BK — predogled PDF -->
+<div class="mo" id="moBkPdf">
+  <div class="modal" style="max-width:900px;width:94vw">
+    <div class="mh"><h3>&#129534; Pregled BK &mdash; <span id="bkPdfName" style="font-family:var(--mono);font-size:12px;font-weight:400"></span></h3>
+      <button class="mc" onclick="closeMo('moBkPdf')">&#10005;</button></div>
+    <div class="mb" style="padding:0">
+      <iframe id="bkPdfFrame" style="width:100%;height:68vh;border:0;background:#fff"></iframe>
+    </div>
+    <div class="mf"><button class="btn btn-g" onclick="closeMo('moBkPdf')">Zapri</button>
+      <button class="btn btn-g" onclick="bkPdfDownload()">&#128190; Shrani PDF</button>
+      <button class="btn btn-a" onclick="bkPdfPrint()">&#128424;&#65039; Natisni</button></div>
+  </div>
+</div>
+
+<!-- ODPRTA EMBALAŽA — vpis odprtja škatle -->
+<div class="mo" id="moPkgOpen">
+  <div class="modal" style="max-width:480px">
+    <div class="mh"><h3 id="pkgMoT">Zabeleži odprtje škatle</h3><button class="mc" onclick="closeMo('moPkgOpen')">&#10005;</button></div>
+    <div class="mb">
+      <div class="fg"><label>Artikel iz zaloge</label>
+        <input type="text" id="pkgSearch" placeholder="&#128269; Išči po nazivu, lotu ali GTIN..." oninput="renderPkgPick()">
+        <div id="pkgPickList" style="max-height:150px;overflow:auto;border:1px solid var(--border);border-radius:6px;margin-top:6px"></div>
+      </div>
+      <div id="pkgChosen" style="display:none;background:var(--bg2);border:1px solid var(--border);border-radius:7px;padding:8px;margin-bottom:10px;font-size:12px"></div>
+      <div class="frow">
+        <div class="fg"><label>Datum in ura odprtja</label><input type="datetime-local" id="pkgOpenedAt" onchange="_pkgUpdPreview()"></div>
+        <div class="fg"><label>Stabilnost po odprtju (dni)</label><input type="number" id="pkgDays" min="0" max="3650" oninput="_pkgUpdPreview()" placeholder="ni omejitve"></div>
+      </div>
+      <div id="pkgUseByPrev" style="font-size:12px;margin:-4px 0 10px 2px;color:var(--text3)"></div>
+      <div id="pkgVialsRow" style="display:none">
+        <div class="frow">
+          <div class="fg"><label>Št. stekleničk / alikvotov</label><input type="number" id="pkgVialCount" min="0" max="200" value="0"></div>
+          <div class="fg"><label>Vrsta</label>
+            <select id="pkgVialKind"><option value="vial">Steklenička</option><option value="aliquot">Alikvot</option></select></div>
+        </div>
+        <div class="muted" style="font-size:11px;margin:-4px 0 10px 2px">Ustvarijo se kot <b>neodprte</b> &mdash; vsako odpreš posebej na seznamu, ko jo dejansko vzameš v uporabo.</div>
+      </div>
+      <div class="fg"><label>Operater</label><select id="pkgOperator"></select></div>
+      <div class="fg"><label>Opomba</label><input type="text" id="pkgNote" placeholder="neobvezno"></div>
+    </div>
+    <div class="mf">
+      <button class="btn btn-g" onclick="closeMo('moPkgOpen')">Prekliči</button>
+      <button class="btn btn-a" onclick="savePkgOpen()">&#10003; Zabeleži odprtje</button>
     </div>
   </div>
 </div>
@@ -537,6 +649,7 @@ body.dark .notif{background:rgba(13,25,50,.95)}
   <div class="modal" style="max-width:520px">
     <div class="mh"><h3 id="docPickTitle">&#128194; Izberi dokument</h3><button class="mc" onclick="closeMo('moDocPick')">&#10005;</button></div>
     <div class="mb">
+      <div id="docPickPathLbl" style="font-size:11px;color:var(--text3);margin-bottom:8px;word-break:break-all"></div>
       <div class="fg"><input type="text" id="docPickSrch" placeholder="&#128269; Išči datoteko..." oninput="renderDocPick()"></div>
       <div id="docPickBody" style="max-height:50vh;overflow-y:auto"><div class="empty">Nalagam&#8230;</div></div>
     </div>
@@ -728,6 +841,12 @@ body.dark .notif{background:rgba(13,25,50,.95)}
         <input type="date" id="filterDateTo" onchange="renderReview()">
         <button class="btn btn-g btn-sm" onclick="exportCSV()">&#128190; CSV</button>
       </div>
+      <div class="fr" style="align-items:center;margin-top:4px">
+        <span style="font-size:12px;font-weight:600;color:var(--text3)">&#128424;&#65039; Natisni pregled kontrol (mesec):</span>
+        <select id="qcPrintMonth"></select>
+        <button class="btn btn-g btn-sm" onclick="printQcMonthly()">Natisni</button>
+        <span class="muted" style="font-size:11px">Izberi analizator zgoraj (Vsi inštrumenti ni podprto za tiskanje)</span>
+      </div>
       <div class="tbl-wrap"><table><thead><tr><th>Datum</th><th>Inštr.</th><th>QC Material</th><th>Nivo</th><th>Preiskava</th><th>Rezultat</th><th>Opomba</th><th>Operater</th></tr></thead><tbody id="reviewBody"></tbody></table></div>
     </div>
   </div>
@@ -790,10 +909,9 @@ body.dark .notif{background:rgba(13,25,50,.95)}
         <select id="ljLevel" onchange="renderLJ()"><option value="L1">Nivo 1</option><option value="L2">Nivo 2</option></select>
       </div>
       <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:10px" id="ljRules"></div>
-      <div class="lj-canvas-wrap"><canvas id="ljCanvas" height="380"></canvas></div>
-      <div id="ljStats"></div>
-      <div style="font-size:11px;color:var(--text3);text-align:center;margin-top:4px">Klik na točko za podrobnosti.</div>
+      <div style="font-size:11px;color:var(--text3);text-align:center;margin-bottom:4px">Grafi so organizirani po analizatorjih. Klik na točko za podrobnosti.</div>
     </div>
+    <div id="ljCharts"></div>
   </div>
 
   <!-- QC LJ MULTI -->
@@ -802,7 +920,9 @@ body.dark .notif{background:rgba(13,25,50,.95)}
       <div class="fr">
         <select id="ljmQcMat" onchange="onLjmQcMatChange()"></select>
         <select id="ljmAssays" multiple size="5" style="min-width:200px"></select>
+        <select id="ljmInstrs" multiple size="5" style="min-width:160px"></select>
       </div>
+      <div style="font-size:11px;color:var(--text3);margin:-4px 0 6px">Preiskave/nivoji: vsak izbran nivo dobi svoj graf. Analizatorji: privzeto vsi skupaj (izberi podmnožico za primerjavo samo izbranih).</div>
       <div id="ljmLevelPills" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px"></div>
       <button class="btn btn-blue btn-sm" onclick="renderLJMulti()">&#128201; Prikaži grafe</button>
     </div>
@@ -814,7 +934,7 @@ body.dark .notif{background:rgba(13,25,50,.95)}
     <div class="sec-hdr"><div class="sec-title" style="font-size:16px">Preiskave</div><button class="btn btn-a" onclick="openAssayModal()">+ Nova</button></div>
     <div class="tabs"><div class="tab active" onclick="setAssayTab('biochem')">Biokemija (Alinity c)</div><div class="tab" onclick="setAssayTab('immuno')">Imunologija (Alinity i)</div></div>
     <div class="fr"><input id="assaySearch" placeholder="&#128269; Iskanje..." oninput="renderAssays()"></div>
-    <div class="card" style="padding:0"><div class="tbl-wrap"><table><thead><tr><th>Naziv</th><th>Tip</th><th>QC materiali</th><th></th></tr></thead><tbody id="assayBody"></tbody></table></div></div>
+    <div class="card" style="padding:0"><div class="tbl-wrap"><table><thead><tr><th>Naziv</th><th>Tip</th><th>Matriks</th><th>QC materiali</th><th></th></tr></thead><tbody id="assayBody"></tbody></table></div></div>
   </div>
 
   <!-- QC MATERIALS -->
@@ -845,6 +965,14 @@ body.dark .notif{background:rgba(13,25,50,.95)}
   <!-- QC MAINT REVIEW -->
   <div class="page qc-page" id="page-maint-review">
     <div class="sec-hdr"><div class="sec-title" style="font-size:16px">Pregled vzdrževanja</div><span style="display:flex;gap:6px"><button class="btn btn-a btn-sm" onclick="openReportModal()">&#128196; Mesečno poročilo</button><button class="btn btn-g btn-sm" onclick="exportMaintCSV()">&#128190; CSV</button></span></div>
+    <div class="card" style="margin-bottom:10px">
+      <div class="fr" style="align-items:center">
+        <span style="font-size:12px;font-weight:600;color:var(--text3)">&#128424;&#65039; Natisni pregled mesečnega vzdrževanja:</span>
+        <select id="mrPrintInstr"></select>
+        <select id="mrPrintMonth"></select>
+        <button class="btn btn-g btn-sm" onclick="printMaintMonthly()">Natisni</button>
+      </div>
+    </div>
     <div class="card">
       <div class="fr">
         <select id="mrFilterType" onchange="renderMaintReview()"><option value="">Vsi tipi</option><option value="daily">Dnevno</option><option value="weekly">Tedensko</option><option value="monthly">Mesečno</option><option value="quarterly">3-mesečno/po potrebi</option></select>
@@ -867,7 +995,7 @@ body.dark .notif{background:rgba(13,25,50,.95)}
       </span>
     </div>
     <div class="qc-subnav" id="ddCatTabs" style="margin-bottom:8px"></div>
-    <input type="file" id="ddFileInput" accept=".xls,.xlsx" multiple style="display:none" onchange="ddFilesChosen(this)">
+    <input type="file" id="ddFileInput" accept=".xls,.xlsx,.xlsm" multiple style="display:none" onchange="ddFilesChosen(this)">
     <div id="ddSectionStats"><div id="ddqcBody" style="padding:4px"></div></div>
     <div id="ddSectionReviews" style="display:none"><div id="ddReviewsBody" style="padding:4px"></div></div>
   </div>
@@ -926,6 +1054,34 @@ body.dark .notif{background:rgba(13,25,50,.95)}
   </div>
 </div>
 
+<!-- ============ IZBIRNIK PDF SERVISNEGA ZAPISNIKA (OneDrive Abbott_Servis) ============ -->
+<div class="mo" id="srvPickModal">
+  <div class="modal" style="max-width:480px">
+    <div class="mh"><h3>Izberi servisni zapisnik (PDF)</h3><button class="mc" onclick="closeMo('srvPickModal')">&#10005;</button></div>
+    <div class="mb">
+      <div id="srvPickPathLbl" style="font-size:11px;color:var(--text3);margin-bottom:8px;word-break:break-all"></div>
+      <div id="srvPickBody" style="max-height:360px;overflow-y:auto"></div>
+    </div>
+    <div class="mf"><button class="btn btn-g" onclick="closeMo('srvPickModal')">Prekliči</button></div>
+  </div>
+</div>
+
+<!-- ============ PREDOGLED PRED TISKANJEM ============
+     Vsako tiskanje PDF poročila gre skozi to okno — najprej se vidi generiran
+     dokument, "Natisni" sele nato sprozi sistemsko okno za tiskanje (Windows/
+     Android), kjer uporabnik izbere svoj Wi-Fi ali Bluetooth tiskalnik. -->
+<div class="mo" id="printPreviewModal">
+  <div class="modal" style="max-width:820px;width:95vw">
+    <div class="mh"><h3 id="printPreviewTitle">&#128424;&#65039; Predogled tiskanja</h3><button class="mc" onclick="closeMo('printPreviewModal')">&#10005;</button></div>
+    <div class="mb" style="padding:0">
+      <iframe id="printPreviewFrame" style="width:100%;height:65vh;border:none;background:#fff"></iframe>
+    </div>
+    <div class="mf"><button class="btn btn-g" onclick="closeMo('printPreviewModal')">Prekliči</button>
+      <button class="btn btn-a" onclick="printCurrentPreview()">&#128424;&#65039; Natisni</button>
+    </div>
+  </div>
+</div>
+
 <!-- ============ NAROČILA ============ -->
 <div class="page-main" id="main-narocila">
   <div class="qc-subnav" id="ordSubnav">
@@ -933,6 +1089,7 @@ body.dark .notif{background:rgba(13,25,50,.95)}
     <div class="tab" data-ord="minstock" onclick="navOrd('minstock')">&#128207; Min. zaloga</div>
     <div class="tab" data-ord="statrecv" onclick="navOrd('statrecv')">&#128229; Statistika sprejema</div>
     <div class="tab" data-ord="statuse" onclick="navOrd('statuse')">&#128228; Statistika porabe</div>
+    <div class="tab" style="margin-left:auto;color:var(--red)" onclick="navMain('reklamacije')">&#9888;&#65039; Reklamacije</div>
   </div>
 
   <!-- PRIPRAVA NAROČILA -->
@@ -989,6 +1146,7 @@ body.dark .notif{background:rgba(13,25,50,.95)}
         <input type="date" id="srTo" onchange="renderStatRecv()">
         <select id="srGroup" onchange="renderStatRecv()"><option value="type">Po tipu</option><option value="article">Po artiklu</option><option value="lot">Po lotu</option></select>
         <button class="btn btn-g btn-sm" onclick="exportStatRecvCSV()">&#128190; CSV</button>
+        <button class="btn btn-g btn-sm" onclick="printStatRecv()">&#128424;&#65039; Natisni</button>
       </div>
       <div class="lj-canvas-wrap"><canvas id="srCanvas" height="300"></canvas></div>
       <div class="tbl-wrap" style="margin-top:10px"><table><thead id="srHead"></thead><tbody id="srBody"></tbody></table></div>
@@ -1004,6 +1162,7 @@ body.dark .notif{background:rgba(13,25,50,.95)}
         <span style="align-self:center">&rarr;</span>
         <select id="suTo" onchange="renderStatUse()"></select>
         <button class="btn btn-g btn-sm" onclick="exportStatUseCSV()">&#128190; CSV</button>
+        <button class="btn btn-g btn-sm" onclick="printStatUse()">&#128424;&#65039; Natisni</button>
       </div>
       <div style="font-size:12px;color:var(--text3);margin-bottom:10px">Poraba = zaloga(popis A) + sprejeto(med A in B) &minus; zaloga(popis B). Shranite popis ob vsakem naročilu za natančen izračun.</div>
       <div id="suResult"></div>
@@ -1027,12 +1186,17 @@ body.dark .notif{background:rgba(13,25,50,.95)}
     <div class="card">
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
         <input type="file" id="sfImportPdfInput" accept=".pdf" style="display:none" onchange="srvPdfImportChosen(this)">
-        <button class="btn btn-g btn-sm" onclick="document.getElementById('sfImportPdfInput').click()">&#128196; Uvozi iz PDF (Abbott DTS)</button>
-        <span class="muted" style="font-size:11px">Predizpolni vsa polja iz servisnega naloga</span>
+        <button class="btn btn-g btn-sm" onclick="document.getElementById('sfImportPdfInput').click()">&#128196; Uvozi servisni zapisnik (PDF)</button>
+        <button class="btn btn-g btn-sm" onclick="openSrvPdfPick()">&#9729; Izberi iz OneDrive</button>
+        <span class="muted" style="font-size:11px">Predizpolni polja iz servisnega naloga (naročilnico vpišite ročno)</span>
       </div>
       <div class="fr">
-        <div class="fg" style="flex:1"><label>Naprava / modul *</label><select id="sfDevice"></select></div>
+        <div class="fg" style="flex:1"><label>Naprava / modul *</label><select id="sfDevice" onchange="srvDeviceChanged()"></select></div>
         <div class="fg" style="flex:2"><label>Napaka / okvara *</label><input id="sfFault" placeholder="Npr. Lifter error"></div>
+      </div>
+      <div class="fr">
+        <div class="fg"><label>Inventarna številka</label><input id="sfInventory" placeholder="iz Analizatorjev / servisnega PDF"></div>
+        <div class="fg"><label>Serijska številka aparata</label><input id="sfSerial" placeholder="iz Analizatorjev / servisnega PDF"></div>
       </div>
       <div class="fr">
         <div class="fg"><label>&#9888;&#65039; Napaka se je pojavila *</label><input type="datetime-local" id="sfOccurred"></div>
@@ -1046,7 +1210,9 @@ body.dark .notif{background:rgba(13,25,50,.95)}
       <div class="fr">
         <div class="fg"><label>&#128196; Št. naloga (servis)</label><input id="sfNalog" placeholder="npr. 0260/2026"></div>
         <div class="fg"><label>&#128195; Naročilnica (interna)</label><input id="sfOrder" placeholder="npr. NAR-2026-123"></div>
+        <div class="fg"><label>&#128337; Zaračunane ure</label><input id="sfBilledHours" type="number" step="0.1" min="0" placeholder="npr. 2.5"></div>
       </div>
+      <div class="muted" style="font-size:11px;margin-top:-6px;margin-bottom:4px">Vnesi ure, kot jih navaja servisni zapisnik (ne izračunani čas do odprave) — uporabljeno v Statistiki servisov za "Vsota ur".</div>
       <div class="fg"><label>Opomba</label><textarea id="sfNote" placeholder="Opis storitve, zamenjani deli, serviser..."></textarea></div>
       <div class="fg">
         <label>&#128206; Priponke (servisna poročila PDF)</label>
@@ -1096,7 +1262,7 @@ body.dark .notif{background:rgba(13,25,50,.95)}
 
   <!-- SRV STATS -->
   <div class="page srv-page" id="srv-stats">
-    <div class="sec-hdr"><div class="sec-title" style="font-size:16px">Statistika servisov</div><button class="btn btn-g btn-sm" onclick="exportSrvStatsCSV()">&#128190; CSV</button></div>
+    <div class="sec-hdr"><div class="sec-title" style="font-size:16px">Statistika servisov</div><span style="display:flex;gap:6px"><button class="btn btn-g btn-sm" onclick="exportSrvStatsCSV()">&#128190; CSV</button><button class="btn btn-g btn-sm" onclick="printSrvStats()">&#128424;&#65039; Natisni</button></span></div>
     <div class="card">
       <div class="fr">
         <select id="ssMode" onchange="srvStatsModeChange()">
@@ -1114,7 +1280,7 @@ body.dark .notif{background:rgba(13,25,50,.95)}
         </select>
       </div>
       <div class="card" style="padding:8px"><canvas id="srvStatsCanvas" style="width:100%;height:300px"></canvas></div>
-      <div class="tbl-wrap"><table><thead><tr><th>Naprava</th><th>Napak</th><th>Odpravljenih</th><th>Odprtih</th><th>Povpr. čas do odprave</th></tr></thead><tbody id="srvStatsBody"></tbody></table></div>
+      <div class="tbl-wrap"><table><thead><tr><th>Naprava</th><th>Napak</th><th>Odpravljenih</th><th>Odprtih</th><th>Povpr. čas do odprave</th><th>Vsota ur</th></tr></thead><tbody id="srvStatsBody"></tbody><tfoot id="srvStatsFoot"></tfoot></table></div>
     </div>
   </div>
 
@@ -1219,11 +1385,44 @@ body.dark .notif{background:rgba(13,25,50,.95)}
   <div class="card">
     <div class="card-title">&#9881;&#65039; Nastavitve</div>
     <div class="toggle-wrap" style="margin-bottom:14px"><label class="toggle"><input type="checkbox" id="darkToggle" onchange="toggleDark()"><span class="toggle-slider"></span></label><span style="font-size:13px">Temni način</span></div>
-    <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text3);margin:12px 0 8px;letter-spacing:.5px">Skeniranje (onemogočeno na tablici)</div>
-    <div class="disabled-note">&#128683; Serijski sprejem &ndash; ni skeniranja na tablici</div>
-    <div class="disabled-note">&#128683; Moč RFID (sprejem) &ndash; ni RFID čitalca</div>
-    <div class="disabled-note">&#128683; Multi RFID &ndash; ni RFID čitalca</div>
-    <div class="disabled-note">&#128683; Locate Tag &ndash; ni RFID čitalca</div>
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text3);margin:12px 0 8px;letter-spacing:.5px">Skeniranje / RFID</div>
+    <div class="toggle-wrap" style="margin-bottom:8px"><label class="toggle"><input type="checkbox" id="rfidToggle" onchange="toggleRfid(this.checked)"><span class="toggle-slider"></span></label><span style="font-size:13px">RFID funkcije</span></div>
+    <div class="muted" style="font-size:11px;margin-bottom:10px">Vklopi, kadar naprava <b>ima</b> RFID čitalec (npr. tablica z RFID vmesnikom). Na PC-ju in na tablici brez čitalca pusti izklopljeno &mdash; gumbi za skeniranje se skrijejo in vse se vpisuje ročno.</div>
+    <div id="rfidNotes">
+      <div class="disabled-note">&#128683; Serijski sprejem &ndash; ni skeniranja na tablici</div>
+      <div class="disabled-note">&#128683; Moč RFID (sprejem) &ndash; ni RFID čitalca</div>
+      <div class="disabled-note">&#128683; Multi RFID &ndash; ni RFID čitalca</div>
+      <div class="disabled-note">&#128683; Locate Tag &ndash; ni RFID čitalca</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">&#128424;&#65039; Tiskalnik</div>
+    <div class="muted" style="font-size:12px;margin-bottom:10px">Za tiskanje PDF poročil aplikacija uporabi sistemsko okno za tiskanje (Windows na PC-ju / Android na tablici) &mdash; tam izbereš svoj tiskalnik, ne glede na to, ali je povezan prek <b>Wi-Fi</b> (omrežni tiskalnik) ali <b>Bluetooth</b> (najprej ga seznani/namesti v nastavitvah naprave). Pred vsakim tiskanjem se najprej odpre predogled PDF-ja.</div>
+    <div class="frow" style="margin-bottom:10px">
+      <div class="fg"><label>Način povezave (informativno)</label>
+        <select id="printerConnType" onchange="_savePrinterPref()">
+          <option value="wifi">&#128225; Wi-Fi (omrežni tiskalnik)</option>
+          <option value="bluetooth">&#128204; Bluetooth</option>
+        </select>
+      </div>
+      <div class="fg"><label>Ime tiskalnika (izbrano nazadnje)</label><input id="printerLastName" readonly placeholder="izbereš ob tiskanju"></div>
+    </div>
+    <button class="btn btn-g btn-sm" onclick="testPrint()">&#128424;&#65039; Testno natisni</button>
+  </div>
+  <div class="card">
+    <div class="card-title">&#129514; Matriksi preiskav</div>
+    <div class="muted" style="font-size:12px;margin-bottom:10px">Oznake vzorca (matriksa), ki jih lahko pripišeš posamezni preiskavi v zavihku Preiskave (npr. S-Glukoza serum, U-Glukoza urin, Lc-Glukoza likvor, PTV-Glukoza punktat telesne votline).</div>
+    <div class="tbl-wrap"><table><thead><tr><th style="width:80px">Oznaka</th><th>Naziv</th><th style="width:90px"></th></tr></thead><tbody id="matrixListBody"></tbody></table></div>
+    <button class="btn btn-a btn-sm" style="margin-top:8px" onclick="addMatrixRow()">&#10133; Nov matriks</button>
+  </div>
+  <div class="card">
+    <div class="card-title">&#129380; Odprta embalaža</div>
+    <div class="muted" style="font-size:12px;margin-bottom:10px">Za katere tipe artiklov se po odprtju šteje <b>stabilnost</b> (rok uporabe po odprtju) in za katere se sledi <b>posameznim stekleničkam / alikvotom</b> v škatli. Privzeta stabilnost velja, kadar artikel v GTIN katalogu nima svoje vrednosti. Za reagente se privzeto beleži le datum odprtja škatle.</div>
+    <div class="fg" style="max-width:230px;margin-bottom:10px"><label>Opozori N dni pred iztekom</label>
+      <input type="number" id="pkgWarnAhead" min="0" max="365" onchange="editPkgWarnAhead(this.value)"></div>
+    <div class="tbl-wrap"><table><thead><tr>
+      <th>Tip</th><th style="width:80px">Opozorilo</th><th style="width:110px">Stekleničke</th><th style="width:110px">Privz. dni</th><th style="width:110px">Privz. št. steklenič.</th>
+    </tr></thead><tbody id="pkgSettingsBody"></tbody></table></div>
   </div>
   </div><!-- /vec-settings -->
 
@@ -1238,7 +1437,7 @@ body.dark .notif{background:rgba(13,25,50,.95)}
       </div></div>
     <div class="muted" style="font-size:12px;margin-bottom:8px">5-mestna matična številka je vpis in podpis. Vloge: Operater &middot; Napredni (urejanje za nazaj) &middot; Admin (nastavitve). <span id="vecOpCount"></span></div>
     <div class="fr"><input id="opSearch" placeholder="&#128269; Ime, priimek, ID..." oninput="renderOperators()"></div>
-    <div class="card" style="padding:0"><div class="tbl-wrap"><table><thead><tr><th>ID</th><th>Ime</th><th>Priimek</th><th></th></tr></thead><tbody id="operatorBody"></tbody></table></div></div>
+    <div class="card" style="padding:0"><div class="tbl-wrap"><table><thead><tr><th>ID</th><th>Ime</th><th>Priimek</th><th>E-pošta</th><th></th></tr></thead><tbody id="operatorBody"></tbody></table></div></div>
   </div><!-- /vec-operators -->
 
   <div class="page vec-page" id="vec-gtins">
@@ -1315,6 +1514,7 @@ body.dark .notif{background:rgba(13,25,50,.95)}
         <option value="operator">Operaterji</option>
         <option value="lot">Loti</option>
         <option value="qcvalue">Uradne vrednosti</option>
+        <option value="openedpkg">Odprta embalaža</option>
       </select>
       <input type="date" id="auFilterFrom" onchange="renderAuditLog()" style="padding:6px 8px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);font-size:12px">
       <input type="date" id="auFilterTo" onchange="renderAuditLog()" style="padding:6px 8px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);font-size:12px">
@@ -1333,6 +1533,7 @@ body.dark .notif{background:rgba(13,25,50,.95)}
       <button class="btn btn-g btn-sm" onclick="$i('importDelivJson').click()">&#8679; Uvozi JSON</button>
       <button class="btn btn-g btn-sm" onclick="if(reconcileDeliveriesFromReceived()){renderDeliveries();notify('Dobavnice usklajene s sprejemom','ok');}else{notify('Ni sprememb','ok');}">&#8644; Uskladi</button>
       <button class="btn btn-a btn-sm" onclick="salusCheckNew()">&#8635; Preveri</button>
+      <button class="btn btn-a btn-sm" style="background:var(--green);border-color:var(--green)" onclick="confirmAllDeliveries()">&#10003;&#10003; Sprejmi in potrdi vse</button>
     </div>
   </div>
   <input type="file" id="importDelivJson" accept=".json" style="display:none" onchange="importDeliveriesJson(event)">
@@ -1431,7 +1632,6 @@ body.dark .notif{background:rgba(13,25,50,.95)}
   <div class="bn-item" data-main="deliveries" onclick="navMain('deliveries')"><div class="bn-icon">&#128666;</div>Dobavnice</div>
   <div class="bn-item" data-main="servis" onclick="navMain('servis')"><div class="bn-icon">&#128295;</div>Servis</div>
   <div class="bn-item" data-main="qc" onclick="navMain('qc')"><div class="bn-icon">&#128202;</div>QC</div>
-  <div class="bn-item" data-main="reklamacije" onclick="navMain('reklamacije')"><div class="bn-icon">&#9888;&#65039;</div>Reklam.</div>
   <div class="bn-item" data-main="vec" onclick="navMain('vec')"><div class="bn-icon">&#9776;</div>Več</div>
 </nav>
 
@@ -1455,6 +1655,11 @@ body.dark .notif{background:rgba(13,25,50,.95)}
 <script src="order_templates.js"></script>
 <script src="naroc_gtins.js"></script>
 <script src="xlsx.full.min.js"></script>
+<!-- pdfMake — za "Natisni BK" (Pregled zaloge kontrol/kalibratorjev).
+     Ista knjiznica in ista razporeditev kot v Zebra aplikaciji Pregled BK,
+     da je PDF identicen (glej _doExportBkPDF spodaj). -->
+<script src="pdfmake.min.js"></script>
+<script src="vfs_fonts.js"></script>
 
 <!-- DETAIL MODAL (Zaloga item) -->
 <div class="mo" id="detailModal">
@@ -1479,6 +1684,7 @@ body.dark .notif{background:rgba(13,25,50,.95)}
     <div class="mb">
       <div class="fg"><label>Naziv</label><input id="assayName"></div>
       <div class="fg"><label>Tip</label><select id="assayType"><option value="biochem">Biokemija (c)</option><option value="immuno">Imunologija (i)</option></select></div>
+      <div class="fg"><label>Matriks</label><select id="assayMatrix"></select></div>
     </div>
     <div class="mf"><button class="btn btn-g" onclick="closeMo('assayModal')">Prekliči</button><button class="btn btn-a" onclick="saveAssay()">Shrani</button></div>
   </div>
@@ -1580,14 +1786,17 @@ body.dark .notif{background:rgba(13,25,50,.95)}
   <div class="modal" style="max-width:440px">
     <div class="mh"><h3 id="operatorModalTitle">Operater</h3><button class="mc" onclick="closeMo('operatorModal')">&#10005;</button></div>
     <div class="mb">
-      <div class="fg"><label>Matična številka (5 mest)</label><input id="opId" inputmode="numeric" maxlength="5"></div>
-      <div class="frow"><div class="fg"><label>Ime</label><input id="opFirst"></div><div class="fg"><label>Priimek</label><input id="opLast"></div></div>
+      <div class="fg"><label>Matična številka (5 mest)</label><input id="opId" inputmode="numeric" maxlength="5" oninput="_updateOpEmailPreview()"></div>
+      <div class="frow"><div class="fg"><label>Ime</label><input id="opFirst" oninput="_updateOpEmailPreview()"></div><div class="fg"><label>Priimek</label><input id="opLast" oninput="_updateOpEmailPreview()"></div></div>
       <div class="fg"><label>Vloga</label>
         <select id="opRole">
           <option value="operator">Operater</option>
           <option value="advanced">Napredni operater</option>
           <option value="admin">Administrator</option>
         </select></div>
+      <div class="fg"><label>E-pošta (samodejno izračunano)</label>
+        <div id="opEmailPreview" style="font-size:12px;line-height:1.6;background:var(--bg2);border:1px solid var(--border);border-radius:7px;padding:6px 10px"></div>
+      </div>
     </div>
     <div class="mf"><button class="btn btn-g" onclick="closeMo('operatorModal')">Prekliči</button><button class="btn btn-a" onclick="saveOperator()">Shrani</button></div>
   </div>
@@ -1610,6 +1819,11 @@ body.dark .notif{background:rgba(13,25,50,.95)}
           <option value="i">i &mdash; imunokemija</option>
           <option value="l">l &mdash; linija</option>
         </select></div>
+      <div class="frow">
+        <div class="fg"><label>Serijska številka</label><input id="inSerial" maxlength="40" placeholder="npr. AC0400973800169289"></div>
+        <div class="fg"><label>Inventarna številka</label><input id="inInventory" maxlength="40" placeholder="iz servisnega zapisnika"></div>
+      </div>
+      <div class="muted" style="font-size:11px;margin-top:-4px">Uporabljeno za samodejno prepoznavo modula pri uvozu servisnega PDF zapisnika (Servis &rarr; Vpis napake) — dopolni se lahko tudi samodejno ob uvozu.</div>
     </div>
     <div class="mf"><button class="btn btn-g" onclick="closeMo('instrModal')">Prekliči</button><button class="btn btn-a" onclick="saveInstr()">Shrani</button></div>
   </div>
@@ -1834,7 +2048,7 @@ function navMain(tab){
   document.querySelector('.bn-item[data-main="'+tab+'"]')?.classList.add('active');
   $i('mainScrollReset')?.scrollTo?.(0,0);
   document.querySelector('.main').scrollTop=0;
-  if(tab==='zaloga') renderZaloga();
+  if(tab==='zaloga') navZal(currentZal||'stock');
   if(tab==='roki') renderRoki();
   if(tab==='loti') renderLoti();
   if(tab==='qc') navQc(currentQc||'dashboard');
@@ -1844,6 +2058,20 @@ function navMain(tab){
   if(tab==='deliveries') renderDeliveries();
   if(tab==='reklamacije') navRekl(currentRekl||'vpis');
   try{renderAlertUI();}catch(e){}
+}
+
+/* ============ ZALOGA SUB-NAVIGATION ============ */
+let currentZal='stock';
+function navZal(page){
+  currentZal=page;
+  document.querySelectorAll('.zal-page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('#zalSubnav .tab').forEach(t=>t.classList.remove('active'));
+  $i('zal-'+page)?.classList.add('active');
+  document.querySelector('#zalSubnav .tab[data-zal="'+page+'"]')?.classList.add('active');
+  if(page==='stock')renderZaloga();
+  if(page==='poraba'){loadPregledDB();renderPoraba();}
+  if(page==='prejeto'){loadPregledDB();renderPrejeto();}
+  if(page==='opened')renderOpenedPkg();
 }
 
 /* ============ QC SUB-NAVIGATION ============ */
@@ -1922,6 +2150,14 @@ function _ddCvFromRaw(ws,r,rawCols){
 var DD_PLACEHOLDER=7;
 function _ddAvgPos(arr){
   var p=arr.filter(function(x){return typeof x==='number'&&x>=0&&x!==DD_PLACEHOLDER;});
+  return {avg:p.length?(p.reduce(function(a,b){return a+b;},0)/p.length):null, n:p.length};
+}
+/* Enako kot _ddAvgPos, a NE odreze negativnih vrednosti — uporabljeno za prikaz
+   stolpcev kanalov (Odklon %), kjer zelimo ohraniti smer odklona (+ nad, - pod
+   ciljno/pricakovano vrednostjo). CV%/CILJ statistika ostaja na _ddAvgPos
+   (AVEARGEIF(">0") kot v izvirnem VBA), ker gre za skupno variabilnost, ne smer. */
+function _ddAvgSigned(arr){
+  var p=arr.filter(function(x){return typeof x==='number'&&isFinite(x)&&x!==DD_PLACEHOLDER;});
   return {avg:p.length?(p.reduce(function(a,b){return a+b;},0)/p.length):null, n:p.length};
 }
 
@@ -2026,7 +2262,7 @@ function _ddComputeStats(categoryId,dateFrom,dateTo){
       Object.keys(d.channels||{}).forEach(function(cn){(chAgg[cn]=chAgg[cn]||[]).push(d.channels[cn]);});
     });
     var chAvg={};
-    Object.keys(chAgg).forEach(function(cn){chAvg[cn]=_ddAvgPos(chAgg[cn]).avg;});
+    Object.keys(chAgg).forEach(function(cn){chAvg[cn]=_ddAvgSigned(chAgg[cn]).avg;});
     var ov=_ddAvgPos(isoList.map(function(iso){return days[iso].overall;}));
     var ciljVal=cilj[name]?cilj[name].cilj:null;
     var flag=(ov.avg!=null&&ciljVal!=null&&ov.avg>ciljVal);
@@ -2133,7 +2369,7 @@ function _ddOnPickListed(json,msg){
 }
 function _ddRenderPick(){
   var folders=_ddPickItems.filter(function(f){return f&&f.folder;});
-  var files=_ddPickItems.filter(function(f){return f&&!f.folder&&/\.xlsx?$/i.test(f.name||'');});
+  var files=_ddPickItems.filter(function(f){return f&&!f.folder&&/\.(xlsx?|xlsm)$/i.test(f.name||'');});
   var h='',parts=_ddPickPath.split('/').filter(Boolean);
   if(parts.length){h+='<div class="assay-pick-item" onclick="_ddPickUp()">&#8593; .. (nazaj)</div>';}
   folders.forEach(function(f){h+='<div class="assay-pick-item" onclick="_ddPickInto(\''+_ge(f.name).replace(/'/g,"\\'")+'\')">&#128193; '+_repEsc(f.name)+'</div>';});
@@ -2154,15 +2390,27 @@ function _ddPickToggle(name,checked){
   if(checked&&i<0)_ddPickSelected.push(name);
   else if(!checked&&i>=0)_ddPickSelected.splice(i,1);
 }
+/* Doda izbrane datoteke v seznam kategorije, zapre izbirnik in se vrne na
+   urejevalnik kategorije (ddCategoryEditModal), kjer so dodane datoteke ze
+   vidne na seznamu — dejansko shranjevanje kategorije se zgodi sele s
+   pritiskom na "Shrani" v urejevalniku (saveDdCategoryEdit).
+   Pomembno: showMo() ob odpiranju izbirnika zapre VSE druge odprte '.mo.open'
+   modale (glej showMo, ~1826) — torej ddCategoryEditModal se je ob odpiranju
+   izbirnika samodejno zaprl in ga je treba tu eksplicitno znova odpreti,
+   sicer uporabnik po zaprtju izbirnika ne vidi vec urejevalnika (in je videti,
+   kot da dodane datoteke izginejo). */
 function ddPickSaveSelected(){
   if(!_ddPickSelected.length){notify('Izberi vsaj eno datoteko (kljukica)','warning');return;}
+  var added=_ddPickSelected.length;
   _ddPickSelected.forEach(function(name){if(_ddCatFilesList.indexOf(name)<0)_ddCatFilesList.push(name);});
   if(($i('ddCatFolder').value||'').trim()!==_ddPickPath)$i('ddCatFolder').value=_ddPickPath;
   _renderDdCatFilesList();
+  _ddPickSelected=[];
   closeMo('ddPickModal');
-  notify('Dodanih '+_ddPickSelected.length+' datotek','ok');
+  showMo('ddCategoryEditModal');
+  notify('Dodanih '+added+' datotek na seznam. Klikni "Shrani" za potrditev kategorije.','ok');
 }
-function ddPickConfirmFolder(){$i('ddCatFolder').value=_ddPickPath;closeMo('ddPickModal');}
+function ddPickConfirmFolder(){$i('ddCatFolder').value=_ddPickPath;closeMo('ddPickModal');showMo('ddCategoryEditModal');}
 
 /* ---- Posodobi: prenos vseh datotek trenutne kategorije iz OneDrive (Graph),
    z DD_CSV predpomnilnikom (glej Del 5) — ce se izvorna xls ni spremenila, se
@@ -2228,7 +2476,7 @@ function _ddDownloadNext(){
   if(job.mode==='cache'&&AndroidBridge.msDownloadText){
     var csvName=job.filename.replace(/\.(xlsx?|xlsm)$/i,'')+'.json';
     _ddAwaitingCache=true;
-    try{AndroidBridge.msDownloadText('DD_CSV/'+job.categoryId+'/'+csvName);}
+    try{AndroidBridge.msDownloadText('BIO/DD_Kontrole/DD_CSV/'+job.categoryId+'/'+csvName);}
     catch(e){_ddAwaitingCache=false;_ddFallbackBinary(job);}
   } else {
     try{AndroidBridge.msDownloadBinary(job.folder+'/'+job.filename);}catch(e){_ddDownloadNext();}
@@ -2258,11 +2506,34 @@ function _ddMergeParsedAndArchive(parsed,job){
       var csvName=job.filename.replace(/\.(xlsx?|xlsm)$/i,'')+'.json';
       var payload=JSON.stringify({dayRecords:parsed.dayRecords,ciljMap:parsed.ciljMap,analyteOrder:parsed.analyteOrder,
         channels:parsed.layout?parsed.layout.channels.map(function(c){return c.n;}):[],sourceFile:job.filename,parsedAt:new Date().toISOString()});
-      AndroidBridge.msUploadRaw('DD_CSV/'+job.categoryId+'/'+csvName,payload,'application/json');
+      AndroidBridge.msUploadRaw('BIO/DD_Kontrole/DD_CSV/'+job.categoryId+'/'+csvName,payload,'application/json');
     }
   }catch(e){}
 }
 function onMsBinaryFile(rel,b64,msg){
+  if(_srvAttachAwaitingView){
+    _srvAttachAwaitingView=false;
+    if(!b64){notify('Ni mogoče prenesti datoteke: '+(msg||''),'error');return;}
+    try{
+      var bin=atob(b64);var u8=new Uint8Array(bin.length);
+      for(var i=0;i<bin.length;i++)u8[i]=bin.charCodeAt(i);
+      var blob=new Blob([u8],{type:'application/pdf'});
+      window.open(URL.createObjectURL(blob),'_blank');
+    }catch(e){notify('Napaka pri odpiranju datoteke','error');}
+    return;
+  }
+  if(_srvPickAwaitingBinary){
+    _srvPickAwaitingBinary=false;closeMo('srvPickModal');
+    if(b64){
+      /* Shrani povezavo (OneDrive pot) do izbranega PDF zapisnika kot priponko na
+         vnosu — ni lokalna kopija, ampak referenca za kasnejse odpiranje/sledenje. */
+      srvAttachTemp.push({name:(rel||'').split('/').pop(),path:'',onedrivePath:rel,
+        size:Math.floor(b64.length*3/4),addedAt:new Date().toISOString(),source:'onedrive'});
+      renderSrvAttach();
+      srvImportPdf(b64);
+    } else notify('Prenos ni uspel: '+(msg||''),'error');
+    return;
+  }
   var job=_ddCurJob;_ddCurJob=null;
   if(!_ddPending){return;} /* prenos ni bil za DD (npr. DD Excel izbirnik drugje) */
   if(job&&b64){
@@ -2346,11 +2617,13 @@ function renderDdqc(){
     return;
   }
   var h='';
-  h+='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">'+
-     '<label style="font-size:11px;color:var(--text3)">Od <input type="date" id="ddDateFrom" value="'+(_ddDateFrom||'')+'" style="font-size:11px"></label>'+
-     '<label style="font-size:11px;color:var(--text3)">Do <input type="date" id="ddDateTo" value="'+(_ddDateTo||'')+'" style="font-size:11px"></label>'+
-     '<button class="btn btn-outline btn-sm" onclick="ddApplyDateRange()">Uporabi</button>'+
-     '<button class="btn btn-outline btn-sm" onclick="ddClearDateRange()">Vse obdobje</button>'+
+  h+='<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:14px;padding:10px 14px;background:var(--bg2);border:1px solid var(--border);border-radius:10px">'+
+     '<label style="display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:var(--text2)">Od'+
+       '<input type="date" id="ddDateFrom" value="'+(_ddDateFrom||'')+'" style="font-size:13px;padding:6px 8px;border:1px solid var(--border);border-radius:7px;background:var(--bg1);color:var(--text)"></label>'+
+     '<label style="display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:var(--text2)">Do'+
+       '<input type="date" id="ddDateTo" value="'+(_ddDateTo||'')+'" style="font-size:13px;padding:6px 8px;border:1px solid var(--border);border-radius:7px;background:var(--bg1);color:var(--text)"></label>'+
+     '<button class="btn btn-a btn-sm" style="font-size:13px;padding:7px 16px" onclick="ddApplyDateRange()">&#10003; Uporabi</button>'+
+     '<button class="btn btn-outline btn-sm" style="font-size:13px;padding:7px 16px" onclick="ddClearDateRange()">&#8635; Vse obdobje</button>'+
      '</div>';
   if(st.flagged>0){
     h+='<div style="display:flex;gap:8px;align-items:flex-start;background:var(--rbg,#fef2f2);border:1px solid var(--red);border-radius:8px;padding:10px 12px;margin-bottom:12px">'+
@@ -2367,29 +2640,43 @@ function ddApplyDateRange(){_ddDateFrom=$i('ddDateFrom').value||'';_ddDateTo=$i(
 function ddClearDateRange(){_ddDateFrom='';_ddDateTo='';renderDdqc();}
 function _ddRenderTable(label,res){
   var fmt=function(v){return v==null?'':(Math.round(v*100)/100).toFixed(2);};
+  /* Odklon % ima predznak (+ nad, - pod pricakovano vrednostjo) — prikazemo ga
+     eksplicitno z + / - in barvno lociramo smer, da je odstopanje razvidno na prvi pogled. */
+  var fmtSigned=function(v){
+    if(v==null)return '';
+    var r=Math.round(v*100)/100;
+    return (r>0?'+':'')+r.toFixed(2);
+  };
+  var nCols=2+res.channels.length+3; // sticky Preiskava + kanali + CV%/CILJ/n dni
+  var chW=(60/Math.max(res.channels.length,1)).toFixed(2);
   var h='<div class="card" style="margin-bottom:12px;overflow-x:auto">';
   h+='<div class="card-title" style="justify-content:space-between"><span>'+_repEsc(label)+'</span>'+
      '<span style="font-size:11px;font-weight:400;color:var(--text3)">'+(res.nDays||0)+' dni'+(res.flagged?' &middot; <span style="color:var(--red);font-weight:700">'+res.flagged+' odstopa</span>':'')+'</span></div>';
   if(!res.assays.length){h+='<div class="empty" style="padding:16px;font-size:12px;color:var(--text3)">Ni podatkov za izbrano obdobje.</div></div>';return h;}
-  h+='<table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr>'+
-     '<th style="text-align:left;padding:5px 6px;position:sticky;left:0;background:var(--bg3)">Preiskava</th>';
-  res.channels.forEach(function(n){h+='<th style="padding:5px 4px">'+_repEsc(n)+'</th>';});
-  h+='<th style="padding:5px 4px">CV%</th><th style="padding:5px 4px">CILJ</th><th style="padding:5px 4px">n dni</th></tr></thead><tbody>';
+  h+='<table style="width:100%;min-width:'+(600+res.channels.length*70)+'px;table-layout:fixed;border-collapse:collapse;font-size:11px">';
+  h+='<colgroup><col style="width:16%">';
+  res.channels.forEach(function(){h+='<col style="width:'+chW+'%">';});
+  h+='<col style="width:8%"><col style="width:8%"><col style="width:8%"></colgroup>';
+  h+='<thead><tr>'+
+     '<th style="text-align:left;padding:5px 6px;position:sticky;left:0;background:var(--bg3);border-right:1px solid var(--border)">Preiskava</th>';
+  res.channels.forEach(function(n){h+='<th style="padding:5px 4px;border-right:1px solid var(--border);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+_repEsc(n)+'">'+_repEsc(n)+'</th>';});
+  h+='<th style="padding:5px 4px;border-right:1px solid var(--border)">CV%</th><th style="padding:5px 4px;border-right:1px solid var(--border)">CILJ</th><th style="padding:5px 4px">n dni</th></tr></thead><tbody>';
   res.assays.forEach(function(a){
     h+='<tr style="border-top:1px solid var(--border)">';
-    h+='<td style="text-align:left;padding:5px 6px;font-weight:600;position:sticky;left:0;background:var(--bg2)">'+_repEsc(a.name)+'</td>';
+    h+='<td style="text-align:left;padding:5px 6px;font-weight:600;position:sticky;left:0;background:var(--bg2);border-right:1px solid var(--border);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+_repEsc(a.name)+'">'+_repEsc(a.name)+'</td>';
     res.channels.forEach(function(n){
-      var v=a.ch[n];var over=(v!=null&&a.cilj!=null&&v>a.cilj);
-      h+='<td style="padding:5px 4px;text-align:center'+(over?';background:var(--rbg,#fef2f2);color:var(--red);font-weight:700':'')+'">'+fmt(v)+'</td>';
+      var v=a.ch[n];var over=(v!=null&&a.cilj!=null&&Math.abs(v)>a.cilj);
+      var signColor=v==null?'':(v<0?'color:var(--blue,#2563eb)':(v>0?'color:var(--text)':''));
+      h+='<td style="padding:5px 4px;text-align:center;border-right:1px solid var(--border)'+(over?';background:var(--rbg,#fef2f2);color:var(--red);font-weight:700':';'+signColor)+'">'+fmtSigned(v)+'</td>';
     });
     var oOver=a.flag;
-    h+='<td style="padding:5px 4px;text-align:center;font-weight:700'+(oOver?';background:var(--red);color:#fff':'')+'">'+fmt(a.overall)+'</td>';
-    h+='<td style="padding:5px 4px;text-align:center;color:var(--text3)">'+fmt(a.cilj)+'</td>';
+    h+='<td style="padding:5px 4px;text-align:center;font-weight:700;border-right:1px solid var(--border)'+(oOver?';background:var(--red);color:#fff':'')+'">'+fmt(a.overall)+'</td>';
+    h+='<td style="padding:5px 4px;text-align:center;color:var(--text3);border-right:1px solid var(--border)">'+fmt(a.cilj)+'</td>';
     h+='<td style="padding:5px 4px;text-align:center;color:var(--text3)">'+(a.n||0)+'</td>';
     h+='</tr>';
   });
   h+='</tbody></table>';
-  h+='<div style="font-size:10px;color:var(--text3);margin-top:6px">Stolpci kanalov = povprečni odklon %; CV% = povprečni skupni CV (izračunan iz dejansko izpolnjenih dni v izbranem obdobju — n); CILJ = CVb/2. Rdeče = nad ciljem.</div>';
+  h+='<div style="font-size:10px;color:var(--text3);margin-top:6px">Stolpci kanalov = povprečni odklon % s predznakom (+ nad, - pod pričakovano vrednostjo; modro = odklon navzdol); CV% = povprečni skupni CV (izračunan iz dejansko izpolnjenih dni v izbranem obdobju — n); CILJ = CVb/2. Rdeče = |odklon|/CV nad ciljem.</div>';
   h+='</div>';
   return h;
 }
@@ -2554,7 +2841,7 @@ function renderZaloga(){
     if(da===null) return 1;if(db===null) return -1;return da-db;
   });
   const body=$i('zalogaBody');
-  if(!items.length){body.innerHTML='<tr><td colspan="6" class="empty">Ni artiklov. Sinhronizirajte z Zebro (OneDrive) ali uvozite pregledBK_db.</td></tr>';renderPoraba();renderPrejeto();return;}
+  if(!items.length){body.innerHTML='<tr><td colspan="6" class="empty">Ni artiklov. Sinhronizirajte z Zebro (OneDrive) ali uvozite pregledBK_db.</td></tr>';return;}
   body.innerHTML=items.map((it,idx)=>{
     const dl=daysLeft(it.expiry);
     const recCnt=(DB_PREGLED.received||[]).filter(r=>r.gtin===it.gtin&&r.lot===it.lot&&r.status==='active').length;
@@ -2567,7 +2854,508 @@ function renderZaloga(){
       '<td><span class="badge '+(TYPE_BADGE[it.type]||'b-gray')+'">'+(TYPE_LABELS[it.type]||it.type||'&ndash;')+'</span></td>'+
     '</tr>';
   }).join('');
-  renderPoraba();renderPrejeto();
+}
+function printZaloga(){
+  loadPregledDB();
+  const q=($i('zSearch').value||'').toLowerCase();
+  const tf=$i('zType').value;
+  const sort=$i('zSort').value;
+  let items=DB_PREGLED.inventory.filter(it=>{
+    if(tf&&it.type!==tf) return false;
+    if(q){const hay=((it.name||'')+' '+(it.lot||'')+' '+(it.gtin||'')).toLowerCase();if(!hay.includes(q))return false;}
+    return true;
+  });
+  if(sort==='name') items.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  else if(sort==='qty') items.sort((a,b)=>(b.qty||0)-(a.qty||0));
+  else items.sort((a,b)=>{const da=daysLeft(a.expiry),db=daysLeft(b.expiry);if(da===null) return 1;if(db===null) return -1;return da-db;});
+  if(!items.length){notify('Ni artiklov za tiskanje','warn');return;}
+  const body=items.map(it=>{
+    const dl=daysLeft(it.expiry);
+    const ec=expiryPrintClass(dl);
+    return '<tr><td class="l">'+(it.name||'&ndash;')+'<div style="font-size:9px;color:#555">'+(it.gtin||'')+'</div></td><td>'+(it.lot||'&ndash;')+'</td>'+
+      '<td'+(ec?' class="'+ec+'"':'')+'>'+fmtExp(it.expiry)+'</td>'+
+      '<td>'+(it.qty||0)+'</td><td class="l">'+(TYPE_LABELS[it.type]||it.type||'&ndash;')+'</td></tr>';
+  }).join('');
+  var css='body{font-family:sans-serif;padding:16px;color:#000}h2{font-size:15px;margin:0 0 8px}'+
+    'table{border-collapse:collapse;width:100%}th,td{border:1px solid #000;padding:3px 6px;font-size:10px;text-align:center}'+
+    'td.l{text-align:left}th{background:#eee}td.pe-exp{background:#f5b5b5;color:#7f1d1d;font-weight:700}'+
+    'td.pe-14{background:#fbc28a;color:#7c2d12;font-weight:700}td.pe-28{background:#fce18b;color:#78350f}';
+  var html='<!doctype html><html><head><meta charset="utf-8"><style>'+css+'</style></head><body>'+
+    _printHead('Trenutno stanje zaloge')+'<table><thead><tr><th class="l">Naziv</th><th>Lot</th><th>Rok</th><th>Količina</th><th class="l">Tip</th></tr></thead><tbody>'+body+'</tbody></table>'+_printFoot()+'</body></html>';
+  openPrintPreview(html,'Zaloga_'+new Date().toISOString().slice(0,10));
+}
+
+/* ============================================================
+   PREGLED BK — evidenca zaloge in lotov kontrolnega/kalibracijskega materiala
+   Prenos iz Zebra aplikacije Pregled BK (pregled_bk.html, build 108) —
+   ista knjiznica (pdfMake), ista razporeditev, isti logo in noga, da je
+   izpis identicen. Edina prilagoditev: DB -> DB_PREGLED (ime baze v tej app)
+   in izbira operaterja prek seznama namesto DataWedge stevilcnice.
+   ============================================================ */
+var PDF_TITLE='VODENJE EVIDENCE O ZALOGI IN LOT-IH KONTROLNEGA TER KALIBRACIJSKEGA MATERIALA NA PODROČJU BIOKEMIJE IN IMUNOKEMIJE (BK)';
+function fmtExpDot(e){
+  e=(e==null?'':e).toString().trim();
+  if(/^\d{6}$/.test(e))return e.slice(4,6)+'.'+e.slice(2,4)+'.20'+e.slice(0,2);
+  var m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(e); if(m)return m[3]+'.'+m[2]+'.'+m[1];
+  return e;
+}
+var _pdfGrid={hLineWidth:function(){return 0.5;},vLineWidth:function(){return 0.5;},
+  hLineColor:function(){return '#000';},vLineColor:function(){return '#000';},
+  paddingLeft:function(){return 3;},paddingRight:function(){return 3;},
+  paddingTop:function(){return 2;},paddingBottom:function(){return 2;}};
+function _bkProducts(type){
+  var gs=(DB_PREGLED.gtins||[]).filter(function(g){return g.type===type;});
+  gs.sort(function(a,b){return (a.name||a.gtin||'').localeCompare(b.name||b.gtin||'','sl');});
+  return gs.map(function(g){
+    var lots=(DB_PREGLED.inventory||[]).filter(function(i){return i.gtin===g.gtin;});
+    lots.sort(function(a,b){return (a.expiry||'').localeCompare(b.expiry||'');});
+    return {name:g.name||g.gtin,lots:lots};
+  });
+}
+function _bkTitle(t){return {h:2,node:{text:t,color:'#c40000',bold:true,fontSize:11,margin:[0,4,0,2]}};}
+function _bkHeader(label,bg){return {h:1.3,node:{
+  table:{widths:['28%','58%','14%'],body:[[
+    {text:label,bold:true,fontSize:7.5,fillColor:bg},
+    {text:'LOT + EXP.DATE',bold:true,fontSize:7.5,fillColor:bg},
+    {text:'KOL',bold:true,fontSize:7.5,alignment:'center',fillColor:bg}]]},
+  layout:_pdfGrid,margin:[0,0,0,0]}};}
+/* Barva roka izteka v PDF — usklajeno z appom: pretecen=rdeca, <=14d=oranzna, <=28d=rumena */
+function _expColorPdf(expiry){
+  var d=daysLeft(expiry);
+  if(d<0)return {color:'#c00000',bold:true};
+  if(d<=14)return {color:'#e8730c',bold:true};
+  if(d<=28)return {color:'#b8860b',bold:true};
+  return {color:'#555',bold:false};
+}
+function _bkProduct(p){
+  var body=[];
+  if(p.lots.length){
+    p.lots.forEach(function(l,idx){
+      var ec=_expColorPdf(l.expiry);
+      body.push([
+        idx===0?{text:p.name,bold:true,fontSize:7.5,alignment:'center',rowSpan:p.lots.length,fillColor:'#f7f7f7'}:{},
+        {text:[{text:l.lot||'',fontSize:7.5},{text:'  '+fmtExpDot(l.expiry),fontSize:7.5,color:ec.color,bold:ec.bold}]},
+        {text:(l.qty==null?'':String(l.qty)),bold:true,fontSize:8,alignment:'center'}
+      ]);
+    });
+  }else{
+    body.push([
+      {text:p.name,bold:true,fontSize:7.5,alignment:'center',fillColor:'#f7f7f7'},
+      {text:'—',italics:true,fontSize:7,color:'#888',fillColor:'#ededed'},
+      {text:'',fillColor:'#ededed'}
+    ]);
+  }
+  return {h:Math.max(1,p.lots.length)+0.45,node:{
+    table:{widths:['28%','58%','14%'],body:body},layout:_pdfGrid,margin:[0,0,0,3]}};
+}
+/* Sestavi pdfMake dokument — 1:1 kot v Zebri */
+function _buildBkDoc(operatorName){
+  var ctrl=_bkProducts('control'),cal=_bkProducts('calibrator');
+  var blocks=[];
+  blocks.push(_bkTitle('KONTROLE'));blocks.push(_bkHeader('KONTROLA','#d9e8d4'));
+  ctrl.forEach(function(p){blocks.push(_bkProduct(p));});
+  blocks.push(_bkTitle('KALIBRATORJI'));blocks.push(_bkHeader('KALIBRATOR','#bfbfbf'));
+  cal.forEach(function(p){blocks.push(_bkProduct(p));});
+  var total=blocks.reduce(function(s,b){return s+b.h;},0),half=total/2,acc=0,left=[],right=[];
+  blocks.forEach(function(b){if(acc<half){left.push(b.node);acc+=b.h;}else right.push(b.node);});
+  var n=new Date();
+  var today=('0'+n.getDate()).slice(-2)+'.'+('0'+(n.getMonth()+1)).slice(-2)+'.'+n.getFullYear()
+           +'  '+('0'+n.getHours()).slice(-2)+':'+('0'+n.getMinutes()).slice(-2);
+  return {
+    pageSize:'A4',pageOrientation:'portrait',pageMargins:[40,82,34,52],
+    header:function(){return {margin:[40,16,34,0],stack:[
+      {columns:[{width:'*',text:PDF_TITLE,bold:true,fontSize:9},
+                {width:96,image:KCLJ_LOGO,fit:[96,40],alignment:'right'}]},
+      {canvas:[{type:'line',x1:0,y1:5,x2:521,y2:5,lineWidth:1}]}
+    ]};},
+    footer:function(cp,pc){return {margin:[40,4,34,0],stack:[
+      {canvas:[{type:'line',x1:0,y1:0,x2:521,y2:0,lineWidth:0.8}]},
+      {columns:[
+        {text:'e - verzija 1.0',fontSize:7,width:'*'},
+        {text:'klas. znak izpolnjenega obrazca: xxxx',fontSize:7,width:'auto'},
+        {text:'OB KIKKB xxx/xx',fontSize:7,width:'auto'},
+        {text:'str. '+cp+'/'+pc,fontSize:7,width:'*',alignment:'right'}
+      ],columnGap:10,margin:[0,3,0,0]}
+    ]};},
+    content:[
+      {text:'Pregled zaloge kontrol in kalibratorjev:  '+today,bold:true,fontSize:9.5,margin:[0,0,0,2]},
+      {text:'Pripravil: '+(operatorName||''),fontSize:9,margin:[0,0,0,3],color:operatorName?'#000':'#aaa'},
+      {text:[{text:'Rok izteka: ',fontSize:7.5,color:'#555'},
+             {text:'pretečen',fontSize:7.5,color:'#c00000',bold:true},{text:'  •  ',fontSize:7.5,color:'#555'},
+             {text:'≤14 dni',fontSize:7.5,color:'#e8730c',bold:true},{text:'  •  ',fontSize:7.5,color:'#555'},
+             {text:'≤28 dni',fontSize:7.5,color:'#b8860b',bold:true}],margin:[0,0,0,6]},
+      {columns:[{stack:left,width:'*'},{text:'',width:10},{stack:right,width:'*'}],columnGap:0}
+    ],
+    defaultStyle:{font:'Roboto',fontSize:8}
+  };
+}
+/* ---- Vstopna tocka: Pripravi (predogled, tiskanje/shranjevanje je gumb znotraj predogleda) ---- */
+function openBkPrep(){
+  if(typeof pdfMake==='undefined'){notify('PDF knjižnica ni naložena','err');return;}
+  loadPregledDB();
+  if(!(DB_PREGLED.gtins||[]).some(function(g){return g.type==='control'||g.type==='calibrator';})){
+    notify('V GTIN katalogu ni kontrol ali kalibratorjev','warn');return;}
+  var cur=(S.session&&S.session.opId)||'';
+  $i('bkSignOp').innerHTML=(S.operators||[]).map(function(o){return '<option value="'+o.id+'"'+(o.id===cur?' selected':'')+'>'+_repEsc(o.first+' '+o.last)+'</option>';}).join('')||'<option value="">(ni operaterjev)</option>';
+  showMo('moBkSign');
+}
+function _bkConfirmSign(){
+  var opId=$i('bkSignOp').value||'';
+  var op=(S.operators||[]).find(function(o){return o.id===opId;});
+  closeMo('moBkSign');
+  _doExportBkPDF(op?(op.first+' '+op.last):'');
+}
+function _doExportBkPDF(operatorName){
+  if(typeof pdfMake==='undefined'){notify('PDF knjižnica ni naložena','err');return;}
+  var n=new Date();
+  var fname='PregledBK_'+_pkgYmd(n)+'.pdf';
+  try{
+    var pdf=pdfMake.createPdf(_buildBkDoc(operatorName));
+    _audit('create','pregledbk',fname,'Pregled BK (zaloga kontrol in kalibratorjev) — predogled, pripravil: '+(operatorName||'–'),null,null,(S.session&&S.session.opId)||'system');
+    save();
+    /* Na tablici (Android most) shrani v Prenose + naloži v OneDrive — enako kot Zebra */
+    if(_hasBridge()&&AndroidBridge.savePdfToDownloads){
+      pdf.getBase64(function(b64){
+        try{AndroidBridge.savePdfToDownloads(fname,b64);}catch(e){notify('Napaka PDF','err');}
+        try{if(typeof AndroidBridge.msPdfUpload==='function'&&AndroidBridge.msIsSignedIn()){
+          AndroidBridge.msPdfUpload(fname,b64);notify('Nalagam PDF v OneDrive…','ok');}}catch(e){}
+      });
+      return;
+    }
+    /* PC / brskalnik: predogled v oknu, "Natisni"/"Shrani PDF" sta gumba znotraj njega */
+    pdf.getDataUrl(function(url){
+      $i('bkPdfFrame').src=url;
+      $i('bkPdfName').textContent=fname;
+      $i('bkPdfFrame')._pdf=pdf;
+      showMo('moBkPdf');
+    });
+  }catch(e){notify('Napaka pri pripravi PDF: '+e.message,'err');}
+}
+function bkPdfPrint(){var f=$i('bkPdfFrame');if(f&&f._pdf){try{f._pdf.print();}catch(e){notify('Napaka tiskanja','err');}}}
+function bkPdfDownload(){var f=$i('bkPdfFrame');if(f&&f._pdf){try{f._pdf.download($i('bkPdfName').textContent||'PregledBK.pdf');}catch(e){notify('Napaka shranjevanja','err');}}}
+
+/* ============================================================
+   ODPRTA EMBALAŽA — dnevnik odprtij škatel in stekleničk/alikvotov
+   Skatla je vezana na KONKRETEN kos (serijsko stevilko) iz sprejema,
+   izbran rocno ali skeniran z RFID citalcem (ce je vklopljen v Nastavitvah).
+   Zaloga (DB_PREGLED) se pri tem NE spreminja — to je locen dnevnik.
+   ============================================================ */
+function _pkgId(p){return p+'_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,6);}
+/* Stabilnost: GTIN katalog → privzeto za tip (Nastavitve) → brez omejitve */
+function _pkgResolveDays(gtin,type){
+  var g=(DB_PREGLED.gtins||[]).find(function(x){return x.gtin===gtin;});
+  if(g&&g.stabilityDays!=null&&g.stabilityDays!=='')return g.stabilityDays;
+  var d=PKGTYPE(type).defaultDays;
+  return (d==null||d==='')?null:d;
+}
+function _pkgResolveVials(gtin,type){
+  var g=(DB_PREGLED.gtins||[]).find(function(x){return x.gtin===gtin;});
+  if(g&&g.vialsPerBox!=null&&g.vialsPerBox!=='')return g.vialsPerBox;
+  return PKGTYPE(type).defaultVials||0;
+}
+/* Lokalni YYYY-MM-DD — NE prek toISOString(), ker ta pretvori v UTC in v
+   nasem casovnem pasu (UTC+1/+2) datum zamakne za en dan nazaj. */
+function _pkgYmd(d){
+  return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);
+}
+/* Rok uporabe po odprtju = odprtje + dni, a NIKOLI cez proizvajalcev rok. */
+function _pkgUseBy(openedAt,days,expiry){
+  if(days==null||days==='')return null;
+  var o=new Date(openedAt);if(isNaN(o))return null;
+  var u=new Date(o.getFullYear(),o.getMonth(),o.getDate()+Number(days));
+  var mfr=_expDate(expiry);
+  if(mfr&&mfr<u)u=mfr;
+  return _pkgYmd(u);
+}
+/* Ali za ta zapis sploh steje stabilnost (tip ima v Nastavitvah vklopljeno opozorilo) */
+function _pkgWarns(type){return !!PKGTYPE(type).warn;}
+function _pkgIsOpen(x){return !x.closedAt;}
+/* Vsi aktivni odstevalniki (skatla + odprte steklenicke) za opozorila/filtre */
+function _pkgActiveUseBys(box){
+  var out=[];
+  if(!_pkgWarns(box.type))return out;
+  if(_pkgIsOpen(box)){
+    if(box.vials&&box.vials.length){
+      box.vials.forEach(function(v){if(v.openedAt&&!v.closedAt&&v.useBy)out.push({useBy:v.useBy,label:v.label,vial:true,id:v.id});});
+      if(box.useBy&&!box.vials.some(function(v){return v.openedAt&&!v.closedAt;}))out.push({useBy:box.useBy,label:'',vial:false,id:box.id});
+    } else if(box.useBy){out.push({useBy:box.useBy,label:'',vial:false,id:box.id});}
+  }
+  return out;
+}
+function _pkgWorstDays(box){
+  var a=_pkgActiveUseBys(box);if(!a.length)return null;
+  var ds=a.map(function(x){return daysLeft(x.useBy);}).filter(function(d){return d!=null;});
+  return ds.length?Math.min.apply(null,ds):null;
+}
+
+/* ---- Izbirnik kosa: aktivni sprejeti kosi (s serijsko), sicer zaloga brez serijske ---- */
+function _pkgUnitOptions(){
+  loadPregledDB();
+  var opened={};
+  (S.openedPackages||[]).filter(_pkgIsOpen).forEach(function(b){
+    opened[(b.gtin||'')+'|'+(b.lot||'')+'|'+(b.serial||'')]=true;
+  });
+  var out=[];
+  (DB_PREGLED.received||[]).forEach(function(r){
+    if(r.status!=='active')return;
+    if(opened[(r.gtin||'')+'|'+(r.lot||'')+'|'+(r.serial||'')])return;
+    out.push({gtin:r.gtin||'',lot:r.lot||'',name:r.name||'',type:r.type||'',expiry:r.expiry||'',
+              serial:r.serial||'',rfidEpc:r.rfidEpc||''});
+  });
+  /* Artikli v zalogi brez serijskih kosov (npr. uvozena zaloga) — en vnos na gtin+lot */
+  var haveSer={};out.forEach(function(u){haveSer[u.gtin+'|'+u.lot]=true;});
+  (DB_PREGLED.inventory||[]).forEach(function(it){
+    var k=(it.gtin||'')+'|'+(it.lot||'');
+    if(haveSer[k])return;
+    if(opened[k+'|'])return;
+    if(!(it.qty>0))return;
+    out.push({gtin:it.gtin||'',lot:it.lot||'',name:it.name||'',type:it.type||'',expiry:it.expiry||'',serial:'',rfidEpc:''});
+  });
+  return out;
+}
+var _pkgUnits=[],_pkgChosenUnit=null;
+function openPkgModal(){
+  _pkgChosenUnit=null;
+  $i('pkgSearch').value='';$i('pkgNote').value='';$i('pkgDays').value='';$i('pkgVialCount').value='0';
+  $i('pkgChosen').style.display='none';$i('pkgVialsRow').style.display='none';$i('pkgUseByPrev').innerHTML='';
+  var n=new Date();n.setMinutes(n.getMinutes()-n.getTimezoneOffset());
+  $i('pkgOpenedAt').value=n.toISOString().slice(0,16);
+  var cur=(S.session&&S.session.opId)||'';
+  $i('pkgOperator').innerHTML=(S.operators||[]).map(function(o){return '<option value="'+o.id+'"'+(o.id===cur?' selected':'')+'>'+_repEsc(o.first+' '+o.last)+'</option>';}).join('')||'<option value="">(ni operaterjev)</option>';
+  _pkgUnits=_pkgUnitOptions();
+  renderPkgPick();
+  showMo('moPkgOpen');
+}
+function renderPkgPick(){
+  var q=($i('pkgSearch').value||'').toLowerCase().trim();
+  var list=_pkgUnits.filter(function(u){
+    if(!q)return true;
+    return ((u.name||'')+' '+(u.lot||'')+' '+(u.gtin||'')+' '+(u.serial||'')).toLowerCase().indexOf(q)>=0;
+  }).slice(0,60);
+  var rfid=_rfidOn();
+  var h=rfid?'<div style="padding:6px;border-bottom:1px solid var(--border)"><button class="btn btn-g btn-sm" onclick="pkgRfidScan()">&#128225; Skeniraj RFID</button></div>':'';
+  if(!list.length){h+='<div class="empty" style="padding:12px;font-size:12px">Ni prostih kosov'+(q?' za "'+_repEsc(q)+'"':'')+'.</div>';}
+  else h+=list.map(function(u){
+    var i=_pkgUnits.indexOf(u);
+    return '<div class="assay-pick-item" style="cursor:pointer" onclick="pkgChooseUnit('+i+')">'+
+      '<span style="flex:1;font-size:12px"><b>'+_repEsc(u.name||u.gtin)+'</b>'+
+      '<div style="font-size:10px;color:var(--text3)">Lot '+_repEsc(u.lot||'–')+' · rok '+fmtExp(u.expiry)+
+      (u.serial?' · SN <span style="font-family:var(--mono)">'+_repEsc(u.serial)+'</span>':' · <i>brez serijske</i>')+'</div></span>'+
+      '<span class="badge '+(TYPE_BADGE[u.type]||'b-gray')+'" style="font-size:9px">'+(TYPE_LABELS[u.type]||u.type||'?')+'</span></div>';
+  }).join('');
+  $i('pkgPickList').innerHTML=h;
+}
+function pkgChooseUnit(i){
+  var u=_pkgUnits[i];if(!u)return;
+  _pkgChosenUnit=u;
+  $i('pkgChosen').style.display='';
+  $i('pkgChosen').innerHTML='<b>'+_repEsc(u.name||u.gtin)+'</b> <span class="badge '+(TYPE_BADGE[u.type]||'b-gray')+'" style="font-size:9px">'+(TYPE_LABELS[u.type]||u.type||'?')+'</span>'+
+    '<div style="margin-top:3px">Lot <b>'+_repEsc(u.lot||'–')+'</b> · rok '+fmtExp(u.expiry)+'</div>'+
+    '<div>Serijska: <b style="font-family:var(--mono)">'+_repEsc(u.serial||'—')+'</b>'+(u.rfidEpc?' · RFID '+_repEsc(u.rfidEpc.slice(0,12))+'…':'')+'</div>';
+  var d=_pkgResolveDays(u.gtin,u.type);
+  $i('pkgDays').value=(d==null?'':d);
+  var c=PKGTYPE(u.type);
+  $i('pkgVialsRow').style.display=c.vials?'':'none';
+  if(c.vials)$i('pkgVialCount').value=_pkgResolveVials(u.gtin,u.type)||0;
+  _pkgUpdPreview();
+}
+function _pkgUpdPreview(){
+  var el=$i('pkgUseByPrev');if(!el)return;
+  if(!_pkgChosenUnit){el.innerHTML='';return;}
+  var days=$i('pkgDays').value.trim();
+  var ub=_pkgUseBy($i('pkgOpenedAt').value,days===''?null:days,_pkgChosenUnit.expiry);
+  if(!ub){el.innerHTML='<span class="muted">Brez omejitve stabilnosti — beleži se le datum odprtja.</span>';return;}
+  var capped=_expDate(_pkgChosenUnit.expiry)&&ub===String(_pkgChosenUnit.expiry).slice(0,10);
+  el.innerHTML='Uporabi do: <b>'+fmtExp(ub)+'</b> '+expiryBadge(daysLeft(ub))+(capped?' <span class="muted">(omejeno s proizvajalčevim rokom)</span>':'');
+}
+function pkgRfidScan(){
+  if(!_rfidOn()){notify('RFID funkcije so izklopljene v Nastavitvah','warn');return;}
+  if(!(_hasBridge()&&AndroidBridge.rfidScanSingle)){notify('Ta naprava nima RFID čitalca','warn');return;}
+  try{AndroidBridge.rfidScanSingle();notify('Približaj nalepko čitalcu…','ok');}
+  catch(e){notify('Napaka RFID skeniranja','err');}
+}
+/* Povratni klic iz Android mostu (RFID citalec) — poisce kos po EPC */
+function onRfidScanned(epc){
+  if(!epc)return;
+  var e=String(epc).trim().toUpperCase();
+  var idx=_pkgUnits.findIndex(function(u){return (u.rfidEpc||'').toUpperCase()===e;});
+  if(idx<0){notify('Kos s to RFID nalepko ni med prostimi kosi','warn');return;}
+  pkgChooseUnit(idx);notify('Kos prepoznan prek RFID','success');
+}
+function savePkgOpen(){
+  if(!_pkgChosenUnit){notify('Izberi kos iz zaloge','warn');return;}
+  var u=_pkgChosenUnit;
+  var openedAtRaw=$i('pkgOpenedAt').value;
+  if(!openedAtRaw){notify('Vpiši datum in uro odprtja','warn');return;}
+  var openedAt=new Date(openedAtRaw).toISOString();
+  var daysRaw=$i('pkgDays').value.trim();
+  var days=daysRaw===''?null:Math.max(0,parseInt(daysRaw,10)||0);
+  var opId=$i('pkgOperator').value||'';
+  var c=PKGTYPE(u.type);
+  var box={id:_pkgId('op'),gtin:u.gtin,lot:u.lot,name:u.name,type:u.type,expiry:u.expiry,
+    serial:u.serial||'',rfidEpc:u.rfidEpc||'',
+    openedAt:openedAt,stabilityDays:days,useBy:_pkgUseBy(openedAt,days,u.expiry),
+    operatorId:opId,note:$i('pkgNote').value.trim(),closedAt:null,closedReason:'',vials:[]};
+  if(c.vials){
+    var n=Math.max(0,parseInt($i('pkgVialCount').value,10)||0);
+    var kind=$i('pkgVialKind').value;
+    for(var k=1;k<=n;k++)box.vials.push({id:_pkgId('v'),label:String(k),kind:kind,
+      openedAt:null,stabilityDays:days,useBy:null,operatorId:'',note:'',closedAt:null,closedReason:''});
+  }
+  S.openedPackages.push(box);
+  _audit('create','openedpkg',box.id,'Odprta embalaža: '+(box.name||box.gtin)+' · lot '+(box.lot||'–')+(box.serial?' · SN '+box.serial:'')+
+    (box.useBy?' · uporabi do '+box.useBy:'')+(box.vials.length?' · '+box.vials.length+' stekleničk':''),null,box,opId);
+  save();closeMo('moPkgOpen');renderOpenedPkg();
+  try{renderAlertUI();}catch(e){}
+  notify('Odprtje zabeleženo ✓','success');
+}
+
+/* ---- Seznam ---- */
+function _pkgFiltered(){
+  var q=($i('opSearch')?.value||'').toLowerCase().trim();
+  var tf=$i('opType')?.value||'';
+  var st=$i('opStatus')?.value;
+  var warnAhead=PKGSET().warnDaysAhead;
+  return (S.openedPackages||[]).filter(function(b){
+    if(tf&&b.type!==tf)return false;
+    if(q&&((b.name||'')+' '+(b.lot||'')+' '+(b.gtin||'')+' '+(b.serial||'')).toLowerCase().indexOf(q)<0)return false;
+    var d=_pkgWorstDays(b);
+    if(st==='open')return _pkgIsOpen(b);
+    if(st==='closed')return !_pkgIsOpen(b);
+    if(st==='soon')return _pkgIsOpen(b)&&d!=null&&d>=0&&d<=warnAhead;
+    if(st==='exp')return _pkgIsOpen(b)&&d!=null&&d<0;
+    return true;
+  }).sort(function(a,b){
+    var da=_pkgWorstDays(a),db=_pkgWorstDays(b);
+    if(da==null&&db==null)return (b.openedAt||'').localeCompare(a.openedAt||'');
+    if(da==null)return 1;if(db==null)return -1;return da-db;
+  });
+}
+function renderOpenedPkg(){
+  var wrap=$i('openedPkgBody');if(!wrap)return;
+  loadPregledDB();
+  var list=_pkgFiltered();
+  if(!list.length){wrap.innerHTML='<div class="card empty" style="padding:24px;text-align:center;color:var(--text3)">Ni zapisov o odprti embalaži za izbrani filter.</div>';return;}
+  wrap.innerHTML=list.map(function(b){
+    var open=_pkgIsOpen(b);
+    var warns=_pkgWarns(b.type);
+    var act=_pkgActiveUseBys(b);
+    var d=_pkgWorstDays(b);
+    /* Znacka in datum v glavi morata izhajati iz ISTEGA vira: pri skatlah s
+       steklenickami steje najkrajsi aktivni odstevalnik steklenicke, ne rok skatle. */
+    var hdrUseBy=null;
+    if(act.length){hdrUseBy=act.reduce(function(m,x){return (m==null||x.useBy<m)?x.useBy:m;},null);}
+    var od=new Date(b.openedAt);
+    var head='<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:6px">'+
+      '<div><b style="font-size:14px">'+_repEsc(b.name||b.gtin)+'</b> <span class="badge '+(TYPE_BADGE[b.type]||'b-gray')+'" style="font-size:9px">'+(TYPE_LABELS[b.type]||b.type||'?')+'</span>'+
+      '<div class="muted" style="font-size:11px;margin-top:2px">Lot '+_repEsc(b.lot||'–')+' · rok '+fmtExp(b.expiry)+
+        (b.serial?' · SN <span style="font-family:var(--mono)">'+_repEsc(b.serial)+'</span>':'')+'</div></div>'+
+      '<div style="text-align:right">'+
+        (!open?'<span class="badge b-gray">Zavrženo</span>':(warns&&hdrUseBy?expiryBadge(d):'<span class="badge b-ok">Odprto</span>'))+
+        (open&&warns&&hdrUseBy?'<div class="muted" style="font-size:10px;margin-top:2px">uporabi do '+fmtExp(hdrUseBy)+
+          ((b.vials&&b.vials.length)?' <span style="font-size:9px">(najkrajša odprta)</span>':'')+'</div>':'')+
+      '</div></div>';
+    var meta='<div style="font-size:11px;color:var(--text3);margin:6px 0">Odprto: '+od.toLocaleString('sl-SI')+
+      ' · '+_repEsc(getOpName(b.operatorId))+
+      (b.stabilityDays!=null?' · stabilnost '+b.stabilityDays+' dni':'')+
+      (!open?' · zavrženo '+new Date(b.closedAt).toLocaleDateString('sl-SI')+(b.closedReason?' ('+_repEsc(b.closedReason)+')':''):'')+'</div>'+
+      (b.note?'<div style="font-size:12px;margin-bottom:4px">'+_repEsc(b.note)+'</div>':'');
+    var vials='';
+    if(b.vials&&b.vials.length){
+      vials='<div style="border-top:1px solid var(--border);margin-top:6px;padding-top:6px">'+
+        '<div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:4px">Stekleničke / alikvoti ('+
+          b.vials.filter(function(v){return v.openedAt&&!v.closedAt;}).length+' odprtih / '+b.vials.length+')</div>'+
+        '<div style="display:flex;flex-wrap:wrap;gap:6px">'+
+        b.vials.map(function(v){
+          var vd=v.useBy?daysLeft(v.useBy):null;
+          var state=v.closedAt?'<span class="badge b-gray">zavržena</span>':
+                    (!v.openedAt?'<span class="badge b-ok">neodprta</span>':(warns&&v.useBy?expiryBadge(vd):'<span class="badge b-ok">odprta</span>'));
+          var btn='';
+          if(open&&!v.closedAt){
+            btn=!v.openedAt
+              ?'<button class="btn btn-a btn-sm" style="padding:2px 7px;font-size:10px" onclick="pkgOpenVial(\''+b.id+'\',\''+v.id+'\')">Odpri</button>'
+              :'<button class="btn btn-g btn-sm" style="padding:2px 7px;font-size:10px" onclick="pkgCloseVial(\''+b.id+'\',\''+v.id+'\')">Zavrzi</button>';
+          }
+          return '<div style="border:1px solid var(--border);border-radius:6px;padding:5px 7px;font-size:11px;min-width:112px">'+
+            '<b>'+(v.kind==='aliquot'?'Alikvot ':'Stekl. ')+_repEsc(v.label)+'</b><br>'+state+
+            (v.openedAt&&warns&&v.useBy?'<div class="muted" style="font-size:9px">do '+fmtExp(v.useBy)+'</div>':'')+
+            (btn?'<div style="margin-top:4px">'+btn+'</div>':'')+'</div>';
+        }).join('')+'</div></div>';
+    }
+    var acts='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">'+
+      (open?'<button class="btn btn-g btn-sm" onclick="pkgCloseBox(\''+b.id+'\')">&#128465;&#65039; Zavrzi škatlo</button>':'')+
+      '<button class="btn btn-d btn-sm" onclick="pkgDelete(\''+b.id+'\')">&#128465;&#65039;</button></div>';
+    return '<div class="card" style="margin-bottom:10px'+(open?'':';opacity:.72')+'">'+head+meta+vials+acts+'</div>';
+  }).join('');
+}
+function _pkgFind(id){return (S.openedPackages||[]).find(function(b){return b.id===id;});}
+function pkgOpenVial(boxId,vialId){
+  var b=_pkgFind(boxId);if(!b)return;
+  var v=(b.vials||[]).find(function(x){return x.id===vialId;});if(!v)return;
+  var now=new Date().toISOString();
+  var before={openedAt:v.openedAt,useBy:v.useBy};
+  v.openedAt=now;
+  v.stabilityDays=(v.stabilityDays!=null?v.stabilityDays:b.stabilityDays);
+  v.useBy=_pkgUseBy(now,v.stabilityDays,b.expiry);
+  v.operatorId=(S.session&&S.session.opId)||b.operatorId||'';
+  _audit('update','openedpkg',b.id,'Odprta '+(v.kind==='aliquot'?'alikvot ':'steklenička ')+v.label+' · '+(b.name||b.gtin)+(v.useBy?' · uporabi do '+v.useBy:''),before,{openedAt:v.openedAt,useBy:v.useBy},v.operatorId);
+  save();renderOpenedPkg();try{renderAlertUI();}catch(e){}
+  notify('Steklenička odprta'+(v.useBy?' · uporabi do '+fmtExp(v.useBy):''),'success');
+}
+function pkgCloseVial(boxId,vialId){
+  var b=_pkgFind(boxId);if(!b)return;
+  var v=(b.vials||[]).find(function(x){return x.id===vialId;});if(!v)return;
+  var r=prompt('Razlog (porabljeno / poteklo / kontaminirano):','porabljeno');
+  if(r===null)return;
+  v.closedAt=new Date().toISOString();v.closedReason=(r||'').trim();
+  _audit('update','openedpkg',b.id,'Zavržena '+(v.kind==='aliquot'?'alikvot ':'steklenička ')+v.label+' · '+(b.name||b.gtin)+' ('+v.closedReason+')',null,null,(S.session&&S.session.opId)||'');
+  save();renderOpenedPkg();try{renderAlertUI();}catch(e){}
+}
+function pkgCloseBox(id){
+  var b=_pkgFind(id);if(!b)return;
+  var r=prompt('Razlog zavrženja škatle (porabljeno / poteklo / kontaminirano):','porabljeno');
+  if(r===null)return;
+  var now=new Date().toISOString();
+  b.closedAt=now;b.closedReason=(r||'').trim();
+  (b.vials||[]).forEach(function(v){if(!v.closedAt){v.closedAt=now;v.closedReason=v.closedReason||b.closedReason;}});
+  _audit('update','openedpkg',b.id,'Zavržena škatla: '+(b.name||b.gtin)+' · lot '+(b.lot||'–')+(b.serial?' · SN '+b.serial:'')+' ('+b.closedReason+')',null,null,(S.session&&S.session.opId)||'');
+  save();renderOpenedPkg();try{renderAlertUI();}catch(e){}
+  notify('Škatla zavržena','success');
+}
+function pkgDelete(id){
+  if(!requireRole('admin'))return;
+  var b=_pkgFind(id);if(!b)return;
+  if(!confirm('Izbrišem zapis o odprtju "'+(b.name||b.gtin)+'" (lot '+(b.lot||'–')+')?'))return;
+  S.openedPackages=(S.openedPackages||[]).filter(function(x){return x.id!==id;});
+  _audit('delete','openedpkg',id,'Izbrisan zapis odprte embalaže: '+(b.name||b.gtin)+' · lot '+(b.lot||'–'),b,null,(S.session&&S.session.opId)||'system');
+  save();renderOpenedPkg();try{renderAlertUI();}catch(e){}
+  notify('Zapis izbrisan');
+}
+function printOpenedPkg(){
+  var list=_pkgFiltered();
+  if(!list.length){notify('Ni zapisov za tiskanje','warn');return;}
+  var rows=list.map(function(b){
+    var open=_pkgIsOpen(b);
+    var vs=(b.vials||[]);
+    var vTxt=vs.length?(vs.filter(function(v){return v.openedAt&&!v.closedAt;}).length+' odprtih / '+vs.length):'–';
+    var d=_pkgWorstDays(b);
+    var st=!open?'zavrženo':(d==null?'odprto':(d<0?'POTEKLO':d+' dni'));
+    return '<tr><td class="l">'+_repEsc(b.name||b.gtin)+'</td><td>'+_repEsc(b.lot||'–')+'</td>'+
+      '<td style="font-family:monospace">'+_repEsc(b.serial||'–')+'</td>'+
+      '<td class="l">'+(TYPE_LABELS[b.type]||b.type||'–')+'</td>'+
+      '<td>'+new Date(b.openedAt).toLocaleDateString('sl-SI')+'</td>'+
+      '<td>'+(b.stabilityDays!=null?b.stabilityDays+' dni':'–')+'</td>'+
+      '<td>'+(b.useBy?fmtExp(b.useBy):'–')+'</td>'+
+      '<td>'+st+'</td><td>'+vTxt+'</td><td class="l">'+_repEsc(getOpName(b.operatorId))+'</td></tr>';
+  }).join('');
+  var css='body{font-family:sans-serif;padding:16px;color:#000}h2{font-size:15px;margin:0 0 8px}'+
+    'table{border-collapse:collapse;width:100%}th,td{border:1px solid #000;padding:3px 5px;font-size:10px;text-align:center}'+
+    'td.l{text-align:left}th{background:#eee}';
+  var html='<!doctype html><html><head><meta charset="utf-8"><style>'+css+'</style></head><body>'+
+    _printHead('Odprta embalaža')+
+    '<table><thead><tr><th class="l">Naziv</th><th>Lot</th><th>Serijska</th><th class="l">Tip</th><th>Odprto</th><th>Stabilnost</th><th>Uporabi do</th><th>Stanje</th><th>Stekleničke</th><th class="l">Operater</th></tr></thead><tbody>'+rows+'</tbody></table>'+
+    _printFoot()+'</body></html>';
+  openPrintPreview(html,'Odprta_embalaza_'+new Date().toISOString().slice(0,10));
 }
 
 /* Poraba (read-only): porabljeni artikli iz zaprtih sej (DB_PREGLED.consumed) */
@@ -3138,10 +3926,14 @@ function exportUdiCSV(){
   var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='UDI_evidenca_'+new Date().toISOString().slice(0,10)+'.csv';a.click();
   notify('UDI evidenca izvožena ('+(rows.length-1)+' enot)','ok');
 }
-/* ===== OneDrive izbirnik dokumentov (Reagenčni/Varnostni listi) ===== */
-var _docPickTarget=null;var _docPickFiles=[];
-/* Shema B: korenski mapi + podtip glede na kategorijo artikla (gtinTypeVal). */
-var DOC_FOLDERS={pi:'Reagencni_Listi',sds:'Varnostni_Listi'};
+/* ===== OneDrive izbirnik dokumentov (Reagenčni/Varnostni listi) =====
+   Enaka logika prostega brskanja po mapah kot pri DD Kontrole izbirniku
+   (_ddPickList/_ddPickInto/_ddPickUp) — uporabnik ni omejen na privzeto
+   mapo/podtip, lahko navigira kamorkoli po OneDrive (nazaj do korena in
+   naprej v poljubno drugo mapo), privzeta pot je le izhodisce. */
+var _docPickTarget=null;var _docPickItems=[];var _docPickPath='';
+/* Shema B: korenski mapi + podtip glede na kategorijo artikla (gtinTypeVal) — privzeto izhodisce brskanja. */
+var DOC_FOLDERS={pi:'BIO/Reagencni_Listi',sds:'BIO/Varnostni_Listi'};
 function _docSubtype(){
   var t=(($i('gtinTypeVal')&&$i('gtinTypeVal').value)||'').toLowerCase();
   if(t==='control')return 'QC';
@@ -3151,40 +3943,56 @@ function _docSubtype(){
 }
 function _docFolderPath(target){return DOC_FOLDERS[target]+'/'+_docSubtype();}
 function openDocPick(target){
-  _docPickTarget=target;_docPickFiles=[];
-  $i('docPickTitle').innerHTML='&#128194; '+_docFolderPath(target);
+  _docPickTarget=target;_docPickPath=_docFolderPath(target);
+  $i('docPickTitle').innerHTML='&#128194; Izberi dokument';
   $i('docPickSrch').value='';
-  $i('docPickBody').innerHTML='<div class="empty">Nalagam&#8230;</div>';
   showMo('moDocPick');
-  if(_hasBridge()&&AndroidBridge.msListFolder){
-    try{
-      if(!(AndroidBridge.msIsSignedIn&&AndroidBridge.msIsSignedIn())){$i('docPickBody').innerHTML='<div class="empty">Najprej se prijavite v OneDrive (Več &rarr; Sinhronizacija).</div>';return;}
-      _msListCtx='docpick';
-      AndroidBridge.msListFolder(_docFolderPath(target));
-    }catch(e){$i('docPickBody').innerHTML='<div class="empty">Napaka: '+_ge(e.message||'')+'</div>';}
-  }else{
-    $i('docPickBody').innerHTML='<div class="empty">Izbirnik deluje na napravi z OneDrive prijavo.<br>Tu prilepi povezavo ročno.</div>';
-  }
+  _docPickList();
+}
+function _docPickList(){
+  if(!(_hasBridge()&&AndroidBridge.msListFolder)){$i('docPickBody').innerHTML='<div class="empty">Izbirnik deluje na napravi z OneDrive prijavo.<br>Tu prilepi povezavo ročno.</div>';return;}
+  if(!(AndroidBridge.msIsSignedIn&&AndroidBridge.msIsSignedIn())){$i('docPickBody').innerHTML='<div class="empty">Najprej se prijavite v OneDrive (Več &rarr; Sinhronizacija).</div>';return;}
+  $i('docPickPathLbl').textContent='DigiLab/'+_docPickPath;
+  $i('docPickBody').innerHTML='<div class="empty">Nalagam&#8230;</div>';
+  _msListCtx='docpick';
+  try{AndroidBridge.msListFolder(_docPickPath);}catch(e){$i('docPickBody').innerHTML='<div class="empty">Napaka: '+_ge(e.message||'')+'</div>';}
 }
 function onDocPickListed(json,msg){
-  if(!json){$i('docPickBody').innerHTML='<div class="empty">'+_ge(msg||'Mape ni mogoče prebrati')+'</div>';return;}
+  /* Ce privzeta izhodiscna mapa (se) ne obstaja v OneDrive, uporabnika NE sme
+     ujeti brez izhoda — pusti mu iti "nazaj" (do korena) in brskati drugam,
+     enako kot pri obstojecih (najdenih) mapah. */
+  if(!json){
+    var parts0=_docPickPath.split('/').filter(Boolean);
+    var h0='<div class="empty">'+_ge(msg||'Mape ni mogoče prebrati')+'</div>';
+    if(parts0.length)h0+='<div class="assay-pick-item" onclick="_docPickUp()">&#8593; .. (nazaj)</div>';
+    $i('docPickBody').innerHTML=h0;
+    return;
+  }
   var obj;try{obj=JSON.parse(json);}catch(e){$i('docPickBody').innerHTML='<div class="empty">Neveljaven odgovor</div>';return;}
-  _docPickFiles=(obj.value||[]).filter(function(f){return f&&f.name&&!f.folder;});
+  _docPickItems=(obj.value||[]).filter(function(f){return f&&f.name;});
   renderDocPick();
 }
+function _docPickInto(name){_docPickPath=(_docPickPath?_docPickPath+'/':'')+name;$i('docPickSrch').value='';_docPickList();}
+function _docPickUp(){var parts=_docPickPath.split('/').filter(Boolean);parts.pop();_docPickPath=parts.join('/');$i('docPickSrch').value='';_docPickList();}
 function renderDocPick(){
   var q=($i('docPickSrch').value||'').toLowerCase();
-  var items=_docPickFiles.filter(function(f){return !q||f.name.toLowerCase().indexOf(q)>=0;});
-  if(!items.length){$i('docPickBody').innerHTML='<div class="empty">Ni datotek.</div>';return;}
-  $i('docPickBody').innerHTML=items.map(function(f,i){
+  var folders=_docPickItems.filter(function(f){return f.folder;});
+  var files=_docPickItems.filter(function(f){return !f.folder&&(!q||f.name.toLowerCase().indexOf(q)>=0);});
+  var parts=_docPickPath.split('/').filter(Boolean);
+  var h='';
+  if(parts.length){h+='<div class="assay-pick-item" onclick="_docPickUp()">&#8593; .. (nazaj)</div>';}
+  folders.forEach(function(f){h+='<div class="assay-pick-item" onclick="_docPickInto(\''+_ge(f.name).replace(/'/g,"\\'")+'\')">&#128193; '+_ge(f.name)+'</div>';});
+  if(!files.length&&!folders.length){h+='<div class="empty">Ni podmap ali datotek.</div>';}
+  files.forEach(function(f){
     var d=(f.lastModifiedDateTime||'').slice(0,10);
-    return '<div class="assay-pick-item" onclick="docPickChoose('+_docPickFiles.indexOf(f)+')">'+
-      '<span style="flex:1;font-size:12px;font-weight:600">'+_ge(f.name)+'</span>'+
+    h+='<div class="assay-pick-item" onclick="docPickChoose('+_docPickItems.indexOf(f)+')">'+
+      '<span style="flex:1;font-size:12px;font-weight:600">&#128196; '+_ge(f.name)+'</span>'+
       '<span style="font-size:10px;color:var(--text3)">'+d+'</span></div>';
-  }).join('');
+  });
+  $i('docPickBody').innerHTML=h;
 }
 function docPickChoose(i){
-  var f=_docPickFiles[i];if(!f)return;
+  var f=_docPickItems[i];if(!f||f.folder)return;
   var url=f.webUrl||'';
   if(!url){notify('Datoteka nima spletne povezave (posodobi aplikacijo)','warn');return;}
   var fieldId=_docPickTarget==='sds'?'gtinSdsUrl':'gtinPiUrl';
@@ -3233,16 +4041,28 @@ function openGtinMo(idx){
     $i('gtinNote').value=g.note||'';$i('gtinCatalog').value=g.catalog||'';
     $i('gtinIdent').value=g.ident||'';$i('gtinRisk').value=g.riskClass||'';$i('gtinPiUrl').value=g.piUrl||'';
     $i('gtinSdsUrl').value=g.sdsUrl||'';
+    $i('gtinStabilityDays').value=(g.stabilityDays==null?'':g.stabilityDays);
+    $i('gtinVialsPerBox').value=(g.vialsPerBox==null?'':g.vialsPerBox);
     $i('gtinLotNotify').checked=(g.lotNotify!==false);
   }else{
-    ['gtinCode','gtinName','gtinMfr','gtinAnal','gtinNote','gtinCatalog','gtinIdent','gtinPiUrl','gtinSdsUrl'].forEach(function(id){$i(id).value='';});
+    ['gtinCode','gtinName','gtinMfr','gtinAnal','gtinNote','gtinCatalog','gtinIdent','gtinPiUrl','gtinSdsUrl','gtinStabilityDays','gtinVialsPerBox'].forEach(function(id){$i(id).value='';});
     $i('gtinTypeVal').value='control';$i('gtinRisk').value='';$i('gtinLotNotify').checked=true;
   }
   _updUdiPreview();
+  _updGtinPkgFields();
   showMo('moGtin');
 }
 function updateLotNotifyDefault(){
   if(_editGtinIdx===null){$i('gtinLotNotify').checked=($i('gtinTypeVal').value!=='consumable');}
+  _updGtinPkgFields();
+}
+/* Polji za odprto embalazo sta vidni le, kadar je za izbrani tip v Nastavitvah
+   vklopljeno opozorilo (stabilnost) oz. sledenje steklenickam. */
+function _updGtinPkgFields(){
+  var c=PKGTYPE($i('gtinTypeVal').value);
+  $i('gtinStabWrap').style.display=c.warn?'':'none';
+  $i('gtinVialsWrap').style.display=c.vials?'':'none';
+  $i('gtinPkgRow').style.display=(c.warn||c.vials)?'':'none';
 }
 function saveGtin(){
   var gtin=$i('gtinCode').value.trim().replace(/\D/g,'');
@@ -3255,6 +4075,13 @@ function saveGtin(){
            analyser:$i('gtinAnal').value.trim(),note:$i('gtinNote').value.trim(),
            catalog:$i('gtinCatalog').value.trim(),ident:$i('gtinIdent').value.trim(),
            riskClass:$i('gtinRisk').value,lotNotify:$i('gtinLotNotify').checked};
+  /* Odprta embalaza — polji se BEREta tudi, kadar sta skriti (tip nima vklopljene
+     nastavitve), da se ob menjavi tipa ze vpisana vrednost ne izgubi. obj se tu
+     sestavi na novo in nadomesti cel zapis, zato morata biti izrecno navedeni. */
+  var _stab=$i('gtinStabilityDays').value.trim();
+  var _vpb=$i('gtinVialsPerBox').value.trim();
+  obj.stabilityDays=_stab===''?null:Math.max(0,parseInt(_stab,10)||0);
+  obj.vialsPerBox=_vpb===''?null:Math.max(0,parseInt(_vpb,10)||0);
   var piUrl=$i('gtinPiUrl').value.trim();
   var prevForPi=_editGtinIdx!=null?(DB_PREGLED.gtins||[])[_editGtinIdx]:null;
   obj.piUrl=piUrl;
@@ -3358,6 +4185,25 @@ function INSTR_ALL(){return (S.instruments&&S.instruments.length)?S.instruments:
 function INSTR(){return INSTR_ALL().filter(i=>!i.retired);}
 const DEFAULT_BIOCHEM = ['Glukoza','Kalij','Natrij','Klorid','Magnezij','Fosfat','CRP','Proteini','Albumini','CK','GGT','AST','ALT','Lipaza','Alkalna fosfataza','Amilaza','Bilirubin direktni','Bilirubin totalni','Kreatinin','Sečnina','Etanol','Digoksin','Teofilin','Vankomicin','Gentamicin','U-Albumin','Kalcij','U/CSF Proteini','HDL-Holesterol','Holesterol','LDL-Holesterol','Trigliceridi','Urati','LDH','Laktat','CO2','UIBC','Železo'];
 const DEFAULT_IMMUNO = ['Troponin','Mioglobin','PCT','Beta-HCG','NT-ProBNP','CK-MB','Feritin','GFAP','UCHL'];
+const DEFAULT_MATRICES = [{code:'S',label:'Serum'},{code:'U',label:'Urin'},{code:'Lc',label:'Likvor'},{code:'PTV',label:'Punktat telesne votline'}];
+/* Odprta embalaza — privzetki po tipu artikla.
+   warn  = odstevalnik stabilnosti po odprtju + opozorila (kontrole/kalibratorji privzeto DA)
+   vials = sledenje posameznim steklenickam/alikvotom znotraj skatle
+   Za reagente belezimo samo datum odprtja skatle (warn/vials izklopljena, a vklopljiva). */
+const PKG_SETTINGS_DEFAULT = {
+  warnDaysAhead:7,
+  types:{
+    'control':      {warn:true, vials:true, defaultDays:30,  defaultVials:0},
+    'calibrator':   {warn:true, vials:true, defaultDays:30,  defaultVials:0},
+    'reagent-bio':  {warn:false,vials:false,defaultDays:null,defaultVials:0},
+    'reagent-imuno':{warn:false,vials:false,defaultDays:null,defaultVials:0},
+    'consumable':   {warn:false,vials:false,defaultDays:null,defaultVials:0}
+  }
+};
+function PKGSET(){if(!S.pkgSettings)S.pkgSettings=JSON.parse(JSON.stringify(PKG_SETTINGS_DEFAULT));return S.pkgSettings;}
+function PKGTYPE(type){var t=PKGSET().types[type];return t||{warn:false,vials:false,defaultDays:null,defaultVials:0};}
+function MATRICES(){return S.matrices&&S.matrices.length?S.matrices:DEFAULT_MATRICES;}
+function matrixLabel(code){const m=MATRICES().find(x=>x.code===code);return m?m.label:code;}
 const DEFAULT_OPERATORS = [
   {id:"51056",first:"NIKOLA",last:"ALEKSIĆ"},{id:"35694",first:"MAJA",last:"ARSOV"},{id:"40801",first:"KATJA",last:"BAHAR"},
   {id:"51700",first:"BLAŽ",last:"BANDUR"},{id:"29611",first:"BARBARA",last:"BAŠA CIGOJ"},{id:"37559",first:"MAŠA TJAŠA",last:"BINTER"},
@@ -3497,6 +4343,19 @@ function initState(){
   /* migracija starih zapisov: triannual → quarterly (3-mesečno) */
   (S.maintenanceLog||[]).forEach(m=>{if(m.type==='triannual')m.type='quarterly';});
   if(!S.assays.length) S.assays=[...DEFAULT_BIOCHEM.map(n=>({name:n,type:'biochem'})),...DEFAULT_IMMUNO.map(n=>({name:n,type:'immuno'}))];
+  if(!S.matrices||!S.matrices.length)S.matrices=JSON.parse(JSON.stringify(DEFAULT_MATRICES));
+  S.assays.forEach(a=>{if(!a.matrix)a.matrix='S';});
+  /* Odprta embalaza: dnevnik + nastavitve po tipu (backfill manjkajocih tipov/polj,
+     ce se privzetki kasneje razsirijo — obstojecih uporabnikovih vrednosti ne povozi) */
+  if(!S.openedPackages)S.openedPackages=[];
+  if(!S.pkgSettings)S.pkgSettings=JSON.parse(JSON.stringify(PKG_SETTINGS_DEFAULT));
+  if(typeof S.pkgSettings.warnDaysAhead!=='number')S.pkgSettings.warnDaysAhead=PKG_SETTINGS_DEFAULT.warnDaysAhead;
+  if(!S.pkgSettings.types)S.pkgSettings.types={};
+  Object.keys(PKG_SETTINGS_DEFAULT.types).forEach(function(t){
+    var def=PKG_SETTINGS_DEFAULT.types[t];
+    if(!S.pkgSettings.types[t]){S.pkgSettings.types[t]=JSON.parse(JSON.stringify(def));return;}
+    Object.keys(def).forEach(function(k){if(S.pkgSettings.types[t][k]===undefined)S.pkgSettings.types[t][k]=def[k];});
+  });
   if(!S.qcMaterials.length) S.qcMaterials=defaultQcMaterials();
   migrateQcMaterials();
   if(!S.qcValues)S.qcValues={};
@@ -4010,6 +4869,21 @@ function computeAlerts(){
     const unchecked=(DB_PREGLED.lots||[]).filter(l=>l.checked===false).length;
     if(unchecked>0)push('pbk_unchecked','info','🔍','Ne-ovrednoteni loti (Pregled BK): '+unchecked,'V Pregled BK je '+unchecked+' lotov brez ovrednotenja.',"navMain('loti')");
   }catch(e){}
+  /* 12: odprta embalaza — stabilnost po odprtju (le tipi z vklopljenim opozorilom) */
+  try{
+    const ahead=PKGSET().warnDaysAhead;
+    const nav="navMain('zaloga');navZal('opened')";
+    (S.openedPackages||[]).forEach(function(b){
+      _pkgActiveUseBys(b).forEach(function(a){
+        const d=daysLeft(a.useBy);if(d==null)return;
+        const what=(b.name||b.gtin)+' · lot '+(b.lot||'–')+(b.serial?' · SN '+b.serial:'')+(a.label?' · stekl. '+a.label:'');
+        if(d<0)push('pkg_exp_'+a.id,'crit','🧴','Potekla odprta embalaža: '+(b.name||b.gtin),
+          what+' — rok po odprtju je potekel '+fmtExp(a.useBy)+' ('+Math.abs(d)+' dni).',nav);
+        else if(d<=ahead)push('pkg_soon_'+a.id,'warn','🧴','Odprta embalaža poteče čez '+d+' dni: '+(b.name||b.gtin),
+          what+' — uporabi do '+fmtExp(a.useBy)+'.',nav);
+      });
+    });
+  }catch(e){}
   const sevOrd={crit:0,warn:1,info:2};
   A.sort((a,b)=>sevOrd[a.sev]-sevOrd[b.sev]);
   return A;
@@ -4159,6 +5033,15 @@ function populateReviewFilters(){
   const instrs=[...new Set(S.entries.map(e=>e.instrId))],mats=[...new Set(S.entries.map(e=>e.qcName))],assays=[...new Set(S.entries.flatMap(e=>e.results?.map(r=>r.assay)||[]))];
   function repop(el,opts,prefix){const cv=el.value;el.innerHTML=prefix+opts.map(o=>'<option value="'+o+'">'+o+'</option>').join('');el.value=cv;}
   repop($i('filterInstr'),instrs,'<option value="">Vsi inštrumenti</option>');repop($i('filterQcMat'),mats,'<option value="">Vsi QC materiali</option>');repop($i('filterAssay'),assays,'<option value="">Vse preiskave</option>');
+  const msel=$i('qcPrintMonth');if(msel&&!msel.options.length){const now=new Date();const opts=[{y:now.getFullYear(),m:now.getMonth()+1}].concat(_repLast12());msel.innerHTML=opts.map(o=>'<option value="'+o.y+'-'+_rp2(o.m)+'">'+REP_MONTHS[o.m-1]+' '+o.y+'</option>').join('');}
+}
+function printQcMonthly(){
+  const instrId=$i('filterInstr').value,mv=$i('qcPrintMonth').value;
+  if(!instrId){notify('Izberi konkreten analizator (ne "Vsi inštrumenti")','warn');return;}
+  if(!mv){notify('Izberi mesec','warn');return;}
+  const parts=mv.split('-'),year=parseInt(parts[0],10),month=parseInt(parts[1],10);
+  try{const html=buildQcNonconfHtml(instrId,year,month);openPrintPreview(html,_reportFilename(instrId,year,month,'kontrole'));}
+  catch(e){notify('Napaka sestave poročila: '+e.message,'err');}
 }
 function renderReviewSummary(){
   const assayMap={};
@@ -4219,38 +5102,59 @@ function renderLJ(){
   const perRules=getAssayRules(qcMat,assay,level);
   const rulesDefs=[{id:'1_2s',label:'1₂ₛ'},{id:'1_3s',label:'1₃ₛ'},{id:'2_2s',label:'2₂ₛ'},{id:'R_4s',label:'R₄ₛ'},{id:'4_1s',label:'4₁ₛ'},{id:'10_x',label:'10ₓ'}];
   const rulesEl=$i('ljRules');if(rulesEl)rulesEl.innerHTML=rulesDefs.map(r=>'<div class="toggle-wrap"><label class="toggle"><input type="checkbox" '+(perRules[r.id]?'checked':'')+' onchange="setAssayRule(\''+qcMat+'\',\''+assay+'\',\''+level+'\',\''+r.id+'\',this.checked);renderLJ()"><span class="toggle-slider"></span></label><span style="font-size:12px;color:var(--text2)">'+r.label+'</span></div>').join('');
-  const pts=[];
-  S.entries.filter(e=>e.qcName===qcMat&&e.levels?.includes(level)).forEach(e=>{const res=(e.results||[]).find(r=>r.assay===assay&&r.level===level);const sd=res?.sd||'ok';pts.push({dt:new Date(e.datetime),sdV:sdToVal(sd),sd,note:res?.note||'',instrId:e.instrId,operatorId:e.operatorId,entryId:e.id});});
-  pts.sort((a,b)=>a.dt-b.dt);
+  const allPts=[];
+  S.entries.filter(e=>e.qcName===qcMat&&e.levels?.includes(level)).forEach(e=>{const res=(e.results||[]).find(r=>r.assay===assay&&r.level===level);const sd=res?.sd||'ok';allPts.push({dt:new Date(e.datetime),sdV:sdToVal(sd),sd,note:res?.note||'',instrId:e.instrId||'?',operatorId:e.operatorId,entryId:e.id});});
   const qcObj=S.qcMaterials.find(q=>q.name===qcMat),vlines=buildVLines(qcObj);
   const qcv=resolveQcValue(qcObj,assay,level);
-  const title=assay+' – '+qcMat+' – Nivo '+level.replace('L','')+(qcv?(' ['+qcv.unit+']'):'');
-  const orig=S.ljRules;S.ljRules=perRules;drawLJCanvas('ljCanvas',pts,title,level,'ljStats',vlines,qcv);S.ljRules=orig;
+  const wrap=$i('ljCharts');wrap.innerHTML='';
+  const instrIds=[...new Set(allPts.map(p=>p.instrId))].sort();
+  if(!instrIds.length){wrap.innerHTML='<div class="card"><div class="empty">Ni podatkov za izbrano kombinacijo.</div></div>';return;}
+  const orig=S.ljRules;S.ljRules=perRules;
+  instrIds.forEach(instrId=>{
+    const pts=allPts.filter(p=>p.instrId===instrId).sort((a,b)=>a.dt-b.dt);
+    const div=document.createElement('div');div.className='card';const cid='ljc_'+instrId.replace(/[^a-z0-9]/gi,'_'),sid='ljs_'+cid;
+    div.innerHTML='<div style="font-weight:600;font-size:13px;color:var(--abbott-blue);margin-bottom:8px">&#128202; '+instrId+'</div><div class="lj-canvas-wrap"><canvas id="'+cid+'" height="320"></canvas></div><div id="'+sid+'" style="margin-top:4px;border-top:1px solid var(--border);padding-top:4px"></div>';
+    wrap.appendChild(div);
+    const title=assay+' – '+qcMat+' – Nivo '+level.replace('L','')+(qcv?(' ['+qcv.unit+']'):'');
+    setTimeout(()=>{const c=$i(cid);if(!c)return;c.height=320;drawLJCanvas(cid,pts,title,level,sid,vlines,qcv);_attachLjPointClick(cid);},30);
+  });
+  S.ljRules=orig;
 }
 
 /* ===== LJ MULTI ===== */
-function onLjmQcMatChange(){const qcName=$i('ljmQcMat').value;const qc=S.qcMaterials.find(q=>q.name===qcName);const assays=qc?.assays?.length?qc.assays:S.assays.map(a=>a.name);$i('ljmAssays').innerHTML=assays.map(a=>'<option value="'+a+'">'+a+'</option>').join('');const levels=qc?.levels||2;$i('ljmLevelPills').innerHTML=Array.from({length:levels},(_,i)=>'<div class="level-pill lp-pill" data-level="L'+(i+1)+'" onclick="this.classList.toggle(\'selected-pill\')" style="font-size:12px">Nivo '+(i+1)+'</div>').join('');}
+function onLjmQcMatChange(){
+  const qcName=$i('ljmQcMat').value;const qc=S.qcMaterials.find(q=>q.name===qcName);
+  const assays=qc?.assays?.length?qc.assays:S.assays.map(a=>a.name);
+  $i('ljmAssays').innerHTML=assays.map(a=>'<option value="'+a+'">'+a+'</option>').join('');
+  const levels=qc?.levels||2;$i('ljmLevelPills').innerHTML=Array.from({length:levels},(_,i)=>'<div class="level-pill lp-pill" data-level="L'+(i+1)+'" onclick="this.classList.toggle(\'selected-pill\')" style="font-size:12px">Nivo '+(i+1)+'</div>').join('');
+  const instrIds=_qcInstrIds();const isel=$i('ljmInstrs');isel.innerHTML=instrIds.map(id=>'<option value="'+id+'" selected>'+id+'</option>').join('');
+}
 function populateLjmSelects(){$i('ljmQcMat').innerHTML=S.qcMaterials.map(q=>'<option value="'+q.name+'">'+q.name+'</option>').join('');onLjmQcMatChange();}
 function renderLJMulti(){
   const qcMat=$i('ljmQcMat').value;const selAssays=[...$i('ljmAssays').selectedOptions].map(o=>o.value);const selLevels=[...document.querySelectorAll('#ljmLevelPills .lp-pill.selected-pill')].map(p=>p.dataset.level);
+  const allInstrOpts=[...$i('ljmInstrs').options].map(o=>o.value);const selInstrs=[...$i('ljmInstrs').selectedOptions].map(o=>o.value);
   if(!selAssays.length){notify('Izberite vsaj eno preiskavo','warning');return;}if(!selLevels.length){notify('Izberite vsaj en nivo','warning');return;}
+  if(!selInstrs.length){notify('Izberite vsaj en analizator','warning');return;}
+  const filterInstrs=selInstrs.length<allInstrOpts.length?selInstrs:null;
+  const instrLabel=filterInstrs?filterInstrs.join(' + '):'vsi analizatorji skupaj';
   const wrap=$i('ljMultiCharts');wrap.innerHTML='';
   selAssays.forEach(assay=>{selLevels.forEach(lvl=>{
     const div=document.createElement('div');div.className='card';const cid='ljmc_'+assay.replace(/[^a-z0-9]/gi,'_')+'_'+lvl,sid='stats_'+cid;
-    div.innerHTML='<div style="font-weight:600;font-size:13px;color:var(--abbott-blue);margin-bottom:8px">'+assay+' – Nivo '+lvl.replace('L','')+'</div><div class="lj-canvas-wrap"><canvas id="'+cid+'" height="260"></canvas></div><div id="'+sid+'" style="margin-top:4px;border-top:1px solid var(--border);padding-top:4px"></div>';
+    div.innerHTML='<div style="font-weight:600;font-size:13px;color:var(--abbott-blue);margin-bottom:8px">'+assay+' – Nivo '+lvl.replace('L','')+' <span class="muted" style="font-weight:400;font-size:11px">('+instrLabel+')</span></div><div class="lj-canvas-wrap"><canvas id="'+cid+'" height="260"></canvas></div><div id="'+sid+'" style="margin-top:4px;border-top:1px solid var(--border);padding-top:4px"></div>';
     wrap.appendChild(div);
-    const pts=[];S.entries.filter(e=>e.qcName===qcMat&&e.levels?.includes(lvl)).forEach(e=>{const res=(e.results||[]).find(r=>r.assay===assay&&r.level===lvl);const sd=res?.sd||'ok';pts.push({dt:new Date(e.datetime),sdV:sdToVal(sd),sd,note:res?.note||'',instrId:e.instrId,operatorId:e.operatorId});});
+    const pts=[];S.entries.filter(e=>e.qcName===qcMat&&e.levels?.includes(lvl)&&(!filterInstrs||filterInstrs.includes(e.instrId))).forEach(e=>{const res=(e.results||[]).find(r=>r.assay===assay&&r.level===lvl);const sd=res?.sd||'ok';pts.push({dt:new Date(e.datetime),sdV:sdToVal(sd),sd,note:res?.note||'',instrId:e.instrId,operatorId:e.operatorId});});
     pts.sort((a,b)=>a.dt-b.dt);
-    setTimeout(()=>{const c=$i(cid);if(!c)return;c.height=260;const qcObjM=S.qcMaterials.find(q=>q.name===qcMat);const qcvM=resolveQcValue(qcObjM,assay,lvl);drawLJCanvas(cid,pts,assay+' – '+qcMat+' – Nivo '+lvl.replace('L','')+(qcvM?(' ['+qcvM.unit+']'):''),lvl,sid,buildVLines(qcObjM),qcvM);},50);
+    setTimeout(()=>{const c=$i(cid);if(!c)return;c.height=260;const qcObjM=S.qcMaterials.find(q=>q.name===qcMat);const qcvM=resolveQcValue(qcObjM,assay,lvl);drawLJCanvas(cid,pts,assay+' – '+qcMat+' – Nivo '+lvl.replace('L','')+(qcvM?(' ['+qcvM.unit+']'):''),lvl,sid,buildVLines(qcObjM),qcvM);_attachLjPointClick(cid);},50);
   });});
 }
 
 /* ===== ASSAYS ===== */
 function setAssayTab(tab){S.currentAssayTab=tab;document.querySelectorAll('#page-assays .tabs .tab').forEach((t,i)=>t.classList.toggle('active',i===(tab==='biochem'?0:1)));renderAssays();}
-function renderAssays(){const q=($i('assaySearch')?.value||'').toLowerCase();const filtered=S.assays.filter(a=>a.type===S.currentAssayTab&&a.name.toLowerCase().includes(q));$i('assayBody').innerHTML=filtered.map(a=>{const ri=S.assays.indexOf(a);const used=S.qcMaterials.filter(q=>q.assays?.includes(a.name)).map(q=>q.name).join(', ')||'–';return '<tr><td><strong>'+a.name+'</strong></td><td><span class="badge '+(a.type==='biochem'?'badge-blue':'badge-ok')+'">'+(a.type==='biochem'?'Biokemija':'Imunologija')+'</span></td><td style="font-size:12px" class="muted">'+used+'</td><td><button class="btn btn-outline btn-sm" onclick="openAssayModal('+ri+')">✏️</button> <button class="btn btn-d btn-sm" onclick="deleteAssay('+ri+')">🗑️</button></td></tr>';}).join('')||'<tr><td colspan="4" class="empty">Ni preiskav.</td></tr>';}
-function openAssayModal(idx){S.editingAssayIdx=idx??null;$i('assayModalTitle').textContent=idx!=null?'Uredi preiskavo':'Nova preiskava';if(idx!=null){$i('assayName').value=S.assays[idx].name;$i('assayType').value=S.assays[idx].type;}else{$i('assayName').value='';$i('assayType').value='biochem';}showMo('assayModal');}
+function renderAssays(){const q=($i('assaySearch')?.value||'').toLowerCase();const filtered=S.assays.filter(a=>a.type===S.currentAssayTab&&a.name.toLowerCase().includes(q));$i('assayBody').innerHTML=filtered.map(a=>{const ri=S.assays.indexOf(a);const used=S.qcMaterials.filter(q=>q.assays?.includes(a.name)).map(q=>q.name).join(', ')||'–';return '<tr><td><strong>'+a.name+'</strong></td><td><span class="badge '+(a.type==='biochem'?'badge-blue':'badge-ok')+'">'+(a.type==='biochem'?'Biokemija':'Imunologija')+'</span></td><td><span class="badge badge-gray" title="'+_repEsc(matrixLabel(a.matrix||'S'))+'">'+(a.matrix||'S')+'</span></td><td style="font-size:12px" class="muted">'+used+'</td><td><button class="btn btn-outline btn-sm" onclick="openAssayModal('+ri+')">✏️</button> <button class="btn btn-d btn-sm" onclick="deleteAssay('+ri+')">🗑️</button></td></tr>';}).join('')||'<tr><td colspan="5" class="empty">Ni preiskav.</td></tr>';}
+function _populateAssayMatrixSelect(sel){$i('assayMatrix').innerHTML=MATRICES().map(m=>'<option value="'+m.code+'">'+m.code+' – '+_repEsc(m.label)+'</option>').join('');$i('assayMatrix').value=sel||'S';}
+function openAssayModal(idx){S.editingAssayIdx=idx??null;$i('assayModalTitle').textContent=idx!=null?'Uredi preiskavo':'Nova preiskava';if(idx!=null){$i('assayName').value=S.assays[idx].name;$i('assayType').value=S.assays[idx].type;_populateAssayMatrixSelect(S.assays[idx].matrix);}else{$i('assayName').value='';$i('assayType').value='biochem';_populateAssayMatrixSelect('S');}showMo('assayModal');}
 function deleteAssay(i){if(!confirm('Izbriši?'))return;S.assays.splice(i,1);save();renderAssays();notify('Preiskava izbrisana');}
-function saveAssay(){const n=$i('assayName').value.trim(),t=$i('assayType').value;if(!n){notify('Vnesite naziv','warning');return;}if(S.editingAssayIdx!=null)S.assays[S.editingAssayIdx]={name:n,type:t};else S.assays.push({name:n,type:t});save();closeMo('assayModal');renderAssays();notify('Preiskava shranjena','success');}
+function saveAssay(){const n=$i('assayName').value.trim(),t=$i('assayType').value,mx=$i('assayMatrix').value||'S';if(!n){notify('Vnesite naziv','warning');return;}if(S.editingAssayIdx!=null)S.assays[S.editingAssayIdx]={name:n,type:t,matrix:mx};else S.assays.push({name:n,type:t,matrix:mx});save();closeMo('assayModal');renderAssays();notify('Preiskava shranjena','success');}
 
 /* ===== QC MATERIALS ===== */
 function renderQcMats(){$i('qcMatBody').innerHTML=S.qcMaterials.map((q,i)=>{const stock=qcStockLotsDistinct(q);let lotCell;if(stock.length){lotCell=stock.map(it=>{const cls=expiryClass(it.daysLeft);const col=cls==='r-exp'?'var(--red)':cls==='r-14'?'var(--orange)':cls==='r-28'?'var(--yellow)':'var(--accent2)';return '<span style="color:'+col+'">'+it.lot+'</span>';}).join('<br>')+' <span style="font-size:10px;color:var(--accent2)">🔗</span>';}else{lotCell=(q.lot||'–');}return '<tr><td><strong>'+q.name+'</strong></td><td><span class="badge badge-gray">'+q.type+'</span></td><td>'+q.levels+'</td><td>'+lotCell+'</td><td style="font-size:12px">'+((q.assays||[]).slice(0,3).join(', ')+(q.assays?.length>3?' +'+(q.assays.length-3):''))+'</td><td><button class="btn btn-outline btn-sm" onclick="openQcModal('+i+')">✏️</button> <button class="btn btn-teal btn-sm" onclick="openQcValuesModal('+i+')">📊</button> <button class="btn btn-g btn-sm" onclick="openLotHistory('+i+')">📋</button> <button class="btn btn-d btn-sm" onclick="deleteQcMat('+i+')">🗑️</button></td></tr>';}).join('')||'<tr><td colspan="6" class="empty">Ni materialov.</td></tr>';}
@@ -4304,8 +5208,35 @@ function applyPanel(idx){
 function saveQcMaterial(){const name=$i('qcName').value.trim(),type=$i('qcType').value,lot=$i('qcLot').value.trim(),levels=parseInt($i('qcLevels').value);const assays=[...$i('qcAssayList').querySelectorAll('input:checked')].map(el=>el.value);const gtins=[...$i('qcGtinList').querySelectorAll('.qc-gtin-cb:checked')].map(el=>el.value);if(!name){notify('Vnesite naziv','warning');return;}const mq=parseInt($i('qcMinQty').value);const obj={name,type,lot,levels,gtins,assays};if(isFinite(mq)&&mq>=0)obj.minQty=mq;if(S.editingQcIdx!=null){const old=S.qcMaterials[S.editingQcIdx];if(old&&old.lotHistory)obj.lotHistory=old.lotHistory;S.qcMaterials[S.editingQcIdx]=obj;}else S.qcMaterials.push(obj);save();closeMo('qcModal');renderQcMats();notify('Material shranjen','success');}
 
 /* ===== OPERATORS ===== */
-function renderOperators(){const q=($i('opSearch')?.value||'').toLowerCase();const filtered=S.operators.filter(o=>(o.first+' '+o.last+' '+o.id).toLowerCase().includes(q));$i('operatorBody').innerHTML=filtered.map(o=>{const ri=S.operators.indexOf(o);const rl=o.role||'operator';const rb=rl==='admin'?'<span class="badge badge-2sd">Admin</span>':rl==='advanced'?'<span class="badge badge-blue">Napredni</span>':'';return '<tr><td><span class="badge badge-blue">'+o.id+'</span></td><td>'+o.first+'</td><td>'+o.last+' '+rb+'</td><td><button class="btn btn-outline btn-sm" onclick="openOperatorModal('+ri+')">✏️</button> <button class="btn btn-d btn-sm" onclick="deleteOperator('+ri+')">🗑️</button></td></tr>';}).join('')||'<tr><td colspan="4" class="empty">Ni rezultatov.</td></tr>';}
-function openOperatorModal(idx){if(!requireRole('admin'))return;S.editingOpIdx=idx??null;$i('operatorModalTitle').textContent=idx!=null?'Uredi operaterja':'Nov operater';if(idx!=null){const o=S.operators[idx];$i('opId').value=o.id;$i('opFirst').value=o.first;$i('opLast').value=o.last;$i('opRole').value=o.role||'operator';}else{$i('opId').value='';$i('opFirst').value='';$i('opLast').value='';$i('opRole').value='operator';}showMo('operatorModal');}
+/* Email ni shranjen podatek — vedno se izracuna iz obstojecih polj (matična
+   st./ime/priimek) po dveh znanih KCLJ konvencijah, da se nikoli ne razide z
+   dejanskim imenom/matično, ce se ta kasneje popravi. */
+function _opEmailId(op){return op&&op.id?(op.id+'@kclj.si'):'';}
+function _opEmailName(op){
+  if(!op||!op.first||!op.last)return '';
+  function translit(s){return (s||'').toLowerCase()
+    .replace(/[čć]/g,'c').replace(/š/g,'s').replace(/ž/g,'z').replace(/đ/g,'dj');}
+  var f=translit(op.first).replace(/\s+/g,'.').replace(/[^a-z.]/g,'');
+  var l=translit(op.last).replace(/\s+/g,'.').replace(/[^a-z.]/g,'');
+  return (f&&l)?(f+'.'+l+'@kclj.si'):'';
+}
+function _copyOpEmail(email){
+  if(!email)return;
+  navigator.clipboard.writeText(email).then(function(){notify('E-pošta kopirana: '+email,'ok');})
+    .catch(function(){notify(email,'ok');});
+}
+function _updateOpEmailPreview(){
+  const draft={id:$i('opId').value.trim(),first:$i('opFirst').value.trim(),last:$i('opLast').value.trim()};
+  const en=_opEmailName(draft),ei=_opEmailId(draft);
+  $i('opEmailPreview').innerHTML=(en?en:'<span class="muted">vpiši ime in priimek…</span>')+'<br>'+(ei?ei:'<span class="muted">vpiši matično…</span>');
+}
+function renderOperators(){const q=($i('opSearch')?.value||'').toLowerCase();const filtered=S.operators.filter(o=>(o.first+' '+o.last+' '+o.id).toLowerCase().includes(q));$i('operatorBody').innerHTML=filtered.map(o=>{const ri=S.operators.indexOf(o);const rl=o.role||'operator';const rb=rl==='admin'?'<span class="badge badge-2sd">Admin</span>':rl==='advanced'?'<span class="badge badge-blue">Napredni</span>':'';
+  const emailName=_opEmailName(o),emailId=_opEmailId(o);
+  const emailCell='<div style="font-size:11px;line-height:1.5;cursor:pointer" title="Klikni za kopiranje">'+
+    '<div onclick="_copyOpEmail(\''+emailName+'\')">'+emailName+'</div>'+
+    '<div class="muted" onclick="_copyOpEmail(\''+emailId+'\')">'+emailId+'</div></div>';
+  return '<tr><td><span class="badge badge-blue">'+o.id+'</span></td><td>'+o.first+'</td><td>'+o.last+' '+rb+'</td><td>'+emailCell+'</td><td><button class="btn btn-outline btn-sm" onclick="openOperatorModal('+ri+')">✏️</button> <button class="btn btn-d btn-sm" onclick="deleteOperator('+ri+')">🗑️</button></td></tr>';}).join('')||'<tr><td colspan="5" class="empty">Ni rezultatov.</td></tr>';}
+function openOperatorModal(idx){if(!requireRole('admin'))return;S.editingOpIdx=idx??null;$i('operatorModalTitle').textContent=idx!=null?'Uredi operaterja':'Nov operater';if(idx!=null){const o=S.operators[idx];$i('opId').value=o.id;$i('opFirst').value=o.first;$i('opLast').value=o.last;$i('opRole').value=o.role||'operator';}else{$i('opId').value='';$i('opFirst').value='';$i('opLast').value='';$i('opRole').value='operator';}_updateOpEmailPreview();showMo('operatorModal');}
 function deleteOperator(i){if(!requireRole('admin'))return;if(!confirm('Izbriši operaterja?'))return;const o=S.operators[i];S.operators.splice(i,1);if(o)_audit('delete','operator',o.id,'Izbrisan operater '+o.first+' '+o.last+' ('+o.id+')',o,null,(currentOp()||{}).id||'system');save();renderOperators();_autoSyncOps();notify('Operater izbrisan');}
 /* Operaterji so vir resnice v tej aplikaciji; ob spremembi se tiho naložijo v OneDrive (DigiLab/operators.json), od koder jih Zebra (Pregled BK) samo prebere. */
 function _autoSyncOps(){try{if(_hasBridge()&&AndroidBridge.msIsSignedIn&&AndroidBridge.msIsSignedIn())AndroidBridge.msUpload('operators',JSON.stringify(S.operators));}catch(e){}}
@@ -4330,23 +5261,25 @@ function openInstrMo(idx){
   if(!requireRole('admin'))return;
   _editInstrIdx=idx??null;
   $i('instrModalTitle').textContent=idx!=null?'Uredi analizator':'Nov analizator';
-  if(idx!=null){const x=INSTR_ALL()[idx];$i('inId').value=x.id;$i('inLabel').value=x.label||'';$i('inInteg').value=x.integration||'';$i('inName').value=x.name||'';$i('inType').value=x.type||'c';}
-  else{$i('inId').value='';$i('inLabel').value='';$i('inInteg').value='';$i('inName').value='';$i('inType').value='c';}
+  if(idx!=null){const x=INSTR_ALL()[idx];$i('inId').value=x.id;$i('inLabel').value=x.label||'';$i('inInteg').value=x.integration||'';$i('inName').value=x.name||'';$i('inType').value=x.type||'c';$i('inSerial').value=x.serial||'';$i('inInventory').value=x.inventory||'';}
+  else{$i('inId').value='';$i('inLabel').value='';$i('inInteg').value='';$i('inName').value='';$i('inType').value='c';$i('inSerial').value='';$i('inInventory').value='';}
   showMo('instrModal');
 }
 function saveInstr(){
   if(!requireRole('admin'))return;
   const id=$i('inId').value.trim(),label=$i('inLabel').value.trim(),integ=$i('inInteg').value.trim(),name=$i('inName').value.trim(),type=$i('inType').value;
+  const serial=$i('inSerial').value.trim();
+  const inventory=$i('inInventory').value.trim();
   if(!id||!integ||!name){notify('Vnesite ID, integracijo in naziv','warning');return;}
   const who=(currentOp()||{}).id||'system';
   if(_editInstrIdx!=null){
     const b=S.instruments[_editInstrIdx];const before={...b};
     if(b.id!==id&&S.instruments.some((x,j)=>j!==_editInstrIdx&&x.id===id)){notify('ID že obstaja','error');return;}
-    S.instruments[_editInstrIdx]={...b,id,label,integration:integ,name,type};
+    S.instruments[_editInstrIdx]={...b,id,label,integration:integ,name,type,serial,inventory};
     _audit('update','instrument',id,'Urejen analizator '+id,before,S.instruments[_editInstrIdx],who);
   }else{
     if(S.instruments.some(x=>x.id===id)){notify('ID že obstaja','error');return;}
-    S.instruments.push({id,label,integration:integ,name,type});
+    S.instruments.push({id,label,integration:integ,name,type,serial,inventory});
     _audit('create','instrument',id,'Dodan analizator '+id+' ('+name+')',null,{id,name,type},who);
   }
   save();closeMo('instrModal');renderInstrList();buildInstrMap();populateEntryInstruments();notify('Analizator shranjen','success');
@@ -5756,12 +6689,22 @@ function renderReportsList(){
       var st=r.ok?'<span class="badge badge-ok">naloženo</span>':'<span class="badge badge-2sd" title="'+_repEsc(r.msg||'')+'">'+_repEsc((r.msg||'napaka')).slice(0,24)+'</span>';
       var btn=(r.ok&&r.path)?'<button class="btn btn-g btn-sm" onclick="openReport('+JSON.stringify(r.path).replace(/"/g,'&quot;')+')">Odpri</button>'
         :'<button class="btn btn-g btn-sm" onclick="regenReport('+JSON.stringify(r.instrId).replace(/"/g,'&quot;')+','+r.year+','+r.month+',\''+r.type+'\')">Ponovi</button>';
-      return '<tr><td style="text-align:left">'+_repEsc(r.filename)+'</td><td>'+st+'</td><td>'+btn+'</td></tr>';
+      var printBtn=(r.type==='kontrole'||r.type==='vzdrzevanje')?' <button class="btn btn-g btn-sm" title="Natisni" onclick="printReportRow('+JSON.stringify(r.instrId).replace(/"/g,'&quot;')+','+r.year+','+r.month+',\''+r.type+'\')">&#128424;&#65039;</button>':'';
+      return '<tr><td style="text-align:left">'+_repEsc(r.filename)+'</td><td>'+st+'</td><td>'+btn+printBtn+'</td></tr>';
     }).join('')+'</tbody></table></div>';
   el.innerHTML=html;
 }
 function openReport(path){if(!path){notify('Pot ni znana','warn');return;}try{if(_hasBridge()&&AndroidBridge.openReportFile){AndroidBridge.openReportFile(path);}else{notify('Odpiranje le na napravi','warn');}}catch(e){notify('Napaka odpiranja','err');}}
 function regenReport(instrId,year,month,type){generateMonthlyReports(year,month,{instrIds:[instrId],types:[type]});}
+/* Ponovno sestavi HTML za ze generirano porocilo (QC neskladja / vzdrzevanje) in
+   ga odpre v predogledu tiskanja — locena pot od masovne mesecne generacije
+   (generateMonthlyReports), da en klik "Natisni" ne sprozi vrste PDF-jev/nalaganj. */
+function printReportRow(instrId,year,month,type){
+  try{
+    var html=(type==='kontrole')?buildQcNonconfHtml(instrId,year,month):buildMaintReportHtml(instrId,year,month);
+    openPrintPreview(html,_reportFilename(instrId,year,month,type));
+  }catch(e){notify('Napaka sestave poročila: '+e.message,'err');}
+}
 function autoGenerateReports(){
   var now=new Date();
   var prevD=new Date(now.getFullYear(),now.getMonth()-1,1);
@@ -5784,9 +6727,23 @@ function retryPendingReports(){
 /* ============================================================
    SERVIS / NAPAKE — vpis napak, servisna poročila, statistika
    ============================================================ */
-const GLP_MODULES=['IOM-1','IOM-2','IOM-3','TAC','BM-1','BM-2','AM','DM','CM-1','CM-2','RM','REM','SM-1','SM-2','LINIJA'];
+/* AM-1/AM-2/DM-1/DM-2 dodano poleg golih "AM"/"DM" — realni servisni zapisniki
+   (npr. "Aliquot Module AM-1") uporabljajo ostevilcene variante po istem vzorcu
+   kot BM-1/BM-2, CM-1/CM-2, SM-1/SM-2; brez njih se golo "AM"/"DM" ujame le
+   delno (npr. "AM" znotraj "AM-1") in pokvari se tudi izluscen SN. */
+const GLP_MODULES=['IOM-1','IOM-2','IOM-3','TAC','BM-1','BM-2','AM-1','AM-2','AM','DM-1','DM-2','DM','CM-1','CM-2','RM','REM','SM-1','SM-2','LINIJA'];
 function SERVICE_DEVICES(){return [...INSTR().map(i=>i.id),...GLP_MODULES];}
 function srvDeviceGroup(dev){const ins=INSTR_ALL().find(i=>i.id===dev);return ins?ins.integration:'GLP linija';}
+/* Normalizacija serijske st. (odstrani presledke/pomisljaje, uppercase) za primerjavo
+   ne glede na formatiranje v razlicnih PDF servisnih zapisnikih. */
+function _normSerial(s){return (s||'').toUpperCase().replace(/[\s\-]/g,'');}
+/* Poisce analizator/modul po serijski st., zapisani v S.instruments[].serial (Del 1) —
+   uporabljeno pri branju servisnih PDF zapisnikov, kjer je konkretna oznaka modula
+   (C1/C2/C3/I1/I2) pogosto NI v besedilu, serijska pa je. */
+function _instrBySerial(serial){
+  const ns=_normSerial(serial);if(!ns)return null;
+  return INSTR_ALL().find(i=>i.serial&&_normSerial(i.serial)===ns)||null;
+}
 function srvStatus(e){if(e.fixedAt)return 'fixed';if(e.notifiedAt)return 'notified';return 'open';}
 const SRV_STATUS_LABEL={open:'<span class="badge badge-3sd">🔴 Odprta</span>',notified:'<span class="badge badge-2sd">🟠 Servis obveščen</span>',fixed:'<span class="badge badge-ok">🟢 Odpravljena</span>'};
 function _fmtDur(ms){if(ms==null||ms<0)return '–';const h=ms/3600000;if(h<1)return Math.round(ms/60000)+' min';if(h<48)return h.toFixed(1)+' h';return Math.floor(h/24)+' d '+Math.round(h%24)+' h';}
@@ -5813,7 +6770,7 @@ function srvInitSelects(){
 }
 function srvResetForm(keepDefaults){
   srvEditId=null;srvAttachTemp=[];
-  ['sfDevice','sfFault','sfNotified','sfResponded','sfArrived','sfFixed','sfNalog','sfOrder','sfNote'].forEach(id=>{$i(id).value='';});
+  ['sfDevice','sfFault','sfNotified','sfResponded','sfArrived','sfFixed','sfNalog','sfOrder','sfBilledHours','sfNote','sfInventory','sfSerial'].forEach(id=>{$i(id).value='';});
   /* privzeto: pojav napake = zdaj (lokalni čas za datetime-local) */
   const n=new Date();n.setMinutes(n.getMinutes()-n.getTimezoneOffset());
   $i('sfOccurred').value=keepDefaults?n.toISOString().slice(0,16):'';
@@ -5827,7 +6784,12 @@ function srvEdit(id){
   $i('sfDevice').value=e.device||'';$i('sfFault').value=e.fault||'';
   $i('sfOccurred').value=e.occurredAt||'';$i('sfNotified').value=e.notifiedAt||'';
   $i('sfResponded').value=e.respondedAt||'';$i('sfArrived').value=e.arrivedAt||'';$i('sfFixed').value=e.fixedAt||'';
-  $i('sfNalog').value=e.nalogNum||'';$i('sfOrder').value=e.orderNum||'';$i('sfNote').value=e.note||'';
+  $i('sfNalog').value=e.nalogNum||'';$i('sfOrder').value=e.orderNum||'';
+  $i('sfBilledHours').value=(e.billedHours!=null)?e.billedHours:'';$i('sfNote').value=e.note||'';
+  /* Inventarna/serijska: prednostno tisto kar je bilo zabelezeno ob vpisu (deviceInventory/
+     deviceSerial na vnosu), sicer trenutna vrednost iz nastavitev Analizatorjev. */
+  if(e.deviceInventory||e.deviceSerial){$i('sfInventory').value=e.deviceInventory||'';$i('sfSerial').value=e.deviceSerial||'';}
+  else srvDeviceChanged();
   $i('srvFormTitle').textContent='Urejanje napake — '+(e.device||'');
   $i('srvCancelEdit').style.display='';
   renderSrvAttach();
@@ -5835,11 +6797,21 @@ function srvEdit(id){
 }
 /* zberi trenutna polja obrazca */
 function _srvFormData(){
+  var bh=$i('sfBilledHours').value;
   return {device:$i('sfDevice').value,fault:$i('sfFault').value.trim(),occurredAt:$i('sfOccurred').value||'',
     notifiedAt:$i('sfNotified').value||'',respondedAt:$i('sfResponded').value||'',
     arrivedAt:$i('sfArrived').value||'',fixedAt:$i('sfFixed').value||'',
     nalogNum:$i('sfNalog').value.trim(),orderNum:$i('sfOrder').value.trim(),
+    billedHours:(bh!==''&&!isNaN(parseFloat(bh)))?parseFloat(bh):null,
+    deviceInventory:$i('sfInventory').value.trim(),deviceSerial:$i('sfSerial').value.trim(),
     note:$i('sfNote').value.trim(),attachments:srvAttachTemp.slice()};
+}
+/* Inventarna/serijska st. sta vezani na izbrano napravo (S.instruments[].inventory/serial) —
+   ob spremembi izbire naprave se polji samodejno napolnita iz nastavitev Analizatorjev. */
+function srvDeviceChanged(){
+  const ins=INSTR_ALL().find(function(i){return i.id===$i('sfDevice').value;});
+  $i('sfInventory').value=(ins&&ins.inventory)||'';
+  $i('sfSerial').value=(ins&&ins.serial)||'';
 }
 /* shrani/posodobi OSNUTEK (nezaključen) — obvezna naprava + opis; po shranjevanju ostane v urejanju */
 function srvSaveDraft(silent){
@@ -5896,13 +6868,20 @@ function renderSrvAttach(){
   const w=$i('sfAttachList');
   if(!srvAttachTemp.length){w.innerHTML='<div class="muted" style="font-size:12px">Ni priponk.</div>';return;}
   w.innerHTML=srvAttachTemp.map((a,i)=>'<div style="display:flex;align-items:center;gap:8px;background:var(--bg2);border:1px solid var(--border);border-radius:7px;padding:6px 10px;font-size:13px">'+
-    '<span>&#128196;</span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer" onclick="srvOpenAttach('+i+')">'+a.name+'</span>'+
-    '<span class="muted" style="font-size:11px">'+(a.size?(a.size/1024).toFixed(0)+' KB':'')+'</span>'+
+    '<span>'+(a.source==='onedrive'?'&#9729;':'&#128196;')+'</span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer" onclick="srvOpenAttach('+i+')" title="'+(a.onedrivePath?_repEsc(a.onedrivePath):'')+'">'+_repEsc(a.name)+'</span>'+
+    '<span class="muted" style="font-size:11px">'+(a.source==='onedrive'?'OneDrive':(a.size?(a.size/1024).toFixed(0)+' KB':''))+'</span>'+
     '<button class="btn btn-d btn-sm" onclick="srvDelAttach('+i+')">&#128465;</button></div>').join('');
 }
 function srvDelAttach(i){srvAttachTemp.splice(i,1);renderSrvAttach();}
+var _srvAttachAwaitingView=false;
 function srvOpenAttach(i){
   const a=srvAttachTemp[i];if(!a)return;
+  if(a.onedrivePath){
+    if(!(_hasBridge()&&AndroidBridge.msDownloadBinary)){notify('Odpiranje OneDrive priponk deluje na napravi/PC','warn');return;}
+    _srvAttachAwaitingView=true;
+    try{AndroidBridge.msDownloadBinary(a.onedrivePath);}catch(e){_srvAttachAwaitingView=false;notify('Napaka pri prenosu','err');}
+    return;
+  }
   if(_hasBridge()&&AndroidBridge.openReportFile&&a.path){try{AndroidBridge.openReportFile(a.path);}catch(e){notify('Ni mogoče odpreti datoteke','err');}}
   else notify('Odpiranje datotek deluje na napravi','warn');
 }
@@ -5965,6 +6944,158 @@ async function _pdfText(u8){
   while((m=reTJ.exec(src)))txt+=m[1].replace(/\(((?:\\.|[^\\()])*)\)/g,'$1 ').replace(/\\([()\\])/g,'$1');
   return txt+' '+src;
 }
+/* Poisce znan analizator/GLP modul v besedilu servisnega PDF. Prednostno preveri
+   znane SERIJSKE ST. iz S.instruments[].serial (Del 1) — ker pdf-parse pogosto
+   zlepi oznako modula neposredno ob serijsko brez locila (npr. "...Alinity
+   IAL01-I2AI30989..."), iskanje je preprost normaliziran podniz, ne \b-mejni regex.
+   Ce serijska ni (se) vpisana/najdena, pade nazaj na neposredno iskanje znane
+   oznake modula (SERVICE_DEVICES()) kot podniz v besedilu. */
+function _srvFindModule(txt){
+  return _srvFindModuleAndSerial(txt).module;
+}
+/* Neposredno, od modula NEODVISNO iskanje SN+inventarne po celotnem besedilu —
+   modul se izbira ROCNO (uporabnikova zahteva: ime naprave v PDF-ju obcasno
+   napacno napisano s strani servisa, zato se nanj ne smemo zanasati niti za
+   samo najdbo SN/inventarne, kaj sele za njuno shranjevanje). INVENTARNA je
+   dosledna: 11-mestno stevilo, ki se zacne z 738 (obcasno 736 — potrjeno na
+   realnih primerih) — poiscemo jo NEPOSREDNO, SN pa je alfanumericni token
+   TAKOJ PRED njo (poljubna dolzina/oblika: "AC04005","AAS088","M04A000104"...). */
+function _srvExtractSnInventory(txt){
+  var m=/([A-Z0-9][A-Z0-9]{2,20})\s*(73[68]\d{8})/.exec(txt||'');
+  if(m)return {sn:m[1],inventory:m[2]};
+  return {sn:null,inventory:null};
+}
+/* Razdeli zlepljen/presledkom-loceni blok "<SN> <inventarna> [DTS <stroskovno
+   mesto>]" na SN in inventarno st. — pomozna funkcija za primere ko SN nima
+   inventarne zraven (stara predloga, samostojna Serijska st.). */
+function _srvSplitSnInventory(blob){
+  var b=(blob||'').replace(/^\s+/,'');
+  var m=b.match(/(73[68]\d{8})/);
+  if(m){
+    var sn=b.slice(0,m.index).trim().replace(/[^A-Z0-9]+$/,'')||null;
+    return {sn:sn,inventory:m[1]};
+  }
+  var m2=b.match(/^([A-Z0-9]{5,20})/);
+  return {sn:m2?m2[1]:null,inventory:null};
+}
+/* Modul (za katerega SERVICE_DEVICES() oznaka je najdena v besedilu) IN
+   SN/inventarna (vedno neposredno iz besedila, neodvisno od modula — glej
+   _srvExtractSnInventory). Ce noben vzorec ni najden, ostane null/'' —
+   NIKOLI izmisljena vrednost. */
+function _srvFindModuleAndSerial(txt){
+  const direct=_srvExtractSnInventory(txt);
+  const ids=SERVICE_DEVICES().slice().sort(function(a,b){return b.length-a.length;});
+  for(let k=0;k<ids.length;k++){
+    const id=ids[k];
+    const variants=[id,id.replace(' ','-'),id.replace(' ','')];
+    for(let j=0;j<variants.length;j++){
+      const v=variants[j];const idx=txt.indexOf(v);
+      if(idx>=0){
+        const tail=txt.slice(idx+v.length,idx+v.length+40);
+        const sp=_srvSplitSnInventory(tail);
+        return {module:id,serial:direct.sn||sp.sn,inventory:direct.inventory||sp.inventory};
+      }
+    }
+  }
+  if(direct.sn||direct.inventory)return {module:null,serial:direct.sn,inventory:direct.inventory};
+  const normTxt=txt.toUpperCase().replace(/[^A-Z0-9]/g,'');
+  const bySerial=INSTR_ALL().find(function(i){return i.serial&&normTxt.indexOf(_normSerial(i.serial))>=0;});
+  if(bySerial)return {module:bySerial.id,serial:null,inventory:null};
+  return {module:null,serial:null,inventory:null};
+}
+/* Generični parser servisnih PDF zapisnikov Abbott — podpira obe realni predlogi:
+   "DTS" (2025+, "Št. naloga:"/"Čas prijave napake:"/"Delo:"...) in starejši
+   "Delovni nalog" (2022-2024, brez teh oznak, polja obrazca pomešana v vrstnem
+   redu ki ga pdf-parse vrne). Polja ki jih ni mogoče zanesljivo najti ostanejo
+   null/'' — NIKOLI izmišljena vrednost (enako pravilo kot pri Salus/QC XML prej).
+   Št. naročilnice se namenoma NIKOLI ne poskuša izluščiti — v Abbottovem PDF-ju
+   je dosledno prazna, uporabnik jo vedno vpiše ročno. */
+/* Klientski _pdfText() (za razliko od server-side pdf-parse) na koncu izhoda
+   priloži tudi SUROV PDF vir (stream/font podatki, lahko sto tisoc znakov) —
+   brez omejitve bi iskanje znane oznake naprave/GLP modula (SERVICE_DEVICES())
+   po naključju zadelo kratek 2-3 znakovni niz (npr. "DM","AM") nekje v tem
+   binarnem smetju namesto v dejanskem berljivem besedilu. Pravo besedilo je
+   VEDNO na zacetku niza (nekaj sto do ~2000 znakov), zato obrezemo na varno mejo.
+   Hkrati popravimo znano, dosledno pokvarjeno kodiranje nekaterih posebnih crk
+   pri tem istem ekstraktorju (razlicne pisave/CMap-i v teh PDF-jih se dekodirajo
+   narobe v fiksne kontrolne zaporedbe) — to velja za CELO besedilo, ne le oznake
+   polj, saj se pojavlja tudi v prostem besedilu (napaka/opomba). */
+function _srvFixPdfChars(s){
+  var C_UP=String.fromCharCode(268);
+  var C_LO=String.fromCharCode(269);
+  var S_LO=String.fromCharCode(353);
+  var C_ACUTE=String.fromCharCode(263);
+  var map={};
+  map['\x01\f']=C_UP;
+  map['\x01\\r']=C_LO;   /* malo "c" je 3-bajtno: \x01 + \ + r (potrjeno na "kolicina"/"narociti") */
+  map['\x01a']=S_LO;
+  map['\x01\x07']=C_ACUTE;
+  return (s||'').replace(/\x01(?:\\r|[\fa\x07])/g,function(m){return map[m]||m;});
+}
+function parseSrvReportText(text){
+  const txt=_srvFixPdfChars((text||'').slice(0,5000).replace(/\x00/g,''));
+  const res={module:null,serial:null,inventory:null,nalogNum:'',occurredAt:'',fixedAt:'',fault:'',note:'',billedHours:null,templateType:'unknown'};
+  const found=_srvFindModuleAndSerial(txt);
+  res.module=found.module;res.serial=found.serial;res.inventory=found.inventory;
+  /* Opomba o kodiranju: klientski _pdfText() (uporablja ga obrazec Vpis napake,
+     drugace kot server-side pdf-parse s katerim je bil parser prvotno testiran)
+     pri nekaterih PDF pisavah/CMap-ih napacno prevede Š/Č/Ž v kontrolne znake
+     (npr. "Št." postane "`t.", "Čas" postane "\fas"). Zato kljucne
+     oznake NE smejo zahtevati natancno teh crk — namesto tega dovolimo 0-2
+     poljubna znaka na tistem mestu. Prav tako ta ekstraktor NE vrne zanesljivih
+     prelomov vrstic (besedilo je skoraj eno samo vrstico, locilo presledki), zato
+     nobena oznaka spodaj ne sme zahtevati dobesednega "\n". */
+  const isDTS=/.{0,2}t\.\s*naloga:/i.test(txt);
+  if(isDTS){
+    res.templateType='dts';
+    let m;
+    m=txt.match(/.{0,2}t\.\s*naloga:\s*(\d{1,5}\s*\/\s*\d{4})/i);
+    if(m)res.nalogNum=m[1].replace(/\s+/g,'');
+    m=txt.match(/.{0,2}as prijave napake:\s*(\d{1,2}[.]\d{1,2}[.]\d{4})\s+(\d{1,2}[.:]\d{2})/i);
+    if(m)res.occurredAt=_slDateToIso(m[1])+'T'+m[2].replace('.',':').padStart(5,'0');
+    /* "Tip dela" v vrsticah sekcije Delo: ni vedno "Popravilo" — realni zapisniki
+       uporabljajo tudi "Delo" (npr. "1Delo07. 01. 2025 11:10 do 11:40 / 0.5..."). */
+    const entries=[...txt.matchAll(/(?:Popravilo|Delo)\s*(\d{1,2}[.\s]+\d{1,2}[.\s]+\d{4})\s*(\d{2}:\d{2})\s*do\s*(\d{2}:\d{2})\s*\/\s*([\d.,]+)/g)];
+    if(entries.length){
+      res.occurredAt=res.occurredAt||(_slDateToIso(entries[0][1])+'T'+entries[0][2]);
+      res.fixedAt=_slDateToIso(entries[entries.length-1][1])+'T'+entries[entries.length-1][3];
+      /* Vsota ur iz posameznih vrstic Dela — rezerva, ce "Skupaj: HH:MM" (spodaj)
+         iz kakega razloga manjka (npr. drugacna postavitev v starejsi DTS razlicici). */
+      var lineHoursSum=entries.reduce(function(s,e){return s+parseFloat((e[4]||'0').replace(',','.'));},0);
+      if(lineHoursSum>0)res.billedHours=lineHoursSum;
+    }
+    m=txt.match(/Prijavljena okvara:\s*(.+?)(?=Opis storitve:|$)/s);
+    if(m)res.fault=m[1].trim().split('\n')[0];
+    m=txt.match(/Opis storitve:\s*(.+?)(?=Postavke|Delo:|$)/s);
+    if(m)res.note=m[1].trim();
+    /* Ure: "Skupaj: HH:MM" takoj po sekciji "Delo:" — zanesljiv, ze-agregiran vir */
+    m=txt.match(/Delo:[\s\S]*?Skupaj:\s*(\d{1,2}):(\d{2})/);
+    if(m)res.billedHours=parseInt(m[1],10)+parseInt(m[2],10)/60;
+  } else if(/Delovni nalog/i.test(txt)) {
+    res.templateType='legacy';
+    /* Nalog: "<Ime Priimek><NNN>/<YYYY>" ali "<Ime Priimek><NNN> - <YYYY>" blizu konca (ime serviserja + interna st.) */
+    let m=txt.match(/(\p{Lu}\p{Ll}+\s\p{Lu}\p{L}+)(\d{1,4})\s*[-/]\s*(\d{4})/u);
+    if(m)res.nalogNum=m[2].padStart(3,'0')+'/'+m[3];
+    /* Datum popravila (edini datum na tej predlogi — obrazec nima loceno prijave/odprave) */
+    m=txt.match(/Datum(\d{1,2}[.]\d{1,2}[.]\d{4})/);
+    if(m)res.occurredAt=_slDateToIso(m[1]);
+    /* Ure dela: prva stevilka takoj po "Kolicina...Skupaj" glavo tabele (vejica kot decimalno locilo);
+       ce za glavo takoj sledi "Skupaj0,00" brez stevilke, je bilo dejansko zaracunanih 0 ur (ne neznano). */
+    m=txt.match(/Koli[cč]ina[\s\S]{0,40}?Skupaj\s*\n\s*([\d]+[.,]\d*)\s*\n/);
+    if(m)res.billedHours=parseFloat(m[1].replace(',','.'));
+    else if(/Koli[cč]ina[\s\S]{0,40}?Skupaj\s*\n\s*Skupaj0,00/.test(txt))res.billedHours=0;
+    /* Napaka/opis: prosto besedilo med glavo obrazca ("...Čas odhoda od uporabnika")
+       in tabelo postavk ("Kolicina...Skupaj") — ta predloga nima locenih oznak
+       "Prijavljena okvara:"/"Opis storitve:" kot DTS, zato gre za en sam blok. */
+    m=txt.match(/Datum in[sš]talacije[^\n]*\n([\s\S]+?)\nKoli[cč]ina/);
+    if(m){
+      const block=m[1].trim();
+      res.note=block;
+      res.fault=block.split('\n')[0].trim();
+    }
+  }
+  return res;
+}
 async function srvTryExtractNalog(base64){
   try{
     const bin=atob(base64);const u8=new Uint8Array(bin.length);
@@ -5983,44 +7114,49 @@ function _slDateToIso(s){const n=s.match(/\d+/g);return n&&n.length>=3?n[2]+'-'+
 function srvPdfImportChosen(input){
   const f=input.files[0];if(!f)return;
   const r=new FileReader();
-  r.onload=ev=>{const b=new Uint8Array(ev.target.result);let s='';for(let i=0;i<b.length;i++)s+=String.fromCharCode(b[i]);srvImportDtsPdf(btoa(s));};
+  r.onload=ev=>{const b=new Uint8Array(ev.target.result);let s='';for(let i=0;i<b.length;i++)s+=String.fromCharCode(b[i]);srvImportPdf(btoa(s));};
   r.readAsArrayBuffer(f);input.value='';
 }
-async function srvImportDtsPdf(base64){
+/* Uvoz servisnega PDF zapisnika (obe predlogi — DTS in starejsi "Delovni nalog")
+   pri vpisu napake — predizpolni polja obrazca prek genericnega parserja
+   (parseSrvReportText, ~6033). Naročilnica (sfOrder) se NIKOLI ne nastavi iz
+   PDF (dosledno prazna v Abbottovem obrazcu) — uporabnik jo vedno vpiše ročno.
+   Ce PDF vsebuje razpoznane ure dela, te PREPIŠEJO obstoječo vrednost polja
+   "Zaračunane ure" (PDF ima prednost — dogovor iz nacrtovanja te funkcije). */
+async function srvImportPdf(base64){
   try{
     const bin=atob(base64);const u8=new Uint8Array(bin.length);
     for(let i=0;i<bin.length;i++)u8[i]=bin.charCodeAt(i);
     const txt=(await _pdfText(u8)).replace(/\x00/g,'');
-    let m,filled=0;
-    // Nalog
-    m=txt.match(/naloga[:\s]{0,10}(\d{2,5}\s*\/\s*\d{4})/i)||txt.match(/(\d{3,4}\/20\d{2})/);
-    if(m){$i('sfNalog').value=m[1].replace(/\s+/g,'');filled++;}
-    // Aparat → select sfDevice (iskanje po vrednosti ali predponi)
-    m=txt.match(/Alinity\s+\S+\s+(\S+)/);
-    if(m){
-      const dev=m[1];const sel=$i('sfDevice');
-      let opt=[...sel.options].find(o=>o.value===dev);
-      if(!opt)opt=[...sel.options].find(o=>dev.startsWith(o.value)||o.value.startsWith(dev.split('-')[0]));
-      if(opt){sel.value=opt.value;filled++;}
+    const r=parseSrvReportText(txt);
+    let filled=0;
+    if(r.templateType==='unknown'){notify('PDF ne vsebuje prepoznavnih polj (ni servisni zapisnik Abbott?)','warning');return;}
+    if(r.nalogNum){$i('sfNalog').value=r.nalogNum;filled++;}
+    if(r.module){
+      const sel=$i('sfDevice');
+      const opt=[...sel.options].find(o=>o.value===r.module);
+      if(opt){
+        sel.value=opt.value;filled++;
+        srvDeviceChanged();
+      }
     }
-    // Napaka
-    m=txt.match(/Prijavljena okvara[:\s]+(.+?)(?=\n|Opis)/s);
-    if(m){$i('sfFault').value=m[1].trim().split('\n')[0];filled++;}
-    // Čas prijave → occurredAt
-    m=txt.match(/Čas prijave napake[:\s]+(\d{1,2}[.]\d{1,2}[.]\d{4})\s+(\d{1,2}[.:]\d{2})/);
-    if(m){$i('sfOccurred').value=_slDateToIso(m[1])+'T'+m[2].replace('.',':').padStart(5,'0');filled++;}
-    // Delo: arrivedAt + fixedAt
-    const entries=[...txt.matchAll(/Popravilo\s+(\d{1,2}[.\s]+\d{1,2}[.\s]+\d{4})\s+(\d{2}:\d{2})\s+do\s+(\d{2}:\d{2})/g)];
-    if(entries.length){
-      $i('sfArrived').value=_slDateToIso(entries[0][1])+'T'+entries[0][2];
-      $i('sfFixed').value=_slDateToIso(entries[entries.length-1][1])+'T'+entries[entries.length-1][3];
-      filled+=2;
-    }
-    // Opis storitve → opomba
-    m=txt.match(/Opis storitve[:\s]+(.+?)(?=\nPostavke|\nDelo:)/s);
-    if(m){$i('sfNote').value=m[1].trim();filled++;}
-    notify(filled?'Uvoženo iz PDF (Abbott DTS) — preverite polja in shranite':'PDF ne vsebuje prepoznavnih polj (ni DTS nalog?)','success');
-  }catch(e){console.log('srvImportDtsPdf err',e);notify('Napaka pri branju PDF','err');}
+    /* SN/inventarna se preberta iz PDF-ja VEDNO, neodvisno od tega, ali je
+       modul/naprava prepoznana — modul se izbira ROCNO (ime naprave v PDF-ju
+       je obcasno napacno napisano s strani servisa, SN pa mora biti vedno
+       zanesljiv/pravi). NAMENOMA se ne pisejo samodejno v Analizatorje — le
+       PRIKAZETA v obrazcu, v nastavitve ju uporabnik vpise/potrdi rocno. */
+    if(r.serial){$i('sfSerial').value=r.serial;filled++;}
+    if(r.inventory){$i('sfInventory').value=r.inventory;filled++;}
+    /* sfOccurred/sfFixed so type="datetime-local" — zahtevajo cas (T HH:MM); stara
+       predloga vrne le datum (occurredAt brez casa), zato dopolni s T00:00, sicer
+       brskalnik neveljavno vrednost tiho zavrze in polje ostane prazno. */
+    if(r.occurredAt){$i('sfOccurred').value=r.occurredAt.indexOf('T')<0?r.occurredAt+'T00:00':r.occurredAt;filled++;}
+    if(r.fixedAt){$i('sfFixed').value=r.fixedAt.indexOf('T')<0?r.fixedAt+'T00:00':r.fixedAt;filled++;}
+    if(r.fault){$i('sfFault').value=r.fault;filled++;}
+    if(r.note){$i('sfNote').value=r.note;filled++;}
+    if(r.billedHours!=null){$i('sfBilledHours').value=r.billedHours;filled++;}
+    notify(filled?'Uvoženo iz servisnega PDF ('+(r.templateType==='dts'?'DTS':'star obrazec')+') — preverite polja (naročilnico vpišite ročno) in shranite':'PDF prepoznan, a ni bilo mogoče izluščiti nobenega polja','success');
+  }catch(e){console.log('srvImportPdf err',e);notify('Napaka pri branju PDF','err');}
 }
 /* ---- seznam napak ---- */
 /* nezaključene (osnutki) — brez closedAt */
@@ -6109,17 +7245,29 @@ function renderSrvStats(){
   const groups={};
   logs.forEach(e=>{
     const k=keyOf(e);
-    if(!groups[k])groups[k]={total:0,fixed:0,open:0,durSum:0,durN:0};
+    if(!groups[k])groups[k]={total:0,fixed:0,open:0,durSum:0,durN:0,billedSum:0};
     const g=groups[k];g.total++;
     if(srvStatus(e)==='fixed'){g.fixed++;if(e.occurredAt&&e.fixedAt){g.durSum+=(new Date(e.fixedAt)-new Date(e.occurredAt));g.durN++;}}
     else g.open++;
+    /* "Vsota ur" = dejansko zaracunane ure iz servisnega zapisnika (sfBilledHours),
+       NE izracunan cas do odprave — servis pogosto ne zaracuna celotnega casa cakanja. */
+    if(typeof e.billedHours==='number')g.billedSum+=e.billedHours;
   });
   const keys=Object.keys(groups).sort((a,b)=>groups[b].total-groups[a].total);
   /* tabela */
   const tbody=$i('srvStatsBody');
-  if(!keys.length){tbody.innerHTML='<tr><td colspan="5" class="empty">Ni napak v izbranem obdobju.</td></tr>';}
-  else tbody.innerHTML=keys.map(k=>{const g=groups[k];
-    return '<tr><td><span class="badge badge-blue">'+k+'</span></td><td>'+g.total+'</td><td>'+g.fixed+'</td><td>'+g.open+'</td><td>'+(g.durN?_fmtDur(g.durSum/g.durN):'–')+'</td></tr>';}).join('');
+  const foot=$i('srvStatsFoot');
+  if(!keys.length){
+    tbody.innerHTML='<tr><td colspan="6" class="empty">Ni napak v izbranem obdobju.</td></tr>';
+    if(foot)foot.innerHTML='';
+  } else {
+    tbody.innerHTML=keys.map(k=>{const g=groups[k];
+      return '<tr><td><span class="badge badge-blue">'+k+'</span></td><td>'+g.total+'</td><td>'+g.fixed+'</td><td>'+g.open+'</td><td>'+(g.durN?_fmtDur(g.durSum/g.durN):'–')+'</td><td><b>'+(g.billedSum?g.billedSum.toFixed(1)+' h':'–')+'</b></td></tr>';}).join('');
+    if(foot){
+      const grandSum=keys.reduce((s,k)=>s+groups[k].billedSum,0);
+      foot.innerHTML='<tr style="font-weight:700;border-top:2px solid var(--border)"><td colspan="5" style="text-align:right">Skupaj ur (izbrano obdobje)</td><td>'+grandSum.toFixed(1)+' h</td></tr>';
+    }
+  }
   /* graf */
   drawSrvChart(keys,groups);
 }
@@ -6164,13 +7312,41 @@ function drawSrvChart(keys,groups){
   x.fillStyle='#dc2626';x.fillRect(padL,2,10,10);x.fillStyle=txtCol;x.fillText('Napake',padL+14,11);
   x.fillStyle='#16a34a';x.fillRect(padL+74,2,10,10);x.fillStyle=txtCol;x.fillText('Odpravljene',padL+88,11);
 }
+function _srvStatsPeriodLabel(){
+  const m=$i('ssMode').value;
+  if(m==='month'){const mv=$i('ssMonth').value;if(!mv)return'';const parts=mv.split('-');return REP_MONTHS[parseInt(parts[1],10)-1]+' '+parts[0];}
+  if(m==='year'){return $i('ssYear').value||'';}
+  const f=$i('ssFrom').value,t=$i('ssTo').value;
+  if(!f&&!t)return'';
+  return (f||'…')+' → '+(t||'…');
+}
+function printSrvStats(){
+  const grp=$i('ssGroup').value==='analyser'?'Po analizatorju/liniji':'Po napravi/modulu';
+  const period=_srvStatsPeriodLabel();
+  const head=$i('srvStatsBody').closest('table').querySelector('thead').innerHTML;
+  const body=$i('srvStatsBody').innerHTML;
+  const foot=$i('srvStatsFoot')?$i('srvStatsFoot').innerHTML:'';
+  if(!body||/class="empty"/.test(body)){notify('Ni podatkov za tiskanje v izbranem obdobju','warn');return;}
+  var css='body{font-family:sans-serif;padding:16px;color:#000}h2{font-size:15px;margin:0 0 8px}'+
+    'table{border-collapse:collapse;width:100%}th,td{border:1px solid #000;padding:3px 6px;font-size:11px;text-align:center}th{background:#eee}'+
+    '.meta{font-size:11px;margin-bottom:8px;color:#333}';
+  var title='Statistika servisov'+(period?' – '+period:'');
+  var html='<!doctype html><html><head><meta charset="utf-8"><style>'+css+'</style></head><body>'+
+    _printHead(title)+'<div class="meta">Razvrstitev: '+grp+(period?' &middot; Obdobje: '+_repEsc(period):'')+'</div>'+
+    '<table><thead>'+head+'</thead><tbody>'+body+'</tbody><tfoot>'+foot+'</tfoot></table>'+_printFoot()+'</body></html>';
+  openPrintPreview(html,'Statistika_servisov'+(period?'_'+period.replace(/[^a-z0-9]+/gi,'_'):''));
+}
 function exportSrvStatsCSV(){
   const logs=_srvStatsFiltered();const grp=$i('ssGroup').value;
   const keyOf=e=>grp==='analyser'?srvDeviceGroup(e.device):e.device;
   const groups={};
-  logs.forEach(e=>{const k=keyOf(e);if(!groups[k])groups[k]={total:0,fixed:0,open:0};const g=groups[k];g.total++;srvStatus(e)==='fixed'?g.fixed++:g.open++;});
-  const rows=[['Naprava','Napak','Odpravljenih','Odprtih']];
-  Object.keys(groups).sort().forEach(k=>rows.push([k,groups[k].total,groups[k].fixed,groups[k].open]));
+  logs.forEach(e=>{const k=keyOf(e);if(!groups[k])groups[k]={total:0,fixed:0,open:0,billedSum:0};const g=groups[k];g.total++;
+    if(srvStatus(e)==='fixed')g.fixed++;else g.open++;
+    if(typeof e.billedHours==='number')g.billedSum+=e.billedHours;});
+  const rows=[['Naprava','Napak','Odpravljenih','Odprtih','Vsota ur']];
+  let grandSum=0;
+  Object.keys(groups).sort().forEach(k=>{grandSum+=groups[k].billedSum;rows.push([k,groups[k].total,groups[k].fixed,groups[k].open,groups[k].billedSum.toFixed(1)]);});
+  rows.push(['Skupaj','','','',grandSum.toFixed(1)]);
   const csv=rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');
   const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='Statistika_servisov_'+new Date().toISOString().slice(0,10)+'.csv';a.click();
@@ -6384,7 +7560,18 @@ function renderReklStatistika(){
   $i('reklStatBody').innerHTML=h||'<div class="empty" style="padding:24px;text-align:center">Ni podatkov.</div>';
 }
 
-function renderMaintReview(){const tf=$i('mrFilterType').value,ig=$i('mrFilterInteg').value,df=$i('mrFilterFrom').value,dt=$i('mrFilterTo').value;let logs=[...(S.maintenanceLog||[])];if(tf)logs=logs.filter(m=>m.type===tf);if(ig)logs=logs.filter(m=>m.integration===ig);if(df)logs=logs.filter(m=>m.datetime>=df);if(dt)logs=logs.filter(m=>m.datetime<=dt+'T23:59:59');logs.sort((a,b)=>b.datetime.localeCompare(a.datetime));const tl={daily:'Dnevno',weekly:'Tedensko',monthly:'Mesečno',quarterly:'3-mesečno',triannual:'3-mesečno'};const tbody=$i('maintReviewBody');if(!logs.length){tbody.innerHTML='<tr><td colspan="7" class="empty">Ni podatkov.</td></tr>';return;}tbody.innerHTML=logs.map(m=>{const allDone=m.doneCount===m.totalSteps;const dt2=new Date(m.datetime);return '<tr><td>'+dt2.toLocaleString('sl-SI')+'</td><td>'+(tl[m.type]||m.type)+'</td><td>'+m.integration+'</td><td><span class="badge badge-blue">'+m.instrId+'</span></td><td><span class="badge '+(allDone?'badge-ok':'badge-2sd')+'">'+m.doneCount+'/'+m.totalSteps+'</span></td><td>'+getOpName(m.operatorId)+'</td><td style="font-size:12px" class="muted">'+(m.note||'')+'</td></tr>';}).join('');}
+function _mrPopulatePrint(){
+  const sel=$i('mrPrintInstr');if(sel&&!sel.options.length){sel.innerHTML=INSTR().map(i=>'<option value="'+i.id+'">'+i.id+' ('+i.name+')</option>').join('');}
+  const msel=$i('mrPrintMonth');if(msel&&!msel.options.length){const now=new Date();const opts=[{y:now.getFullYear(),m:now.getMonth()+1}].concat(_repLast12());msel.innerHTML=opts.map(o=>'<option value="'+o.y+'-'+_rp2(o.m)+'">'+REP_MONTHS[o.m-1]+' '+o.y+'</option>').join('');}
+}
+function printMaintMonthly(){
+  const instrId=$i('mrPrintInstr').value,mv=$i('mrPrintMonth').value;
+  if(!instrId||!mv){notify('Izberi analizator in mesec','warn');return;}
+  const parts=mv.split('-'),year=parseInt(parts[0],10),month=parseInt(parts[1],10);
+  try{const html=buildMaintReportHtml(instrId,year,month);openPrintPreview(html,_reportFilename(instrId,year,month,'vzdrzevanje'));}
+  catch(e){notify('Napaka sestave poročila: '+e.message,'err');}
+}
+function renderMaintReview(){_mrPopulatePrint();const tf=$i('mrFilterType').value,ig=$i('mrFilterInteg').value,df=$i('mrFilterFrom').value,dt=$i('mrFilterTo').value;let logs=[...(S.maintenanceLog||[])];if(tf)logs=logs.filter(m=>m.type===tf);if(ig)logs=logs.filter(m=>m.integration===ig);if(df)logs=logs.filter(m=>m.datetime>=df);if(dt)logs=logs.filter(m=>m.datetime<=dt+'T23:59:59');logs.sort((a,b)=>b.datetime.localeCompare(a.datetime));const tl={daily:'Dnevno',weekly:'Tedensko',monthly:'Mesečno',quarterly:'3-mesečno',triannual:'3-mesečno'};const tbody=$i('maintReviewBody');if(!logs.length){tbody.innerHTML='<tr><td colspan="7" class="empty">Ni podatkov.</td></tr>';return;}tbody.innerHTML=logs.map(m=>{const allDone=m.doneCount===m.totalSteps;const dt2=new Date(m.datetime);return '<tr><td>'+dt2.toLocaleString('sl-SI')+'</td><td>'+(tl[m.type]||m.type)+'</td><td>'+m.integration+'</td><td><span class="badge badge-blue">'+m.instrId+'</span></td><td><span class="badge '+(allDone?'badge-ok':'badge-2sd')+'">'+m.doneCount+'/'+m.totalSteps+'</span></td><td>'+getOpName(m.operatorId)+'</td><td style="font-size:12px" class="muted">'+(m.note||'')+'</td></tr>';}).join('');}
 function exportMaintCSV(){const rows=[['Datum','Čas','Tip','Integracija','Analizator','Korak','Opravljeno','Operater','Opomba']];(S.maintenanceLog||[]).forEach(m=>{const dt=new Date(m.datetime);(m.steps||[]).forEach(s=>{rows.push([dt.toLocaleDateString('sl-SI'),dt.toLocaleTimeString('sl-SI'),m.type,m.integration,m.instrId,s.text,s.done?'DA':'NE',getOpName(m.operatorId),m.note||'']);});});const csv=rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='Vzdrzevanje_'+new Date().toISOString().slice(0,10)+'.csv';a.click();notify('CSV izvožen','success');}
 
 /* ============================================================
@@ -6404,7 +7591,7 @@ function navVec(page){
   if(page==='operators'){renderOperators();const oc=$i('vecOpCount');if(oc)oc.textContent='&middot; Registriranih: '+(S.operators||[]).length;}
   if(page==='gtins')renderGtins();
   if(page==='instruments'){try{renderInstrList();}catch(e){}}
-  if(page==='settings'){try{renderLabInfo();}catch(e){}}
+  if(page==='settings'){try{renderLabInfo();}catch(e){}try{_loadPrinterPref();}catch(e){}try{renderMatrixList();}catch(e){}try{renderPkgSettings();}catch(e){}try{_loadRfidPref();}catch(e){}}
   if(page==='about')renderVecAbout();
   if(page==='audit')renderAuditLog();
 }
@@ -6429,7 +7616,7 @@ function renderVecAbout(){
 }
 /* ===== REVIZIJSKA SLED — prikaz + izvoz ===== */
 const _AU_ACT={create:{l:'Ustvarjeno',c:'badge-ok'},update:{l:'Urejeno',c:'badge-2sd'},delete:{l:'Izbrisano',c:'badge-3sd'},login:{l:'Vpis',c:'badge-blue'},lock:{l:'Zaklep',c:'badge-blue'}};
-const _AU_ENT={entry:'QC vnos',qcreview:'Pregled QC',operator:'Operater',lot:'Lot',qcvalue:'Uradne vrednosti',session:'Seja',instrument:'Analizator',settings:'Nastavitve'};
+const _AU_ENT={entry:'QC vnos',qcreview:'Pregled QC',operator:'Operater',lot:'Lot',qcvalue:'Uradne vrednosti',session:'Seja',instrument:'Analizator',settings:'Nastavitve',openedpkg:'Odprta embalaža',pregledbk:'Pregled BK'};
 function _auditFiltered(){
   const fe=$i('auFilterEntity')?$i('auFilterEntity').value:'';const df=$i('auFilterFrom')?$i('auFilterFrom').value:'';const dt=$i('auFilterTo')?$i('auFilterTo').value:'';
   let logs=[...(S.auditLog||[])];
@@ -6479,7 +7666,14 @@ function refreshSyncUI(){
 function msSignIn(){if(!_hasBridge()){notify('Samo na napravi','warn');return;}try{AndroidBridge.msSignIn();}catch(e){notify('Napaka prijave','err');}}
 function msSignOut(){if(!_hasBridge()){notify('Samo na napravi','warn');return;}try{AndroidBridge.msSignOut();}catch(e){}_hideDeviceCodeBox();}
 function msCancelSignIn(){if(!_hasBridge()){notify('Samo na napravi','warn');return;}try{AndroidBridge.msCancelSignIn&&AndroidBridge.msCancelSignIn();}catch(e){}_hideDeviceCodeBox();notify('Prijava preklicana','ok');}
-function msEnsureFolders(){if(!_hasBridge()||!AndroidBridge.msEnsureFolders){notify('Ni na voljo na tej napravi','warn');return;}notify('Pripravljam mape v OneDrive…','ok');try{AndroidBridge.msEnsureFolders();}catch(e){notify('Napaka priprave map','err');}}
+function msEnsureFolders(){
+  if(!_hasBridge()||!AndroidBridge.msEnsureFolders){notify('Ni na voljo na tej napravi','warn');return;}
+  notify('Pripravljam mape v OneDrive…','ok');
+  /* Poleg osnovne sheme ustvari tudi vse trenutno konfigurirane DD kategorije
+     (Vec → DD Kontrole → Kategorije), da lahko takoj tja dodas Excel datoteke. */
+  const ddFolders=ddCategories().map(function(c){return c.folder;});
+  try{AndroidBridge.msEnsureFolders(ddFolders);}catch(e){notify('Napaka priprave map','err');}
+}
 function onMsFoldersReady(ok,msg){notify(ok?'Mape v OneDrive pripravljene':(msg||'Napaka priprave map'),ok?'ok':'err');}
 function msChangeAccount(){
   if(!_hasBridge()){notify('Samo na napravi','warn');return;}
@@ -6618,7 +7812,7 @@ function onMsDownloadDone(key,json,msg){
   if(json===null||json===undefined||json===''){notify(msg||'Ni podatkov v OneDrive','warn');return;}
   try{
     if(key==='qclab_v2'){const cloud=JSON.parse(json);mergeQclab(cloud);delete S.exportedAt;save();initState();notify('QC podatki združeni','ok');navQc(currentQc);}
-    else if(key==='pregledBK_db'){const cloud=JSON.parse(json);const r=mergePregledDB(cloud);savePregledDB();notify('Zaloga združena: +'+r.received+' sprejem, +'+r.lots+' lotov','ok');renderZaloga();}
+    else if(key==='pregledBK_db'){const cloud=JSON.parse(json);const r=mergePregledDB(cloud);DB_PREGLED.sessions=[];/* BIO Alinity ne uporablja sej — izpusti, da ne napihuje localStorage kvote na tablici */savePregledDB();notify('Zaloga združena: +'+r.received+' sprejem, +'+r.lots+' lotov','ok');renderZaloga();}
     else if(key==='servis_abbott'){_abbottData=JSON.parse(json);_abbottBuildFilters();renderAbbott();notify('Abbott poročila posodobljena','ok');}
     refreshSyncUI();
   }catch(e){notify('Napaka pri branju podatkov','err');}
@@ -6804,9 +7998,14 @@ function _reconcileInvFromLatestSession(db){
 function exportJson(key){const data=key==='qclab_v2'?JSON.stringify(S,null,2):JSON.stringify(DB_PREGLED,null,2);const blob=new Blob([data],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=key+'_'+new Date().toISOString().slice(0,10)+'.json';a.click();notify(key+' izvožen','success');}
 function importJson(input,key){const f=input.files[0];if(!f)return;const r=new FileReader();r.onload=e=>{try{if(key==='qclab_v2'){const obj=JSON.parse(e.target.result);Object.assign(S,obj);delete S.exportedAt;save();initState();notify('qclab_v2 uvožen','success');navQc(currentQc);}else{/* zaloga: skozi isti varni merge kot Quick Share */onSharedImport(f.name,e.target.result);}}catch(err){notify('Napaka pri uvozu JSON','error');}};r.readAsText(f);input.value='';}
 
-/* ============ POINT/VLINE CLICK on LJ ============ */
-document.addEventListener('DOMContentLoaded',()=>{
-  const c=$i('ljCanvas');if(!c)return;
+/* ============ POINT/VLINE CLICK on LJ ============
+   Ponovno uporabna funkcija — pripnemo jo tako na glavni #ljCanvas (enkratno,
+   ob nalaganju strani) kot na vsak dinamicno ustvarjen canvas na "Multi LJ"
+   strani (renderLJMulti ustvari nov <canvas id="ljmc_..."> za vsako izbrano
+   preiskavo/nivo — brez tega pripenjanja klik na te grafe ni deloval). */
+function _attachLjPointClick(canvasId){
+  const c=$i(canvasId);if(!c||c._ljClickBound)return;
+  c._ljClickBound=true;
   c.addEventListener('click',e=>{
     const pts=c._pts||[];if(!pts.length)return;const r=c.getBoundingClientRect();const sx=c.width/r.width,sy=c.height/r.height;const cx=(e.clientX-r.left)*sx,cy=(e.clientY-r.top)*sy;
     const vlines=c._vlines||[];const hitV=vlines.find(v=>Math.abs(v.x-cx)<10);
@@ -6814,7 +8013,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     const hit=pts.find(p=>Math.hypot(p.x-cx,p.y-cy)<14);if(!hit)return;const op=S.operators.find(o=>o.id===hit.operatorId);
     $i('pointModalBody').innerHTML='<div style="display:flex;flex-direction:column;gap:10px"><div><span class="muted" style="font-size:12px">Datum/Čas</span><br>'+hit.dt.toLocaleString('sl-SI')+'</div><div><span class="muted" style="font-size:12px">Inštrument</span><br><strong>'+hit.instrId+'</strong></div><div><span class="muted" style="font-size:12px">Rezultat</span><br>'+sdBadge(hit.sd)+'</div>'+(hit.note?'<div><span class="muted" style="font-size:12px">Zabeležka</span><br><em>'+hit.note+'</em></div>':'')+'<div><span class="muted" style="font-size:12px">Operater</span><br>'+(op?op.first+' '+op.last:hit.operatorId)+'</div></div>';showMo('pointModal');
   });
-});
+}
 window.addEventListener('resize',()=>{if($i('page-lj').classList.contains('active')&&$i('main-qc').classList.contains('active'))renderLJ();});
 document.querySelectorAll('.mo').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');}));
 
@@ -6942,6 +8141,136 @@ function expiryPrintClass(dl){
   if(dl<=28)return 'pe-28';
   return '';
 }
+/* ============ TISKANJE (predogled + sistemsko okno za tiskanje) ============
+   Vsak klic na "natisni" v aplikaciji naj gre skozi openPrintPreview(html,naslov)
+   namesto neposredno na window.print()/AndroidBridge.printPdf — uporabnik
+   najprej vidi predogled, sele "Natisni" v tem oknu sprozi dejansko sistemsko
+   okno za tiskanje (Windows na PC-ju prek AndroidBridge.printHtml, Android na
+   tablici prek PrintManager) — tam izbere svoj Wi-Fi ali Bluetooth tiskalnik,
+   ne glede na povezavo (obe vrsti se v OS-u pojavita kot obicajen tiskalnik). */
+/* Skupna glava/noga z logotipom laboratorija (Nastavitve → Laboratorij) za
+   preproste (ne-uradne OB KIKKB) izpise (naročilnica, zaloga, statistike) —
+   uradna poročila (buildMaintReportHtml/buildQcNonconfHtml) imajo svojo glavo/nogo (_reportDoc/_reportFoot). */
+function _printHead(title){
+  var lab=LAB();var logo=lab.logoDataUri||KCLJ_LOGO;
+  return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:2px solid #003087;padding-bottom:6px;margin-bottom:10px">'
+    +'<img src="'+logo+'" style="height:34px;width:auto" alt="'+_repEsc(lab.org||'')+'">'
+    +'<div style="text-align:right;font-size:11px;color:#333;line-height:1.4"><strong>'+_repEsc(lab.org||'UKC Ljubljana')+'</strong><br>'+_repEsc(lab.legalManufacturer||'')+'</div>'
+    +'</div><h2 style="margin:0 0 8px">'+_repEsc(title||'')+'</h2>';
+}
+function _printFoot(){
+  return '<div style="margin-top:14px;border-top:1px solid #999;padding-top:4px;font-size:9px;color:#555;text-align:center">Natisnjeno: '+new Date().toLocaleString('sl-SI')+'</div>';
+}
+var _printPreviewHtml='';var _printPreviewTitle='';
+function openPrintPreview(html,title){
+  _printPreviewHtml=html;_printPreviewTitle=title||'Poročilo';
+  $i('printPreviewTitle').innerHTML='&#128424;&#65039; Predogled: '+_repEsc(_printPreviewTitle);
+  $i('printPreviewFrame').srcdoc=html;
+  showMo('printPreviewModal');
+}
+function printCurrentPreview(){
+  if(_hasBridge()&&AndroidBridge.printHtml){
+    try{AndroidBridge.printHtml(_printPreviewHtml,_printPreviewTitle);return;}catch(e){notify('Napaka pri tiskanju','err');}
+  }
+  /* Brez naprave/mostu (npr. test v brskalniku) — natisni vsebino iframe-a prek
+     standardnega window.print(), ki v brskalniku/PC-ju brez lastnega mostu vseeno
+     odpre sistemsko okno za tiskanje. */
+  try{
+    var frame=$i('printPreviewFrame');
+    frame.contentWindow.focus();
+    frame.contentWindow.print();
+  }catch(e){notify('Tiskanje ni na voljo','warn');}
+}
+/* Klice iz mostu (PC/Android) po zakljucenem/prekinjenem tiskanju — zapre predogled
+   in (ce znano) zapomni ime nazadnje uporabljenega tiskalnika za prikaz v Nastavitvah. */
+function onPrintDone(printerName){
+  if(!S.settings)S.settings={};
+  if(printerName){S.settings.printerLastName=printerName;save();var el=$i('printerLastName');if(el)el.value=printerName;}
+  closeMo('printPreviewModal');
+}
+function _savePrinterPref(){if(!S.settings)S.settings={};S.settings.printerConnType=$i('printerConnType').value;save();}
+/* ---- RFID funkcije (naprave brez citalca: izklopljeno) ---- */
+function _rfidOn(){return !!(S.settings&&S.settings.rfidEnabled);}
+function toggleRfid(v){
+  if(!S.settings)S.settings={};
+  S.settings.rfidEnabled=!!v;save();
+  var n=$i('rfidNotes');if(n)n.style.display=v?'none':'';
+  try{renderOpenedPkg();}catch(e){}
+  notify(v?'RFID funkcije vklopljene':'RFID funkcije izklopljene','ok');
+}
+function _loadRfidPref(){
+  if(!S.settings)S.settings={};
+  var t=$i('rfidToggle');if(t)t.checked=_rfidOn();
+  var n=$i('rfidNotes');if(n)n.style.display=_rfidOn()?'none':'';
+}
+function _loadPrinterPref(){
+  if(!S.settings)S.settings={};
+  $i('printerConnType').value=S.settings.printerConnType||'wifi';
+  $i('printerLastName').value=S.settings.printerLastName||'';
+}
+/* ---- Matriksi preiskav (Nastavitve) ---- */
+function renderMatrixList(){
+  const el=$i('matrixListBody');if(!el)return;
+  if(!MATRICES().length){el.innerHTML='<tr><td colspan="3" class="empty">Ni matriksov.</td></tr>';return;}
+  el.innerHTML=MATRICES().map((m,i)=>'<tr>'+
+    '<td><input value="'+_repEsc(m.code)+'" style="width:70px;font-weight:700" onchange="editMatrixRow('+i+',\'code\',this.value)"></td>'+
+    '<td><input value="'+_repEsc(m.label)+'" onchange="editMatrixRow('+i+',\'label\',this.value)"></td>'+
+    '<td><button class="btn btn-d btn-sm" onclick="deleteMatrixRow('+i+')">&#128465;&#65039;</button></td>'+
+    '</tr>').join('');
+}
+function editMatrixRow(i,field,val){
+  val=(val||'').trim();
+  if(field==='code'){
+    if(!val){notify('Oznaka ne sme biti prazna','warn');renderMatrixList();return;}
+    if(S.matrices.some((m,j)=>j!==i&&m.code.toLowerCase()===val.toLowerCase())){notify('Oznaka že obstaja','warn');renderMatrixList();return;}
+    const oldCode=S.matrices[i].code;
+    S.assays.forEach(a=>{if(a.matrix===oldCode)a.matrix=val;});
+  }
+  S.matrices[i][field]=val;save();renderMatrixList();renderAssays();
+}
+/* ---- Odprta embalaza: nastavitve po tipu (Nastavitve) ---- */
+function renderPkgSettings(){
+  const el=$i('pkgSettingsBody');if(!el)return;
+  const cfg=PKGSET();
+  const wa=$i('pkgWarnAhead');if(wa)wa.value=cfg.warnDaysAhead;
+  el.innerHTML=Object.keys(PKG_SETTINGS_DEFAULT.types).map(function(t){
+    const c=PKGTYPE(t);
+    return '<tr>'+
+      '<td><span class="badge '+(TYPE_BADGE[t]||'b-gray')+'">'+(TYPE_LABELS[t]||t)+'</span></td>'+
+      '<td style="text-align:center"><input type="checkbox" '+(c.warn?'checked':'')+' style="width:18px;height:18px" onchange="editPkgSetting(\''+t+'\',\'warn\',this.checked)"></td>'+
+      '<td style="text-align:center"><input type="checkbox" '+(c.vials?'checked':'')+' style="width:18px;height:18px" onchange="editPkgSetting(\''+t+'\',\'vials\',this.checked)"></td>'+
+      '<td><input type="number" min="0" max="3650" value="'+(c.defaultDays==null?'':c.defaultDays)+'" '+(c.warn?'':'disabled')+' style="width:80px" onchange="editPkgSetting(\''+t+'\',\'defaultDays\',this.value)"></td>'+
+      '<td><input type="number" min="0" max="200" value="'+(c.defaultVials||0)+'" '+(c.vials?'':'disabled')+' style="width:80px" onchange="editPkgSetting(\''+t+'\',\'defaultVials\',this.value)"></td>'+
+      '</tr>';
+  }).join('');
+}
+function editPkgSetting(type,field,val){
+  const c=PKGSET().types[type];if(!c)return;
+  if(field==='warn'||field==='vials')c[field]=!!val;
+  else if(field==='defaultDays')c.defaultDays=(val===''||val==null)?null:Math.max(0,parseInt(val,10)||0);
+  else if(field==='defaultVials')c.defaultVials=Math.max(0,parseInt(val,10)||0);
+  save();renderPkgSettings();
+}
+function editPkgWarnAhead(v){PKGSET().warnDaysAhead=Math.max(0,parseInt(v,10)||0);save();try{renderAlertUI();}catch(e){}}
+
+function addMatrixRow(){
+  if(!S.matrices)S.matrices=[];
+  let code='NOV',n=1;while(S.matrices.some(m=>m.code===code)){n++;code='NOV'+n;}
+  S.matrices.push({code,label:'Nov matriks'});save();renderMatrixList();
+}
+function deleteMatrixRow(i){
+  const m=S.matrices[i];
+  const inUse=S.assays.filter(a=>a.matrix===m.code).length;
+  if(inUse&&!confirm('Matriks "'+m.code+'" uporablja '+inUse+' preiskav — te bodo prestavljene na privzeti matriks "S". Nadaljujem?'))return;
+  if(!confirm('Izbriši matriks "'+m.code+' – '+m.label+'"?'))return;
+  S.assays.forEach(a=>{if(a.matrix===m.code)a.matrix='S';});
+  S.matrices.splice(i,1);save();renderMatrixList();renderAssays();notify('Matriks izbrisan');
+}
+function testPrint(){
+  var html='<!doctype html><html><head><meta charset="utf-8"><style>body{font-family:sans-serif;padding:40px;color:#000}</style></head>'+
+    '<body><h1>Testni izpis</h1><p>Če to vidiš natisnjeno, je tiskalnik pravilno povezan.</p><p>'+new Date().toLocaleString('sl-SI')+'</p></body></html>';
+  openPrintPreview(html,'Testni izpis');
+}
 function printOrder(){
   const cat=catById(currentOrdCat);if(!cat)return;const d=ORD.orderDrafts[currentOrdCat]||{};
   const mo=$i('ordMonth').value||'';
@@ -6959,9 +8288,14 @@ function printOrder(){
     const expCell=exp?(fmtExp(exp)+(dl<0?' (poteklo)':(dl<=28?' ('+dl+' dni)':''))):'&ndash;';
     return '<tr><td>'+it.ident+'</td><td class="l">'+it.name+(it.catalog?' '+it.catalog:'')+'</td><td>'+(minOf(it)??'')+'</td><td>'+(r.z??'')+'</td><td>'+(r.n??'')+'</td><td'+(ec?' class="'+ec+'"':'')+'>'+expCell+'</td></tr>';
   }).join('');
-  $i('orderPrintArea').innerHTML='<h2>'+cat.label+'</h2>'+meta+'<table><thead>'+head+'</thead><tbody>'+body+'</tbody></table>';
-  if(_hasBridge()&&AndroidBridge.printPdf){try{AndroidBridge.printPdf('Narocilo_'+cat.id+'_'+mo,$i('orderPrintArea').innerHTML);return;}catch(e){}}
-  window.print();
+  var content=_printHead(cat.label)+meta+'<table><thead>'+head+'</thead><tbody>'+body+'</tbody></table>'+_printFoot();
+  var css='body{font-family:sans-serif;padding:16px;color:#000}h2{font-size:15px;margin:0 0 8px}'+
+    'table{border-collapse:collapse;width:100%}th,td{border:1px solid #000;padding:3px 5px;font-size:10px;text-align:center}'+
+    'td.l{text-align:left}td.pe-exp{background:#f5b5b5;color:#7f1d1d;font-weight:700}'+
+    'td.pe-14{background:#fbc28a;color:#7c2d12;font-weight:700}td.pe-28{background:#fce18b;color:#78350f}'+
+    '.pmeta{margin-bottom:8px;font-size:11px}.pmeta div{margin-bottom:2px}';
+  var html='<!doctype html><html><head><meta charset="utf-8"><style>'+css+'</style></head><body>'+content+'</body></html>';
+  openPrintPreview(html,'Narocilo_'+cat.id+'_'+mo);
 }
 
 /* ============ MIN. ZALOGA ============ */
@@ -7012,6 +8346,15 @@ function renderStatRecv(){
 }
 function fillStatTable(headId,bodyId,cols,rows){$i(headId).innerHTML='<tr>'+cols.map(c=>'<th>'+c+'</th>').join('')+'</tr>';$i(bodyId).innerHTML=rows.length?rows.map(([k,v])=>'<tr><td>'+k+'</td><td style="text-align:right;font-family:var(--mono)">'+v+'</td></tr>').join(''):'<tr><td colspan="2" class="empty">Ni podatkov o sprejemu v obdobju.</td></tr>';}
 function exportStatRecvCSV(){const rows=[['kljuc','kosov']];document.querySelectorAll('#srBody tr').forEach(tr=>{const c=tr.querySelectorAll('td');if(c.length===2)rows.push([c[0].textContent,c[1].textContent]);});dlCsv(rows,'statistika_sprejema.csv');}
+function printStatRecv(){
+  const head=$i('srHead').innerHTML,body=$i('srBody').innerHTML;
+  var css='body{font-family:sans-serif;padding:16px;color:#000}h2{font-size:15px;margin:0 0 8px}'+
+    'table{border-collapse:collapse;width:100%}th,td{border:1px solid #000;padding:3px 6px;font-size:11px}'+
+    'th{background:#eee;text-align:left}td{text-align:right}td:first-child{text-align:left}';
+  var html='<!doctype html><html><head><meta charset="utf-8"><style>'+css+'</style></head><body>'+
+    _printHead('Statistika sprejema')+'<table><thead>'+head+'</thead><tbody>'+body+'</tbody></table>'+_printFoot()+'</body></html>';
+  openPrintPreview(html,'Statistika_sprejema');
+}
 
 /* ============ STATISTIKA PORABE ============ */
 function initStatUse(){
@@ -7043,6 +8386,17 @@ function renderStatUse(){
   $i('suResult')._rows=rows;$i('suResult')._range=[lo.date,hi.date];
 }
 function exportStatUseCSV(){const rows=$i('suResult')._rows;if(!rows){notify('Ni podatkov','warn');return;}const out=[['ident','artikel','tip','popis_zac','sprejeto','popis_kon','poraba']];rows.forEach(r=>out.push([r.id,r.name,r.type,r.a,r.rec,r.b,r.used]));dlCsv(out,'statistika_porabe.csv');}
+function printStatUse(){
+  const rows=$i('suResult')._rows;if(!rows){notify('Ni podatkov','warn');return;}
+  const range=$i('suResult')._range||['',''];
+  const body=rows.map(r=>'<tr><td>'+r.name+'</td><td>'+(TYPE_LABELS[r.type]||r.type)+'</td><td style="text-align:center">'+r.a+'</td><td style="text-align:center">'+r.rec+'</td><td style="text-align:center">'+r.b+'</td><td style="text-align:center;font-weight:700">'+r.used+'</td></tr>').join('');
+  var css='body{font-family:sans-serif;padding:16px;color:#000}h2{font-size:15px;margin:0 0 8px}'+
+    'table{border-collapse:collapse;width:100%}th,td{border:1px solid #000;padding:3px 6px;font-size:11px}th{background:#eee}';
+  var html='<!doctype html><html><head><meta charset="utf-8"><style>'+css+'</style></head><body>'+
+    _printHead('Statistika porabe ('+range[0]+' → '+range[1]+')')+
+    '<table><thead><tr><th>Artikel</th><th>Tip</th><th>Popis '+range[0]+'</th><th>Sprejeto</th><th>Popis '+range[1]+'</th><th>Poraba</th></tr></thead><tbody>'+body+'</tbody></table>'+_printFoot()+'</body></html>';
+  openPrintPreview(html,'Statistika_porabe_'+range[0]+'_'+range[1]);
+}
 
 /* ---- helpers: CSV + bar chart ---- */
 function dlCsv(rows,fname){const csv=rows.map(r=>r.map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(',')).join('\r\n');const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fname;a.click();notify('CSV izvožen','success');}
@@ -7063,8 +8417,127 @@ function drawBars(canvasId,data,title){
 var _abbottData=null;
 function abbottRefresh(){
   if(typeof AndroidBridge==='undefined'||!AndroidBridge.msIsSignedIn||!AndroidBridge.msIsSignedIn()){notify('Ni prijave v OneDrive','warning');return;}
+  /* Ce je na voljo msExtractPdfText (PC), poisci nove/manjkajoce PDF-je v OneDrive
+     mapi "Abbott_Servis" in jih razčleni (Del 3); sicer (tablica/Zebra, brez PC
+     PDF-mostu) samo prenesi ze-sestavljen servis_abbott.json, ce obstaja. */
+  if(AndroidBridge.msExtractPdfText&&AndroidBridge.msListFolder){updateSrvAbbott();return;}
   if(!AndroidBridge.msDownload){notify('msDownload ni na voljo','warning');return;}
   try{AndroidBridge.msDownload('servis_abbott');}catch(e){notify('Napaka: '+e,'error');}
+}
+/* Prenese seznam OneDrive mape "Abbott_Servis" (uporabnik sem kopira/sinhronizira
+   servisne PDF zapisnike, enak vzorec kot Salus_Dobavnice) in razčleni tiste, ki
+   se niso ze v _abbottData.records (po imenu datoteke — enkrat razčlenjen
+   zapisnik se ne spreminja, zato ni potrebe po lastModifiedDateTime primerjavi
+   kot pri DD_CSV). */
+function updateSrvAbbott(){
+  if(!(AndroidBridge.msIsSignedIn&&AndroidBridge.msIsSignedIn())){notify('Ni prijave v OneDrive','warning');return;}
+  if(!AndroidBridge.msListFolder){notify('msListFolder ni na voljo','warning');return;}
+  _msListCtx='srvabbott';
+  try{AndroidBridge.msListFolder('Abbott_Servis');}catch(e){notify('Napaka: '+e,'error');}
+}
+var _srvAbbottQueue=[];var _srvAbbottQueueTotal=0;var _srvAbbottAwaitingPdf=false;
+function _srvAbbottOnFolderListed(json,msg){
+  if(!json){notify('Napaka OneDrive (mapa Abbott_Servis ni najdena?): '+(msg||''),'error');return;}
+  var data;try{data=JSON.parse(json);}catch(e){return;}
+  var files=(data.value||[]).filter(function(f){return f&&!f.folder&&/\.pdf$/i.test(f.name||'');});
+  if(!_abbottData)_abbottData={records:[]};
+  var known={};(_abbottData.records||[]).forEach(function(r){known[r.file]=true;});
+  _srvAbbottQueue=files.filter(function(f){return !known[f.name];}).map(function(f){return f.name;});
+  if(!_srvAbbottQueue.length){
+    if(!files.length)notify('Mapa Abbott_Servis v OneDrive je prazna','warn');
+    else notify('Najdenih '+files.length+' zapisnikov — vsi že uvoženi','ok');
+    return;
+  }
+  _srvAbbottQueueTotal=_srvAbbottQueue.length;
+  notify('Nalagam '+_srvAbbottQueueTotal+' servisnih zapisnikov…','ok');
+  _srvAbbottDownloadNext();
+}
+function _srvAbbottDownloadNext(){
+  if(!_srvAbbottQueue.length){
+    save();
+    _abbottBuildFilters();
+    var pg=$i('main-servis');if(pg&&pg.classList.contains('active')&&currentSrv==='abbott')renderAbbott();
+    try{if(AndroidBridge.msUpload)AndroidBridge.msUpload('servis_abbott',JSON.stringify(_abbottData));}catch(e){}
+    notify('Servisni zapisniki posodobljeni ('+_srvAbbottQueueTotal+'/'+_srvAbbottQueueTotal+')','success');
+    return;
+  }
+  var name=_srvAbbottQueue.shift();
+  if(!AndroidBridge.msExtractPdfText){_srvAbbottDownloadNext();return;}
+  _srvAbbottAwaitingPdf=true;
+  try{AndroidBridge.msExtractPdfText('Abbott_Servis/'+name);}catch(e){_srvAbbottAwaitingPdf=false;_srvAbbottDownloadNext();}
+}
+/* Zapis v _abbottData.records (za obstoječo "Servisni zapisniki" stran, renderAbbott)
+   IN — če se nalogNum ujema z obstoječim S.serviceLog[] vnosom — posodobitev
+   billedHours/device na tem vnosu (PDF ima prednost pred ročno vpisano vrednostjo,
+   glej odločitev iz načrtovanja: PDF prepiše ročno "Zaračunane ure"). */
+function _srvAbbottOnPdfExtracted(relPath,text,msg){
+  var name=(relPath||'').split('/').pop();
+  if(!text){_srvAbbottDownloadNext();return;}
+  try{
+    var r=parseSrvReportText(text);
+    var yearM=name.match(/(20\d{2})/);
+    if(!_abbottData)_abbottData={records:[]};
+    _abbottData.records.push({
+      id:r.nalogNum||name,year:yearM?parseInt(yearM[1],10):null,
+      instrument:r.module||'',desc:r.fault||r.note||'',file:name,text:text
+    });
+    if(r.nalogNum){
+      var normNalog=r.nalogNum.replace(/\s+/g,'');
+      var e=(S.serviceLog||[]).find(function(x){return (x.nalogNum||'').replace(/\s+/g,'')===normNalog;});
+      if(e){
+        if(r.billedHours!=null)e.billedHours=r.billedHours;
+        if(r.module&&!e.device)e.device=r.module;
+      }
+    }
+    /* NAMENOMA brez samodejnega ucenja SN/inventarne v S.instruments — glej
+       obrazlozitev pri srvImportPdf (ime naprave iz PDF ni vedno zanesljivo,
+       SN/inventarno uporabnik vpise/potrdi rocno v Analizatorje). */
+  }catch(e){}
+  _srvAbbottDownloadNext();
+}
+/* ---- Izbirnik PDF servisnega zapisnika iz OneDrive (Abbott_Servis) pri Vpisu napake ----
+   Enak vzorec brskanja po mapah kot DD Kontrole izbirnik (openDdFilePick/_ddPickList),
+   a poenostavljen na en sam klik: klik na PDF datoteko jo takoj prenese
+   (msDownloadBinary) in uvozi prek srvImportPdf (isti generični parser kot pri
+   lokalnem uvozu iz naprave). */
+var _srvPickPath='Abbott_Servis';var _srvPickItems=[];var _srvPickAwaitingBinary=false;
+function openSrvPdfPick(){
+  if(!(_hasBridge()&&AndroidBridge.msIsSignedIn&&AndroidBridge.msIsSignedIn())){notify('Ni prijave v OneDrive','warning');return;}
+  _srvPickPath='Abbott_Servis';
+  showMo('srvPickModal');_srvPickList();
+}
+function _srvPickList(){
+  if(!(_hasBridge()&&AndroidBridge.msListFolder)){$i('srvPickBody').innerHTML='<div class="empty">Brskanje deluje le na napravi/PC z OneDrive prijavo.</div>';return;}
+  $i('srvPickPathLbl').textContent='DigiLab/'+_srvPickPath;
+  $i('srvPickBody').innerHTML='<div class="empty">Nalagam…</div>';
+  _msListCtx='srvpick';
+  try{AndroidBridge.msListFolder(_srvPickPath);}catch(e){$i('srvPickBody').innerHTML='<div class="empty">Napaka: '+e.message+'</div>';}
+}
+function _srvPickOnListed(json,msg){
+  if(!json){$i('srvPickBody').innerHTML='<div class="empty">'+(msg||'Mape ni mogoče prebrati')+'</div>';return;}
+  var obj;try{obj=JSON.parse(json);}catch(e){$i('srvPickBody').innerHTML='<div class="empty">Neveljaven odgovor</div>';return;}
+  _srvPickItems=obj.value||[];_srvRenderPick();
+}
+function _srvRenderPick(){
+  var folders=_srvPickItems.filter(function(f){return f&&f.folder;});
+  var files=_srvPickItems.filter(function(f){return f&&!f.folder&&/\.pdf$/i.test(f.name||'');});
+  var h='',parts=_srvPickPath.split('/').filter(Boolean);
+  if(parts.length>1){h+='<div class="assay-pick-item" onclick="_srvPickUp()">&#8593; .. (nazaj)</div>';}
+  folders.forEach(function(f){h+='<div class="assay-pick-item" onclick="_srvPickInto(\''+_ge(f.name).replace(/'/g,"\\'")+'\')">&#128193; '+_repEsc(f.name)+'</div>';});
+  files.forEach(function(f){
+    var nEsc=_ge(f.name).replace(/'/g,"\\'");
+    h+='<div class="assay-pick-item" style="cursor:pointer" onclick="_srvPickChoose(\''+nEsc+'\')">&#128196; '+_repEsc(f.name)+'</div>';
+  });
+  if(!folders.length&&!files.length)h+='<div class="empty">Ni podmap ali PDF datotek.</div>';
+  $i('srvPickBody').innerHTML=h;
+}
+function _srvPickInto(name){_srvPickPath=(_srvPickPath?_srvPickPath+'/':'')+name;_srvPickList();}
+function _srvPickUp(){var parts=_srvPickPath.split('/').filter(Boolean);parts.pop();_srvPickPath=parts.join('/');_srvPickList();}
+function _srvPickChoose(name){
+  if(!AndroidBridge.msDownloadBinary){notify('msDownloadBinary ni na voljo','warning');return;}
+  _srvPickAwaitingBinary=true;
+  $i('srvPickBody').innerHTML='<div class="empty">Nalagam '+_repEsc(name)+'…</div>';
+  try{AndroidBridge.msDownloadBinary(_srvPickPath+'/'+name);}catch(e){_srvPickAwaitingBinary=false;notify('Napaka: '+e.message,'error');}
 }
 function _abbottBuildFilters(){
   var sel=$i('abbottFilterYear');if(!sel)return;
@@ -7141,6 +8614,19 @@ function abbottShowDetail(file){
 /* ============ BOOT ============ */
 // ===== DOBAVNICE SALUS =====
 var _salusQueue=[];
+/* Nekateri pdf-parse izvlecki Salus PDF dobavnic zlepijo stolpce tabele brez
+   presledkov (opazeno na realnih dobavnicah, npr. "1.A04W1901KALIB WW UCH-L1
+   ALNTY I 4W1901 ABBO1KOS0,00..." in "01*4916420038074019487184257FZ0013.09.2026").
+   Regexi zato NE zahtevajo vec obveznih presledkov (\s* namesto \s+) — delujejo
+   tako na starem (s presledki) kot na novem (zlepljenem) formatu. GTIN se poisce
+   znotraj zlepljenega stevilskega niza prek znanih GS1 predpon iz DB_PREGLED.gtins,
+   ker natancna dolzina "suma" pred GTIN v zlepljenem besedilu ni znana vnaprej.
+   AI-koda pred GTIN ni vedno "01*" — na realnih dobavnicah se pojavljajo tudi
+   "02*", "03*" in celo brez zvezdice ("01 "), zato je koda 0[1-3] + locilo (*|presledek).
+   En sam artikel (glava "N.") je lahko razdeljen na VEC vrstic (razlicni loti/
+   serije iste dobave) — kolicina na koncu vsake podatkovne vrstice (za datumom)
+   je kolicina TE za TA lot, ne celotna kolicina glave; glava se zato NE resetira
+   po prvi ujemajoci podatkovni vrstici, ampak ostane veljavna do naslednje glave. */
 function parseSalusText(pages){
   var text=(Array.isArray(pages)?pages:[pages]).join('\n');
   var lines=text.split('\n');
@@ -7148,22 +8634,51 @@ function parseSalusText(pages){
   var ph=null;
   for(var i=0;i<lines.length;i++){
     var line=lines[i].trim();
-    var hm=line.match(/^(\d+)\.\s+([A-Z][A-Z0-9]+)(?:\s+\d{5,7})?\s+(.+?)\s+ABBO\s+(\d+)\s+KOS/);
-    if(hm){ph={name:hm[3].trim(),qty:parseInt(hm[4],10),salusCode:hm[2]};continue;}
-    var dm=line.match(/^01\*\s+\d+\s+(\d{14})\s+(\S+)\s+(\d{2})\.(\d{2})\.(\d{4})/);
+    var hm=line.match(/^(\d+)\.\s*(.+?)\s*ABBO\s*(\d+)\s*KOS/);
+    if(hm){ph={name:hm[2].trim(),qty:parseInt(hm[3],10)};continue;}
+    var dm=line.match(/^0[1-3][\*\s](\d+)(.*?)(\d{2})\.(\d{2})\.(\d{4})(\d*)$/);
     if(dm&&ph){
-      var gtin=dm[1],lot=dm[2];
+      var found=_salusFindGtin(dm[1]);
+      var gtin=found.gtin;
+      var lot=((found.leftover||'')+dm[2]).trim();
       var expiry=dm[3]+dm[4]+dm[5].slice(2);
+      var lineQty=dm[6]?parseInt(dm[6],10):ph.qty;
       var key=gtin+'|'+lot;
-      if(items[key]){items[key].qty+=ph.qty;}
-      else{items[key]={gtin:gtin,lot:lot,expiry:expiry,name:ph.name,qty:ph.qty,
-        salusCode:ph.salusCode,catalog:'',matched:false,
+      if(items[key]){items[key].qty+=lineQty;}
+      else{items[key]={gtin:gtin,lot:lot,expiry:expiry,name:ph.name,qty:lineQty,
+        catalog:'',matched:false,
         matchedType:_salusGuessType(ph.name)};}
-      ph=null;
     }
   }
   var out=[];Object.keys(items).forEach(function(k){out.push(items[k]);});
   return out;
+}
+/* Poisce pravi 14-mestni GTIN znotraj (morda daljsega) stevilskega niza, ki lahko
+   vsebuje "sum" pred GTIN (glej opombo zgoraj) in zacetne stevilke lota za GTIN-om.
+   Ce noben znan prefiks ni najden (povsem nov artikel, se ne v DB), privzame
+   prvih 14 stevilk — postavka se v tem primeru le ne uveljavi kot "matched",
+   kar je varno (uporabnik dobi opozorilo namesto napacnega ujemanja). */
+function _salusFindGtin(digits){
+  if(digits.length<=14)return {gtin:digits,leftover:''};
+  var known=_salusKnownGtinPrefixes();
+  for(var i=0;i+14<=digits.length;i++){
+    var seg=digits.substr(i,14);
+    if(known.indexOf(seg.slice(0,7))>=0)return {gtin:seg,leftover:digits.slice(i+14)};
+  }
+  return {gtin:digits.slice(0,14),leftover:digits.slice(14)};
+}
+/* Za zaznavo GTIN-a (locevanje od "suma" pred njim v zlepljenem besedilu, glej
+   zgoraj) uporabi tako trenutno sinhronizirano bazo (DB_PREGLED.gtins) KOT
+   staticni vgrajeni katalog (BUILTIN_GTINS) — slednji obstaja vedno, tudi ce
+   naprava se ni nikoli sinhronizirala/imela vnesenih GTIN kod, medtem ko
+   dejansko UJEMANJE artikla (enrichDeliveryItems) ostane vezano samo na
+   DB_PREGLED.gtins (prava, uporabnikova sinhronizirana zaloga). */
+function _salusKnownGtinPrefixes(){
+  loadPregledDB();
+  var set={};
+  (DB_PREGLED.gtins||[]).forEach(function(g){if(g.gtin&&g.gtin.length>=7)set[g.gtin.slice(0,7)]=true;});
+  (typeof BUILTIN_GTINS!=='undefined'?BUILTIN_GTINS:[]).forEach(function(g){if(g.gtin&&g.gtin.length>=7)set[g.gtin.slice(0,7)]=true;});
+  return Object.keys(set);
 }
 /* Salus dobavnice shranijo rok kot DDMMYY; kanonični format (skenirano, daysLeft, fmtExp) je YYMMDD. */
 function _delivExpIso(exp){return (exp&&exp.length===6)?exp.slice(4,6)+exp.slice(2,4)+exp.slice(0,2):(exp||'');}
@@ -7214,13 +8729,18 @@ function onMsFolderListed(json,msg){
   if(_msListCtx==='docpick'){_msListCtx='salus';onDocPickListed(json,msg);return;}
   if(_msListCtx==='ddmeta'){_msListCtx='salus';_ddOnMetaListed(json);return;}
   if(_msListCtx==='ddpick'){_msListCtx='salus';_ddOnPickListed(json,msg);return;}
+  if(_msListCtx==='srvabbott'){_msListCtx='salus';_srvAbbottOnFolderListed(json,msg);return;}
+  if(_msListCtx==='srvpick'){_msListCtx='salus';_srvPickOnListed(json,msg);return;}
   if(!json){notify('Napaka OneDrive (mapa ni najdena?): '+(msg||''),'error');return;}
   var data;try{data=JSON.parse(json);}catch(e){return;}
   var files=data.value||[];
   var salusFiles=files.filter(function(f){return (f.name||'').indexOf('.salus.json')>=0;});
   var pdfFiles=files.filter(function(f){return /\.pdf$/i.test(f.name||'');});
   var sidecarBase={};salusFiles.forEach(function(f){sidecarBase[(f.name||'').replace('.salus.json','')]=true;});
-  var known={};(S.deliveries||[]).forEach(function(d){known[d.file]=true;});
+  /* Dobavnice z 0 artikli (uvozene s starejso, pokvarjeno razlicico parseSalusText —
+     glej popravek "0/0" bug) se NAMENOMA ne stejejo za "znane", da jih naslednji
+     "Preveri"/"Uskladi" samodejno ponovno razclene s trenutnim parserjem. */
+  var known={};(S.deliveries||[]).forEach(function(d){if((d.items||[]).length)known[d.file]=true;});
   _salusQueue=[];
   salusFiles.forEach(function(f){
     var n=f.name||'';
@@ -7267,13 +8787,23 @@ function _salusAddDelivery(file,pages,fetchedAt){
   var items=parseSalusText(pages);
   enrichDeliveryItems(items);
   if(!S.deliveries)S.deliveries=[];
-  S.deliveries.push({id:Date.now().toString(),file:file,supplier:'Salus',
-    fetchedAt:fetchedAt||new Date().toISOString(),status:'pending',items:items});
+  /* Ce dobavnica za to datoteko ze obstaja (npr. prejsnji uvoz z 0 artikli
+     zaradi starejsega, pokvarjenega parserja), jo NADOMESTI namesto podvoji —
+     ohrani id/status/fetchedAt originala, posodobi le items. */
+  var existing=S.deliveries.find(function(d){return d.file===file;});
+  if(existing){
+    existing.items=items;
+    if(!existing.status)existing.status='pending';
+  }else{
+    S.deliveries.push({id:Date.now().toString(),file:file,supplier:'Salus',
+      fetchedAt:fetchedAt||new Date().toISOString(),status:'pending',items:items});
+  }
 }
 /* PDF brez sidecar JSON: besedilo izlusceno v oblaku (Graph -> pdf-parse), brez lokalne datoteke.
    Rezultat shranimo v dobavnice IN nalozimo generiran sidecar nazaj v OneDrive, da se naslednjic
    ze najde kot .salus.json (hitreje, brez ponovne ekstrakcije). */
 function onMsPdfTextExtracted(relPath,text,msg){
+  if(_srvAbbottAwaitingPdf){_srvAbbottAwaitingPdf=false;_srvAbbottOnPdfExtracted(relPath,text,msg);return;}
   if(!text){_salusDownloadNext();return;}
   var name=(relPath||'').split('/').pop();
   var fetchedAt=new Date().toISOString();
@@ -7431,7 +8961,7 @@ function delivReceiveAll(id){
   (d.items||[]).forEach(function(it){it.received=it.qty||1;});
   save();renderDeliveries();
 }
-function confirmDelivery(id){
+function confirmDelivery(id,silent){
   var d=(S.deliveries||[]).filter(function(x){return x.id===id;})[0];
   if(!d)return;
   loadPregledDB();
@@ -7464,10 +8994,33 @@ function confirmDelivery(id){
   d.status=_delivStatus(d);
   savePregledDB();
   save();
+  if(silent)return {added:added,newLotsReg:newLotsReg};
   renderDeliveries();
   var msg='Sprejem '+added+' kosov potrjen';
   if(newLotsReg)msg+=' · '+newLotsReg+' nov(ih) lot(ov) → Loti za ovrednotenje';
   notify(msg,'ok');
+  try{if(typeof AndroidBridge!=='undefined'&&AndroidBridge.msIsSignedIn&&AndroidBridge.msIsSignedIn())msUpload('pregledBK_db',JSON.stringify(DB_PREGLED));}catch(e){}
+  return {added:added,newLotsReg:newLotsReg};
+}
+/* Sprejme (received=qty) IN potrdi (zapis v zalogo/loti) VSE aktivne (pending/delno)
+   dobavnice naenkrat — enaka logika kot posamicni "Sprejmi vse" + "Potrdi sprejem",
+   le zdruzena v en klik in eno koncno obvestilo/nalaganje namesto po ena na dobavnico. */
+function confirmAllDeliveries(){
+  var active=(S.deliveries||[]).filter(function(d){return d.status==='pending'||d.status==='delno';});
+  if(!active.length){notify('Ni dobavnic za sprejem','ok');return;}
+  if(!confirm('Sprejeti in potrditi VSE ('+active.length+') čakajoče dobavnice? To vpiše vse kose v zalogo.'))return;
+  var totAdded=0,totNewLots=0,totDeliv=0;
+  active.forEach(function(d){
+    (d.items||[]).forEach(function(it){it.received=it.qty||1;});
+    var r=confirmDelivery(d.id,true);
+    if(r){totAdded+=r.added;totNewLots+=r.newLotsReg;}
+    totDeliv++;
+  });
+  save();
+  renderDeliveries();
+  var msg='Sprejetih in potrjenih '+totDeliv+' dobavnic ('+totAdded+' kosov)';
+  if(totNewLots)msg+=' · '+totNewLots+' nov(ih) lot(ov) → Loti za ovrednotenje';
+  notify(msg,'success');
   try{if(typeof AndroidBridge!=='undefined'&&AndroidBridge.msIsSignedIn&&AndroidBridge.msIsSignedIn())msUpload('pregledBK_db',JSON.stringify(DB_PREGLED));}catch(e){}
 }
 function skipDelivery(id){

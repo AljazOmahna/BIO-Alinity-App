@@ -60,8 +60,8 @@ const Bridge = {
   },
   // Rocno preveri/ustvari mapno strukturo v OneDrive (BIO/, PBK/ ...) — koristno, ce je
   // uporabnik ze prijavljen izpred te funkcionalnosti (samodejno se sprozi le ob novi prijavi).
-  msEnsureFolders() {
-    ipcRenderer.invoke('bridge:graph:ensureFolders').then(r => call('onMsFoldersReady', r.ok, r.msg))
+  msEnsureFolders(extraFolders) {
+    ipcRenderer.invoke('bridge:graph:ensureFolders', extraFolders).then(r => call('onMsFoldersReady', r.ok, r.msg))
       .catch(e => call('onMsFoldersReady', false, e.message));
   },
 
@@ -113,6 +113,13 @@ const Bridge = {
     ipcRenderer.invoke('bridge:openPath', p).then(r => {
       if (!r.ok) call('onReportPickError', 'Ni mogoce odpreti: ' + (r.msg || ''));
     });
+  },
+
+  // ---------- Tiskanje (predogled -> sistemsko okno Windows, Wi-Fi/Bluetooth tiskalnik) ----------
+  printHtml(html /*, title */) {
+    ipcRenderer.invoke('bridge:printHtml', html)
+      .then(r => call('onPrintDone', null))
+      .catch(e => { call('onPrintDone', null); });
   },
 
   // ---------- QC vrednosti: poisci XML lota (se vedno lokalna DigiLab mapa, ce nastavljena) ----------

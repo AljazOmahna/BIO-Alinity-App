@@ -19,6 +19,9 @@ import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.print.PrintAttributes;
+import android.print.PrintDocumentAdapter;
+import android.print.PrintManager;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.FileProvider;
 import androidx.annotation.NonNull;
@@ -493,6 +496,88 @@ public class MainActivity extends AppCompatActivity {
             mainHandler.post(() -> msAcquireToken(k, (token, err) -> {
                 if (token == null) { callJs("onMsDownloadDone(" + jsStr(k) + ",null," + jsStr(err) + ")"); return; }
                 graphGet(k, token);
+            }));
+        }
+
+        // Natisni HTML poročilo — odpre Androidov sistemski PrintManager dialog,
+        // kjer uporabnik izbere svoj tiskalnik (Wi-Fi/Mopria ali Bluetooth prek
+        // ustreznega Print Service dodatka, ce je nameshcen) — enaka logika kot
+        // Windows sistemsko okno na PC strani (glej pc/main.js bridge:printHtml).
+        // Klice se samo iz predogleda (printPreviewModal "Natisni"), nikoli neposredno.
+        @JavascriptInterface
+        public void printHtml(String html, String title) {
+            final String h = html;
+            final String jobName = (title == null || title.trim().isEmpty()) ? "BIO_Alinity_porocilo" : title.trim();
+            mainHandler.post(() -> {
+                WebView printWebView = new WebView(MainActivity.this);
+                printWebView.setWebViewClient(new WebViewClient() {
+                    @Override
+                    public void onPageFinished(WebView view, String url) {
+                        PrintManager printManager = (PrintManager) getSystemService(android.content.Context.PRINT_SERVICE);
+                        PrintDocumentAdapter adapter = view.createPrintDocumentAdapter(jobName);
+                        if (printManager != null) {
+                            printManager.print(jobName, adapter, new PrintAttributes.Builder().build());
+                        }
+                        callJs("onPrintDone(null)");
+                    }
+                });
+                printWebView.loadDataWithBaseURL(null, h, "text/html", "UTF-8", null);
+            });
+        }
+
+        // ---- Pregled BK (pdfMake) — shrani gotov PDF v Prenose ----
+        // Prenos iz Zebra aplikacije Pregled BK, da se "Natisni BK" na tablici
+        // obnasha enako: PDF se shrani v javno mapo Download in se naznani
+        // MediaScannerju, da je takoj viden v Datotekah/Prenosih.
+        @JavascriptInterface
+        public void savePdfToDownloads(String filename, String base64) {
+            final String fn = filename, b64 = base64;
+            mainHandler.post(() -> {
+                try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+                        && Build.VERSION.SDK_INT <= 28
+                        && checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                           != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                        requestPermissions(new String[]{android.Manifest.permission.WRITE_EXTERNAL_STORAGE}, 1001);
+                        callJs("if(typeof onSaveToDownloadsDone==='function')onSaveToDownloadsDone(null,'perm')");
+                        return;
+                    }
+                    String name = (fn == null || fn.isEmpty()) ? "export.pdf" : fn;
+                    byte[] bytes = android.util.Base64.decode(b64 == null ? "" : b64, android.util.Base64.DEFAULT);
+                    File dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+                    if (!dir.exists()) dir.mkdirs();
+                    File f = new File(dir, name);
+                    try (FileOutputStream fos = new FileOutputStream(f)) {
+                        fos.write(bytes);
+                    }
+                    sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, Uri.fromFile(f)));
+                    callJs("if(typeof onSaveToDownloadsDone==='function')onSaveToDownloadsDone(" + jsStr(name) + ")");
+                    android.widget.Toast.makeText(MainActivity.this, "Shranjeno: " + name,
+                        android.widget.Toast.LENGTH_SHORT).show();
+                } catch (Throwable t) {
+                    android.util.Log.e("PregledBK", "savePdfToDownloads", t);
+                    callJs("if(typeof onSaveToDownloadsDone==='function')onSaveToDownloadsDone(null,'err')");
+                }
+            });
+        }
+
+        // ---- Pregled BK — arhiviraj gotov PDF v OneDrive (DigiLab/Porocila/PregledBK) ----
+        @JavascriptInterface
+        public void msPdfUpload(String filename, String base64) {
+            final String name = (filename == null || filename.isEmpty()) ? "PregledBK.pdf" : filename;
+            final byte[] bytes;
+            try {
+                bytes = android.util.Base64.decode(base64 == null ? "" : base64, android.util.Base64.DEFAULT);
+            } catch (Throwable t) {
+                callJs("if(typeof onMsPdfUploadDone==='function')onMsPdfUploadDone(false," + jsStr("Neveljaven PDF") + ")");
+                return;
+            }
+            mainHandler.post(() -> msAcquireToken("pdf", (token, err) -> {
+                if (token == null) {
+                    callJs("if(typeof onMsPdfUploadDone==='function')onMsPdfUploadDone(false," + jsStr(String.valueOf(err)) + ")");
+                    return;
+                }
+                graphPutBytes("Porocila/PregledBK/" + name, bytes, "application/pdf", token, name, null);
             }));
         }
 

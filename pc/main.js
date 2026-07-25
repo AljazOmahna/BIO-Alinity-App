@@ -186,7 +186,7 @@ ipcMain.handle('bridge:graph:uploadBytesBase64', async (e, relPath, base64, mime
   if (!graph) return { ok: false, msg: 'Ni prijave' };
   return graph.uploadBytes(relPath, Buffer.from(base64 || '', 'base64'), mimeType);
 });
-ipcMain.handle('bridge:graph:ensureFolders', async () => graph ? graph.ensureFolderStructure() : { ok: false, msg: 'Ni prijave' });
+ipcMain.handle('bridge:graph:ensureFolders', async (e, extraFolders) => graph ? graph.ensureFolderStructure(extraFolders) : { ok: false, msg: 'Ni prijave' });
 ipcMain.handle('bridge:graph:extractPdfText', async (e, relPath) => graph ? graph.extractPdfText(relPath) : { ok: false, text: null, msg: 'Ni prijave' });
 
 ipcMain.on('bridge:accountEmail', (e, digiLabPath) => {
@@ -232,6 +232,26 @@ ipcMain.handle('bridge:report', async (e, { subfolder, filename, html }) => {
     return { ok: true, msg: 'PDF shranjen: ' + filename, localPath };
   } catch (err) {
     return { ok: false, msg: 'Napaka PDF: ' + err.message, localPath: '' };
+  } finally {
+    if (win) win.destroy();
+  }
+});
+
+// Natisni HTML poročilo — odpre sistemsko okno za tiskanje Windows (tam uporabnik
+// izbere svoj tiskalnik, ne glede na to ali je povezan prek Wi-Fi ali Bluetooth —
+// oboje se v Windows pojavi kot obicajen nameshcen tiskalnik). Klice se sele iz
+// predogleda ("Natisni" v printPreviewModal), nikoli neposredno.
+ipcMain.handle('bridge:printHtml', async (e, html) => {
+  let win;
+  try {
+    win = new BrowserWindow({ show: false, webPreferences: { sandbox: false } });
+    await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+    await new Promise((resolve) => {
+      win.webContents.print({ silent: false, printBackground: true }, () => resolve());
+    });
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, msg: 'Napaka tiskanja: ' + err.message };
   } finally {
     if (win) win.destroy();
   }
